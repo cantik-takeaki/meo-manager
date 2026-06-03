@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEO Manager | cantik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0f;
+  --bg-2: #111118;
+  --bg-3: #1a1a24;
+  --border: rgba(255,255,255,0.08);
+  --border-active: rgba(255,255,255,0.2);
+  --text: #f0f0f5;
+  --text-sub: #8888aa;
+  --text-muted: #555570;
+  --accent: #4f7df3;
+  --accent-2: #34d399;
+  --red: #ef4444;
+  --gold: #f59e0b;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ─── Login Screen ─── */
+.login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 50%, #1a1a3e 0%, #0a0a0f 70%);
+}
+.login-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 40px;
+  width: 380px;
+  text-align: center;
+}
+.login-logo {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+.login-subtitle { color: var(--text-sub); margin-bottom: 36px; font-size: 13px; }
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  background: #fff;
+  color: #333;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow .2s;
+}
+.google-btn:hover { box-shadow: 0 4px 20px rgba(255,255,255,0.15); }
+.google-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+/* ─── App Layout ─── */
+.app { display: none; grid-template-columns: 220px 1fr; grid-template-rows: 56px 1fr; min-height: 100vh; }
+.app.visible { display: grid; }
+
+/* ─── Topbar ─── */
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  gap: 16px;
+}
+.topbar-logo {
+  font-size: 16px; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.topbar-user { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.topbar-user img { width: 28px; height: 28px; border-radius: 50%; }
+.topbar-user span { font-size: 13px; color: var(--text-sub); }
+.logout-btn { background: none; border: 1px solid var(--border); color: var(--text-sub); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.logout-btn:hover { border-color: var(--border-active); color: var(--text); }
+
+/* ─── Sidebar ─── */
+.sidebar {
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+.sidebar-section { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin: 16px 0 6px 8px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; color: var(--text-sub); font-size: 13px;
+  transition: all .15s; border: none; background: none; width: 100%; text-align: left;
+}
+.nav-item:hover { background: var(--bg-3); color: var(--text); }
+.nav-item.active { background: var(--bg-3); color: var(--text); font-weight: 500; }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ─── Store List in Sidebar ─── */
+.store-list { margin-top: 4px; }
+.store-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; color: var(--text-sub); font-size: 12px;
+  transition: all .15s; border: none; background: none; width: 100%; text-align: left;
+}
+.store-item:hover { background: var(--bg-3); color: var(--text); }
+.store-item.active { background: rgba(79,125,243,0.15); color: var(--accent); }
+.store-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); flex-shrink: 0; }
+
+/* ─── Main Content ─── */
+.main { background: var(--bg); overflow-y: auto; }
+.panel { display: none; padding: 28px; }
+.panel.active { display: block; }
+
+/* ─── Page Header ─── */
+.page-header { margin-bottom: 24px; }
+.page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.page-sub { color: var(--text-sub); font-size: 13px; }
+
+/* ─── Cards ─── */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.card-title { font-size: 15px; font-weight: 600; }
+
+/* ─── Stats Grid ─── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px;
+}
+.stat-label { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+.stat-value { font-size: 26px; font-weight: 700; }
+.stat-value.green { color: var(--accent-2); }
+.stat-value.blue { color: var(--accent); }
+.stat-value.gold { color: var(--gold); }
+.stat-change { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* ─── Review Card ─── */
+.review-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px;
+}
+.review-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.reviewer-name { font-weight: 600; font-size: 14px; }
+.review-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.stars { color: var(--gold); font-size: 14px; margin-bottom: 8px; }
+.review-text { color: var(--text-sub); font-size: 13px; line-height: 1.7; margin-bottom: 12px; }
+.review-reply { background: var(--bg-3); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 6px; font-size: 13px; color: var(--text-sub); margin-bottom: 12px; }
+.review-reply-label { font-size: 11px; color: var(--accent); margin-bottom: 4px; font-weight: 600; }
+.review-actions { display: flex; gap: 8px; }
+.btn {
+  padding: 7px 14px; border-radius: var(--radius-sm); border: none;
+  cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #3d6be0; }
+.btn-outline { background: none; border: 1px solid var(--border); color: var(--text-sub); }
+.btn-outline:hover { border-color: var(--border-active); color: var(--text); }
+.btn-success { background: var(--accent-2); color: #000; }
+.btn-success:hover { background: #28c586; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* ─── Reply Editor ─── */
+.reply-editor { display: none; margin-top: 12px; }
+.reply-editor.open { display: block; }
+.reply-editor textarea {
+  width: 100%; background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 13px; resize: vertical; min-height: 80px; font-family: inherit;
+  line-height: 1.6;
+}
+.reply-editor textarea:focus { outline: none; border-color: var(--accent); }
+.reply-editor-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.tone-select {
+  background: var(--bg-3); border: 1px solid var(--border); color: var(--text);
+  padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; margin-left: auto;
+}
+
+/* ─── Post Form ─── */
+.post-form textarea {
+  width: 100%; background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm); padding: 10px 12px;
+  font-size: 13px; resize: vertical; min-height: 120px; font-family: inherit;
+  line-height: 1.6; margin-bottom: 10px;
+}
+.post-form textarea:focus { outline: none; border-color: var(--accent); }
+.form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.form-row input, .form-row select {
+  flex: 1; background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size: 13px; font-family: inherit;
+}
+.form-row input:focus, .form-row select:focus { outline: none; border-color: var(--accent); }
+
+/* ─── Post Card ─── */
+.post-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; margin-bottom: 12px;
+}
+.post-type-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; background: rgba(79,125,243,0.2); color: var(--accent);
+  margin-bottom: 8px;
+}
+.post-text { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+.post-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.post-date { font-size: 11px; color: var(--text-muted); }
+
+/* ─── Empty State ─── */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-sub); }
+.empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: .4; }
+.empty-state p { font-size: 14px; }
+
+/* ─── Badge ─── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.badge-pending { background: rgba(245,158,11,0.2); color: var(--gold); }
+.badge-active { background: rgba(52,211,153,0.2); color: var(--accent-2); }
+
+/* ─── Loading ─── */
+.loading { text-align: center; padding: 40px; color: var(--text-sub); }
+.spinner {
+  width: 24px; height: 24px; border: 2px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 20px;
+  font-size: 13px; z-index: 999; opacity: 0; transform: translateY(10px);
+  transition: all .3s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { border-color: var(--accent-2); color: var(--accent-2); }
+.toast.error { border-color: var(--red); color: var(--red); }
+
+/* ─── Filter Bar ─── */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.filter-btn {
+  padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: none; color: var(--text-sub); font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.filter-btn.active { background: rgba(79,125,243,0.2); border-color: var(--accent); color: var(--accent); }
+.filter-btn:hover { border-color: var(--border-active); color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ─── Login ─── -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">MEO Manager</div>
+    <p class="login-subtitle">Googleビジネスプロフィールを一元管理</p>
+    <a href="/api/auth/login" class="google-btn">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Googleでログイン
+    </a>
+  </div>
+</div>
+
+<!-- ─── App ─── -->
+<div class="app" id="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-logo">MEO Manager</div>
+    <div class="topbar-user">
+      <img id="userPic" src="" alt="">
+      <span id="userName"></span>
+      <a href="/api/auth/logout" class="logout-btn">ログアウト</a>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section">メニュー</div>
+    <button class="nav-item active" onclick="showPanel('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      ダッシュボード
+    </button>
+    <button class="nav-item" onclick="showPanel('reviews')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      口コミ管理
+    </button>
+    <button class="nav-item" onclick="showPanel('posts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+      投稿管理
+    </button>
+
+    <div class="sidebar-section">店舗</div>
+    <div class="store-list" id="storeList">
+      <div class="loading" style="padding:12px;font-size:12px;">読み込み中...</div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Dashboard -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="page-header">
+        <div class="page-title">ダッシュボード</div>
+        <div class="page-sub">全店舗の概況</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">管理店舗数</div>
+          <div class="stat-value blue" id="statLocations">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">未返信の口コミ</div>
+          <div class="stat-value gold" id="statPending">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">平均評価</div>
+          <div class="stat-value green" id="statRating">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">今月の投稿数</div>
+          <div class="stat-value" id="statPosts">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">管理中の店舗</div></div>
+        <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- Reviews -->
+    <div class="panel" id="panel-reviews">
+      <div class="page-header">
+        <div class="page-title">口コミ管理</div>
+        <div class="page-sub" id="reviewsSubtitle">店舗を選択してください</div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterReviews('all', this)">すべて</button>
+        <button class="filter-btn" onclick="filterReviews('unreplied', this)">未返信</button>
+        <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
+        <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
+      </div>
+      <div id="reviewsList">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <p>左のサイドバーから店舗を選んでください</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Posts -->
+    <div class="panel" id="panel-posts">
+      <div class="page-header">
+        <div class="page-title">投稿管理</div>
+        <div class="page-sub" id="postsSubtitle">店舗を選択してください</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">新規投稿</div></div>
+        <div class="post-form">
+          <textarea id="postText" placeholder="投稿内容を入力（キャンペーン情報・お知らせなど）"></textarea>
+          <div class="form-row">
+            <select id="postType">
+              <option value="STANDARD">一般投稿</option>
+              <option value="EVENT">イベント</option>
+              <option value="OFFER">特典・クーポン</option>
+            </select>
+            <select id="postCTA">
+              <option value="">CTAなし</option>
+              <option value="LEARN_MORE">詳しくはこちら</option>
+              <option value="BOOK">予約する</option>
+              <option value="ORDER">注文する</option>
+              <option value="CALL">電話する</option>
+            </select>
+          </div>
+          <div class="form-row" id="ctaUrlRow" style="display:none">
+            <input id="postCTAUrl" type="url" placeholder="リンクURL（https://...）">
+          </div>
+          <button class="btn btn-primary" onclick="createPost()">投稿する</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">投稿一覧</div></div>
+        <div id="postsList">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            <p>左のサイドバーから店舗を選んでください</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentLocation = null;
+let allReviews = [];
+let currentFilter = 'all';
+
+// ─── Init ───
+async function init() {
+  try {
+    const res = await fetch('/api/me');
+    if (!res.ok) { showLogin(); return; }
+    const user = await res.json();
+    if (!user.loggedIn) { showLogin(); return; }
+
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('userName').textContent = user.name || user.email;
+    if (user.picture) document.getElementById('userPic').src = user.picture;
+
+    loadLocations();
+  } catch {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+}
+
+// ─── Locations ───
+async function loadLocations() {
+  try {
+    const res = await fetch('/api/locations');
+    const data = await res.json();
+    const locations = data.locations || [];
+
+    document.getElementById('statLocations').textContent = locations.length;
+
+    // Sidebar store list
+    const storeList = document.getElementById('storeList');
+    if (!locations.length) {
+      storeList.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:var(--text-muted)">店舗なし</div>';
+    } else {
+      storeList.innerHTML = locations.map((loc, i) => `
+        <button class="store-item${i === 0 ? ' active' : ''}" onclick="selectLocation(${i})" id="store-${i}">
+          <span class="store-dot"></span>
+          ${loc.title || '店舗 ' + (i+1)}
+        </button>
+      `).join('');
+      window._locations = locations;
+      selectLocation(0);
+    }
+
+    // Dashboard location list
+    document.getElementById('locationList').innerHTML = locations.length
+      ? locations.map(loc => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+            <div class="store-dot"></div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px">${loc.title || '—'}</div>
+              <div style="font-size:12px;color:var(--text-sub)">${formatAddress(loc.storefrontAddress)}</div>
+            </div>
+            <span class="badge badge-active">稼働中</span>
+          </div>
+        `).join('')
+      : '<div class="empty-state"><p>店舗が見つかりません</p></div>';
+
+  } catch (e) {
+    document.getElementById('storeList').innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--red)">${e.message}</div>`;
+  }
+}
+
+function formatAddress(addr) {
+  if (!addr) return '住所未設定';
+  return [addr.locality, addr.administrativeArea].filter(Boolean).join(', ');
+}
+
+function selectLocation(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  currentLocation = loc;
+
+  document.querySelectorAll('.store-item').forEach((el, i) => el.classList.toggle('active', i === idx));
+
+  document.getElementById('reviewsSubtitle').textContent = loc.title;
+  document.getElementById('postsSubtitle').textContent = loc.title;
+
+  loadReviews();
+  loadPosts();
+}
+
+// ─── Reviews ───
+async function loadReviews() {
+  if (!currentLocation) return;
+  document.getElementById('reviewsList').innerHTML = '<div class="loading"><div class="spinner"></div>口コミを読み込み中...</div>';
+
+  try {
+    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`);
+    const data = await res.json();
+
+    if (data.pending || data.error) {
+      document.getElementById('reviewsList').innerHTML = `
+        <div class="card" style="border-color:rgba(245,158,11,0.3)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span class="badge badge-pending">API申請中</span>
+            <span style="font-size:13px;font-weight:600">口コミAPIへのアクセスを申請中</span>
+          </div>
+          <p style="font-size:13px;color:var(--text-sub);line-height:1.7">
+            Google Business Profile APIの口コミ機能は審査が必要です。<br>
+            承認されると自動的に表示されます（通常1〜4週間）。<br><br>
+            <strong style="color:var(--text)">デモデータで表示中：</strong>
+          </p>
+        </div>`;
+      allReviews = getDemoReviews();
+    } else {
+      allReviews = data.reviews || [];
+      document.getElementById('statPending').textContent = allReviews.filter(r => !r.reviewReply).length;
+    }
+
+    if (!allReviews.length) allReviews = getDemoReviews();
+    document.getElementById('statPending').textContent = allReviews.filter(r => !r.reviewReply).length;
+    renderReviews();
+  } catch (e) {
+    allReviews = getDemoReviews();
+    renderReviews();
+  }
+}
+
+function getDemoReviews() {
+  return [
+    { name: 'demo/review1', reviewer: { displayName: '田中 花子' }, starRating: 'FIVE', comment: 'スタッフの方がとても丁寧で、料理もおいしかったです！また来ます。', createTime: new Date().toISOString() },
+    { name: 'demo/review2', reviewer: { displayName: '山田 太郎' }, starRating: 'TWO', comment: '待ち時間が長かったです。改善してほしいです。', createTime: new Date(Date.now()-86400000).toISOString(), reviewReply: { comment: 'ご不便をおかけしました。改善に努めます。' } },
+    { name: 'demo/review3', reviewer: { displayName: '佐藤 次郎' }, starRating: 'FOUR', comment: '雰囲気が良くて気に入りました。駐車場があれば最高です。', createTime: new Date(Date.now()-172800000).toISOString() },
+  ];
+}
+
+function filterReviews(type, btn) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderReviews();
+}
+
+function starRatingToNum(r) {
+  return { ONE:1, TWO:2, THREE:3, FOUR:4, FIVE:5 }[r] || parseInt(r) || 3;
+}
+
+function renderReviews() {
+  let reviews = [...allReviews];
+  if (currentFilter === 'unreplied') reviews = reviews.filter(r => !r.reviewReply);
+  if (currentFilter === 'low') reviews = reviews.filter(r => starRatingToNum(r.starRating) <= 2);
+  if (currentFilter === 'high') reviews = reviews.filter(r => starRatingToNum(r.starRating) >= 4);
+
+  const el = document.getElementById('reviewsList');
+  if (!reviews.length) {
+    el.innerHTML = '<div class="empty-state"><p>該当する口コミがありません</p></div>';
+    return;
+  }
+
+  el.innerHTML = reviews.map((r, i) => {
+    const stars = '★'.repeat(starRatingToNum(r.starRating)) + '☆'.repeat(5-starRatingToNum(r.starRating));
+    const date = new Date(r.createTime).toLocaleDateString('ja-JP');
+    return `
+      <div class="review-card" id="rc-${i}">
+        <div class="review-header">
+          <div>
+            <div class="reviewer-name">${r.reviewer?.displayName || '匿名'}</div>
+            <div class="review-date">${date}</div>
+          </div>
+          <div class="stars">${stars}</div>
+        </div>
+        <div class="review-text">${r.comment || '（コメントなし）'}</div>
+        ${r.reviewReply ? `<div class="review-reply"><div class="review-reply-label">オーナーの返信</div>${r.reviewReply.comment}</div>` : ''}
+        <div class="review-actions">
+          <button class="btn btn-outline btn-sm" onclick="toggleReplyEditor(${i})">
+            ${r.reviewReply ? '返信を編集' : '返信する'}
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})">✨ AI返信生成</button>
+        </div>
+        <div class="reply-editor" id="re-${i}">
+          <select class="tone-select" id="tone-${i}">
+            <option value="polite">丁寧・プロフェッショナル</option>
+            <option value="warm">温かみ・親しみやすい</option>
+            <option value="formal">フォーマル・格式</option>
+          </select>
+          <textarea id="replyText-${i}" placeholder="返信文を入力...">${r.reviewReply?.comment || ''}</textarea>
+          <div class="reply-editor-actions">
+            <button class="btn btn-success btn-sm" onclick="submitReply(${i}, '${r.name}')">返信を投稿</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleReplyEditor(${i})">キャンセル</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleReplyEditor(i) {
+  document.getElementById(`re-${i}`).classList.toggle('open');
+}
+
+async function generateReply(i) {
+  const review = allReviews.filter(r => {
+    if (currentFilter === 'unreplied') return !r.reviewReply;
+    if (currentFilter === 'low') return starRatingToNum(r.starRating) <= 2;
+    if (currentFilter === 'high') return starRatingToNum(r.starRating) >= 4;
+    return true;
+  })[i];
+
+  const tone = document.getElementById(`tone-${i}`)?.value || 'polite';
+  const ta = document.getElementById(`replyText-${i}`);
+  if (ta) ta.value = '生成中...';
+  document.getElementById(`re-${i}`).classList.add('open');
+
+  try {
+    const res = await fetch('/api/generate-reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewText: review.comment,
+        rating: starRatingToNum(review.starRating),
+        storeName: currentLocation?.title,
+        tone,
+      }),
+    });
+    const data = await res.json();
+    if (ta) ta.value = data.reply || '生成失敗';
+  } catch (e) {
+    if (ta) ta.value = '生成に失敗しました';
+  }
+}
+
+async function submitReply(i, reviewName) {
+  const comment = document.getElementById(`replyText-${i}`)?.value?.trim();
+  if (!comment) return showToast('返信文を入力してください', 'error');
+
+  try {
+    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewName, comment }),
+    });
+    const data = await res.json();
+    if (data.pending || data.error) {
+      showToast('APIの審査完了後に返信できます（デモモード）', 'error');
+    } else {
+      showToast('返信を投稿しました！', 'success');
+      loadReviews();
+    }
+  } catch (e) {
+    showToast('エラーが発生しました', 'error');
+  }
+}
+
+// ─── Posts ───
+document.getElementById('postCTA').addEventListener('change', function() {
+  document.getElementById('ctaUrlRow').style.display = this.value ? 'flex' : 'none';
+});
+
+async function loadPosts() {
+  if (!currentLocation) return;
+  document.getElementById('postsList').innerHTML = '<div class="loading"><div class="spinner"></div>投稿を読み込み中...</div>';
+
+  try {
+    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}`);
+    const data = await res.json();
+
+    if (data.pending || data.error) {
+      document.getElementById('postsList').innerHTML = `
+        <div style="padding:12px 0">
+          <span class="badge badge-pending">API申請中</span>
+          <p style="margin-top:8px;font-size:13px;color:var(--text-sub)">投稿APIは審査完了後に利用できます。</p>
+        </div>`;
+      document.getElementById('statPosts').textContent = '—';
+      return;
+    }
+
+    const posts = data.localPosts || [];
+    document.getElementById('statPosts').textContent = posts.length;
+
+    document.getElementById('postsList').innerHTML = posts.length
+      ? posts.map(p => `
+          <div class="post-card">
+            <div class="post-type-badge">${p.topicType || 'STANDARD'}</div>
+            <div class="post-text">${p.summary || ''}</div>
+            <div class="post-footer">
+              <span class="post-date">${new Date(p.createTime).toLocaleDateString('ja-JP')}</span>
+            </div>
+          </div>`).join('')
+      : '<div class="empty-state"><p>投稿がありません</p></div>';
+  } catch {
+    document.getElementById('postsList').innerHTML = '<div class="empty-state"><p>読み込みに失敗しました</p></div>';
+  }
+}
+
+async function createPost() {
+  const summary = document.getElementById('postText').value.trim();
+  if (!summary) return showToast('投稿内容を入力してください', 'error');
+  if (!currentLocation) return showToast('店舗を選択してください', 'error');
+
+  const topicType = document.getElementById('postType').value;
+  const callToActionType = document.getElementById('postCTA').value;
+  const callToActionUrl = document.getElementById('postCTAUrl').value;
+
+  try {
+    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary, topicType, callToActionType, callToActionUrl }),
+    });
+    const data = await res.json();
+    if (data.pending || data.error) {
+      showToast('APIの審査完了後に投稿できます（デモモード）', 'error');
+    } else {
+      showToast('投稿しました！', 'success');
+      document.getElementById('postText').value = '';
+      loadPosts();
+    }
+  } catch {
+    showToast('エラーが発生しました', 'error');
+  }
+}
+
+// ─── Navigation ───
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ─── Toast ───
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>
