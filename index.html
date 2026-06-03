@@ -323,6 +323,14 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
       投稿管理
     </button>
+    <button class="nav-item" onclick="showPanel('knowledge')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      企業ナレッジ
+    </button>
+    <button class="nav-item" onclick="showPanel('protection')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      改ざん防止
+    </button>
     <button class="nav-item" onclick="showPanel('guide')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       使い方ガイド
@@ -383,6 +391,148 @@ body {
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
           <p>左のサイドバーから店舗を選んでください</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Knowledge -->
+    <div class="panel" id="panel-knowledge">
+      <div class="page-header">
+        <div class="page-title">企業ナレッジ</div>
+        <div class="page-sub" id="knowledgeSubtitle">店舗を選択してください</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 基本情報</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店舗名</label>
+            <input id="kn-storeName" type="text" placeholder="例：山田美容室 渋谷店" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">業種・カテゴリ</label>
+            <input id="kn-category" type="text" placeholder="例：美容室、整骨院、カフェ" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">電話番号</label>
+            <input id="kn-phone" type="text" placeholder="03-0000-0000" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業時間</label>
+            <input id="kn-businessHours" type="text" placeholder="例：10:00〜20:00（火曜定休）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">駐車場</label>
+            <input id="kn-parking" type="text" placeholder="例：店舗前に5台分あり・無料" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">近隣のランドマーク</label>
+            <input id="kn-nearbyLandmarks" type="text" placeholder="例：渋谷駅から徒歩3分" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">🔑 MEOキーワード（5個）</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿文・返信文の生成に使われます。上位表示を狙うキーワードを設定してください。</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード1</label>
+            <input id="kn-kw0" type="text" placeholder="例：渋谷 美容室" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード2</label>
+            <input id="kn-kw1" type="text" placeholder="例：カット 安い" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード3</label>
+            <input id="kn-kw2" type="text" placeholder="例：縮毛矯正 得意" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード4</label>
+            <input id="kn-kw3" type="text" placeholder="例：予約なし 当日OK" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード5</label>
+            <input id="kn-kw4" type="text" placeholder="例：口コミ 4.5以上" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">💪 店舗の強み・サービス</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店舗の強み・特徴</label>
+            <textarea id="kn-strengths" placeholder="例：10年以上の経験を持つスタイリストが在籍。カラーが得意で特に白髪染めの仕上がりに自信あり。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">サービス・メニュー</label>
+            <textarea id="kn-services" placeholder="例：カット3,000円〜、カラー6,000円〜、縮毛矯正12,000円〜、ヘッドスパ2,000円〜" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">ターゲット顧客</label>
+            <textarea id="kn-targetCustomer" placeholder="例：20〜40代の働く女性。初めての方も多く、リピート率80%以上。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:60px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">その他特記事項（季節のキャンペーン・最新情報など）</label>
+            <textarea id="kn-description" placeholder="例：現在夏のヘアカラーキャンペーン実施中。初回限定20%オフ。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:60px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveKnowledge()" style="margin-bottom:16px">💾 ナレッジを保存</button>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">✍️ 投稿文を生成</div></div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:center">
+          <select id="postGenType" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
+            <option value="一般投稿">一般投稿</option>
+            <option value="キャンペーン">キャンペーン告知</option>
+            <option value="季節">季節のご挨拶</option>
+            <option value="スタッフ紹介">スタッフ紹介</option>
+          </select>
+          <input id="postGenInstruction" type="text" placeholder="追加の指示（任意）" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary" onclick="generatePost()">✨ 生成</button>
+        </div>
+        <textarea id="generatedPost" placeholder="ここに生成された投稿文が表示されます" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:120px;font-family:inherit;line-height:1.6"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-outline btn-sm" onclick="generatePost()">再生成</button>
+          <button class="btn btn-success btn-sm" onclick="copyToPost()">投稿管理にコピー</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Protection -->
+    <div class="panel" id="panel-protection">
+      <div class="page-header">
+        <div class="page-title">改ざん防止</div>
+        <div class="page-sub" id="protectionSubtitle">店舗を選択してください</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🛡️ 正規情報の登録</div>
+          <span class="badge badge-pending" id="baselineStatus">未設定</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px;line-height:1.7">
+          現在のGoogleビジネスプロフィール情報を「正規の情報」として保存します。<br>
+          誰かに改ざんされた場合、ここに保存した情報と比較してアラートを出します。
+        </p>
+        <div id="baselineInfo" style="background:var(--bg-3);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;font-size:13px;color:var(--text-sub)">
+          正規情報を取得して保存してください
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="saveBaseline()">現在の情報を正規として保存</button>
+          <button class="btn btn-outline" onclick="checkNow()">🔍 今すぐチェック</button>
+        </div>
+      </div>
+
+      <div class="card" id="alertsCard">
+        <div class="card-header"><div class="card-title">🚨 アラート履歴</div></div>
+        <div id="alertsList">
+          <div class="empty-state"><p>アラートなし（正常です）</p></div>
         </div>
       </div>
     </div>
@@ -553,6 +703,7 @@ body {
 
 <script>
 let currentLocation = null;
+let currentLocationId = null;
 let allReviews = [];
 let currentFilter = 'all';
 
@@ -632,14 +783,19 @@ function selectLocation(idx) {
   const loc = window._locations?.[idx];
   if (!loc) return;
   currentLocation = loc;
+  currentLocationId = loc.name.replace(/\//g, '_');
 
   document.querySelectorAll('.store-item').forEach((el, i) => el.classList.toggle('active', i === idx));
 
   document.getElementById('reviewsSubtitle').textContent = loc.title;
   document.getElementById('postsSubtitle').textContent = loc.title;
+  document.getElementById('knowledgeSubtitle').textContent = loc.title;
+  document.getElementById('protectionSubtitle').textContent = loc.title;
 
   loadReviews();
   loadPosts();
+  loadKnowledge();
+  loadProtection();
 }
 
 // ─── Reviews ───
@@ -750,32 +906,50 @@ function toggleReplyEditor(i) {
   document.getElementById(`re-${i}`).classList.toggle('open');
 }
 
-async function generateReply(i) {
-  const review = allReviews.filter(r => {
+function getFilteredReviews() {
+  return allReviews.filter(r => {
     if (currentFilter === 'unreplied') return !r.reviewReply;
     if (currentFilter === 'low') return starRatingToNum(r.starRating) <= 2;
     if (currentFilter === 'high') return starRatingToNum(r.starRating) >= 4;
     return true;
-  })[i];
+  });
+}
 
-  const tone = document.getElementById(`tone-${i}`)?.value || 'polite';
+async function generateReply(i) {
+  const review = getFilteredReviews()[i];
+  const rating = starRatingToNum(review.starRating);
+  const type = rating >= 4 ? 'reply_positive' : 'reply_negative';
+
   const ta = document.getElementById(`replyText-${i}`);
   if (ta) ta.value = '生成中...';
   document.getElementById(`re-${i}`).classList.add('open');
 
+  // ★3以下は通知バッジ表示
+  if (rating <= 3) {
+    const badge = document.querySelector(`#rc-${i} .reviewer-name`);
+    if (badge && !document.getElementById(`alert-${i}`)) {
+      const alertEl = document.createElement('div');
+      alertEl.id = `alert-${i}`;
+      alertEl.style.cssText = 'background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#ef4444;margin-bottom:8px';
+      alertEl.textContent = '⚠️ 低評価の口コミです。返信前に内容を必ず確認してください。';
+      document.getElementById(`rc-${i}`).insertBefore(alertEl, document.querySelector(`#rc-${i} .review-actions`));
+    }
+  }
+
   try {
-    const res = await fetch('/api/generate-reply', {
+    const res = await fetch('/api/generate-content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        locationId: currentLocationId,
+        type,
         reviewText: review.comment,
-        rating: starRatingToNum(review.starRating),
-        storeName: currentLocation?.title,
-        tone,
+        rating,
+        reviewerName: review.reviewer?.displayName,
       }),
     });
     const data = await res.json();
-    if (ta) ta.value = data.reply || '生成失敗';
+    if (ta) ta.value = data.content || '生成失敗';
   } catch (e) {
     if (ta) ta.value = '生成に失敗しました';
   }
@@ -886,6 +1060,138 @@ function showToast(msg, type = 'success') {
   t.textContent = msg;
   t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── Knowledge ───
+async function loadKnowledge() {
+  if (!currentLocationId) return;
+  try {
+    const res = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`);
+    const d = await res.json();
+    document.getElementById('kn-storeName').value = d.storeName || '';
+    document.getElementById('kn-category').value = d.category || '';
+    document.getElementById('kn-phone').value = d.phone || '';
+    document.getElementById('kn-businessHours').value = d.businessHours || '';
+    document.getElementById('kn-parking').value = d.parking || '';
+    document.getElementById('kn-nearbyLandmarks').value = d.nearbyLandmarks || '';
+    document.getElementById('kn-strengths').value = d.strengths || '';
+    document.getElementById('kn-services').value = d.services || '';
+    document.getElementById('kn-targetCustomer').value = d.targetCustomer || '';
+    document.getElementById('kn-description').value = d.description || '';
+    (d.keywords || ['','','','','']).forEach((kw, i) => {
+      const el = document.getElementById(`kn-kw${i}`);
+      if (el) el.value = kw;
+    });
+  } catch {}
+}
+
+async function saveKnowledge() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const keywords = [0,1,2,3,4].map(i => document.getElementById(`kn-kw${i}`)?.value || '');
+  const body = {
+    storeName: document.getElementById('kn-storeName').value,
+    category: document.getElementById('kn-category').value,
+    phone: document.getElementById('kn-phone').value,
+    businessHours: document.getElementById('kn-businessHours').value,
+    parking: document.getElementById('kn-parking').value,
+    nearbyLandmarks: document.getElementById('kn-nearbyLandmarks').value,
+    strengths: document.getElementById('kn-strengths').value,
+    services: document.getElementById('kn-services').value,
+    targetCustomer: document.getElementById('kn-targetCustomer').value,
+    description: document.getElementById('kn-description').value,
+    keywords,
+  };
+  try {
+    await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    showToast('ナレッジを保存しました！', 'success');
+  } catch { showToast('保存に失敗しました', 'error'); }
+}
+
+async function generatePost() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const ta = document.getElementById('generatedPost');
+  ta.value = '生成中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId: currentLocationId,
+        type: 'post',
+        postType: document.getElementById('postGenType').value,
+        customInstruction: document.getElementById('postGenInstruction').value,
+      }),
+    });
+    const data = await res.json();
+    ta.value = data.content || '生成失敗';
+  } catch { ta.value = '生成に失敗しました'; }
+}
+
+function copyToPost() {
+  const text = document.getElementById('generatedPost').value;
+  if (!text) return;
+  document.getElementById('postText').value = text;
+  showPanel('posts');
+  showToast('投稿管理にコピーしました', 'success');
+}
+
+// ─── Protection ───
+async function loadProtection() {
+  if (!currentLocationId) return;
+  try {
+    const res = await fetch(`/api/store-settings?locationId=${encodeURIComponent(currentLocationId)}`);
+    const d = await res.json();
+    if (d.info) {
+      document.getElementById('baselineStatus').textContent = '設定済み';
+      document.getElementById('baselineStatus').className = 'badge badge-active';
+      document.getElementById('baselineInfo').innerHTML = `
+        <div style="font-weight:600;color:var(--text);margin-bottom:6px">${d.info.title || '—'}</div>
+        <div>保存日時: ${new Date(d.savedAt).toLocaleString('ja-JP')}</div>
+        ${d.info.websiteUri ? `<div>URL: ${d.info.websiteUri}</div>` : ''}
+      `;
+    }
+    const alerts = d.alerts || [];
+    document.getElementById('alertsList').innerHTML = alerts.length
+      ? alerts.map(a => `
+          <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px;margin-bottom:8px">
+            <div style="font-size:11px;color:var(--red);margin-bottom:6px">⚠️ ${new Date(a.detectedAt).toLocaleString('ja-JP')} に変更を検出</div>
+            ${a.diffs.map(d => `<div style="font-size:13px"><strong>${d.field}</strong>: 「${d.saved}」→「${d.current}」</div>`).join('')}
+          </div>`).join('')
+      : '<div class="empty-state"><p>✅ アラートなし（正常です）</p></div>';
+  } catch {}
+}
+
+async function saveBaseline() {
+  if (!currentLocation || !currentLocationId) return showToast('店舗を選択してください', 'error');
+  try {
+    await fetch(`/api/store-settings?locationId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ info: { title: currentLocation.title, websiteUri: currentLocation.websiteUri } }),
+    });
+    showToast('正規情報を保存しました！', 'success');
+    loadProtection();
+  } catch { showToast('保存に失敗しました', 'error'); }
+}
+
+async function checkNow() {
+  if (!currentLocation || !currentLocationId) return showToast('店舗を選択してください', 'error');
+  showToast('チェック中...', 'success');
+  try {
+    const res = await fetch('/api/verify-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationName: currentLocation.name, locationId: currentLocationId }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') showToast('✅ 変更なし。正常です', 'success');
+    else if (data.status === 'changed') showToast(`⚠️ ${data.diffs.length}件の変更を検出！`, 'error');
+    else if (data.status === 'no_baseline') showToast('正規情報を先に保存してください', 'error');
+    else showToast('チェック完了（API審査待ち）', 'success');
+    loadProtection();
+  } catch { showToast('チェックに失敗しました', 'error'); }
 }
 
 init();
