@@ -47,5 +47,18 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── AIO/LLMO/GEO ──
+  if (action === 'aio') {
+    const key = `aio_${locationId}`;
+    if (req.method === 'GET') {
+      return res.json(await kvGet(key) || { checks: {}, notes: {}, updatedAt: null });
+    }
+    if (req.method === 'POST') {
+      const data = { ...req.body, updatedAt: new Date().toISOString() };
+      await kvSet(key, data);
+      return res.json({ success: true });
+    }
+  }
+
   return res.status(405).end();
 }

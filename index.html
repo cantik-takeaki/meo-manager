@@ -339,6 +339,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
       サイテーション
     </button>
+    <button class="nav-item" onclick="showPanel('aio')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v4l3 3"/></svg>
+      AIO/LLMO/GEO対策
+    </button>
     <button class="nav-item" onclick="showPanel('guide')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       使い方ガイド
@@ -655,6 +659,56 @@ body {
       </div>
     </div>
 
+    <!-- AIO/LLMO/GEO -->
+    <div class="panel" id="panel-aio">
+      <div class="page-header">
+        <div class="page-title">AIO / LLMO / GEO 対策</div>
+        <div class="page-sub" id="aioSubtitle">AIに選ばれる店舗情報の最適化</div>
+      </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.3)">
+        <div class="card-header"><div class="card-title">💡 AIO/LLMO/GEOとは？</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px">
+          <div style="background:var(--bg-3);border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:var(--accent);margin-bottom:6px">AIO</div>
+            <div style="color:var(--text-sub);font-size:12px;line-height:1.7">AI全般が自社情報を正しく把握し、好意的に引用できるようコンテンツを最適化する戦略</div>
+          </div>
+          <div style="background:var(--bg-3);border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:var(--accent-2);margin-bottom:6px">LLMO</div>
+            <div style="color:var(--text-sub);font-size:12px;line-height:1.7">ChatGPT・Geminiなど大規模言語モデルが回答時に自社情報を引用しやすくする最適化</div>
+          </div>
+          <div style="background:var(--bg-3);border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:var(--gold);margin-bottom:6px">GEO</div>
+            <div style="color:var(--text-sub);font-size:12px;line-height:1.7">Perplexity・Copilotなど生成AI検索エンジン全般に対する最適化。検索→AI回答時代の新SEO</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">✅ 対策チェックリスト</div>
+          <span id="aioProgress" style="font-size:13px;color:var(--accent-2);font-weight:600"></span>
+        </div>
+
+        <div id="aioChecklist"></div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="saveAio()">💾 チェック状況を保存</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">🤖 AIに引用されているか確認する方法</div></div>
+        <div style="font-size:13px;color:var(--text-sub);line-height:2">
+          <p style="margin-bottom:12px">以下のプロンプトをChatGPT・Gemini・Perplexityに入力して、自店舗が回答に含まれるか確認しましょう。</p>
+          <div id="aioTestPrompts" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">📝 メモ・改善記録</div></div>
+        <textarea id="aioNotes" placeholder="対策の進捗・気づきをメモしてください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:100px;font-family:inherit;line-height:1.6"></textarea>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="saveAio()">メモを保存</button>
+      </div>
+    </div>
+
     <!-- Guide -->
     <div class="panel" id="panel-guide">
       <div class="page-header">
@@ -921,7 +975,7 @@ function selectLocation(idx) {
   document.querySelectorAll('.store-item').forEach((el, i) => el.classList.toggle('active', i === idx));
 
   const title = loc.title || '';
-  ['reviewsSubtitle','postsSubtitle','knowledgeSubtitle','protectionSubtitle','citationSubtitle'].forEach(id => {
+  ['reviewsSubtitle','postsSubtitle','knowledgeSubtitle','protectionSubtitle','citationSubtitle','aioSubtitle'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = title;
   });
@@ -1194,6 +1248,7 @@ function showPanel(name) {
   if (event?.currentTarget) event.currentTarget.classList.add('active');
   if (name === 'clients') loadClientStores();
   if (name === 'citation') loadCitation();
+  if (name === 'aio') loadAio();
 }
 
 // ─── Toast ───
@@ -1315,24 +1370,38 @@ async function saveRankings() {
 
 // ─── Citation ───
 const CITATION_SITES = [
-  { id: 'google', name: 'Googleビジネスプロフィール', url: 'https://business.google.com', priority: 'high' },
-  { id: 'facebook', name: 'Facebook ビジネスページ', url: 'https://facebook.com', priority: 'high' },
-  { id: 'bing', name: 'Bingマップ', url: 'https://bingplaces.com', priority: 'high' },
-  { id: 'apple', name: 'Appleマップ', url: 'https://mapsconnect.apple.com', priority: 'high' },
-  { id: 'tabelog', name: '食べログ', url: 'https://tabelog.com', priority: 'high' },
-  { id: 'hotpepper', name: 'ホットペッパービューティー', url: 'https://beauty.hotpepper.jp', priority: 'high' },
-  { id: 'gurunavi', name: 'ぐるなび', url: 'https://gurunavi.com', priority: 'mid' },
-  { id: 'retty', name: 'Retty', url: 'https://retty.me', priority: 'mid' },
-  { id: 'yahoo_local', name: 'Yahoo!ロコ', url: 'https://loco.yahoo.co.jp', priority: 'mid' },
-  { id: 'itp', name: 'iタウンページ', url: 'https://itp.ne.jp', priority: 'mid' },
-  { id: 'foursquare', name: 'Foursquare', url: 'https://foursquare.com', priority: 'mid' },
-  { id: 'ekiten', name: '駅探', url: 'https://ekiten.jp', priority: 'mid' },
-  { id: 'homemate', name: 'ホームメイト', url: 'https://www.homemate.co.jp', priority: 'low' },
-  { id: 'jalan', name: 'じゃらん', url: 'https://jalan.net', priority: 'low' },
-  { id: 'rakuten', name: '楽天ビジネス', url: 'https://business.rakuten.com', priority: 'low' },
-  { id: 'townwork', name: 'タウンワーク', url: 'https://townwork.net', priority: 'low' },
-  { id: 'instagram', name: 'Instagram ビジネスアカウント', url: 'https://instagram.com', priority: 'low' },
-  { id: 'line', name: 'LINE公式アカウント', url: 'https://www.linebiz.com', priority: 'low' },
+  // ── 最重要（AIも参照する主要データソース）──
+  { id: 'google_gbp', name: 'Googleビジネスプロフィール', url: 'https://business.google.com', priority: 'high', category: '検索・地図', note: 'MEO最重要。AIが最も参照するデータソース' },
+  { id: 'apple_maps', name: 'Appleマップ（Siri連携）', url: 'https://mapsconnect.apple.com', priority: 'high', category: '検索・地図', note: 'Siriの音声検索に反映。iPhoneユーザーへのリーチ' },
+  { id: 'bing_places', name: 'Bingプレイス（Microsoft/Copilot連携）', url: 'https://www.bingplaces.com', priority: 'high', category: '検索・地図', note: 'Microsoft CopilotのAI検索に反映される' },
+  { id: 'here_maps', name: 'HERE Maps', url: 'https://here.com', priority: 'high', category: '検索・地図', note: '多数のカーナビ・アプリのデータソース' },
+  { id: 'foursquare', name: 'Foursquare（データ配信源）', url: 'https://foursquare.com', priority: 'high', category: '検索・地図', note: '多数のアプリにNAPデータを配信するハブ' },
+  { id: 'facebook', name: 'Facebookページ', url: 'https://facebook.com', priority: 'high', category: 'SNS', note: 'MetaAIの参照元。ビジネスページ必須' },
+  // ── 日本主要サイト ──
+  { id: 'yahoo_local', name: 'Yahoo!ロコ', url: 'https://loco.yahoo.co.jp', priority: 'high', category: '日本・総合', note: 'Yahoo!検索・地図への反映' },
+  { id: 'itp', name: 'iタウンページ', url: 'https://itp.ne.jp', priority: 'high', category: '日本・総合', note: 'NTTの電話帳。信頼性が高くAIも参照' },
+  { id: 'tabelog', name: '食べログ', url: 'https://tabelog.com', priority: 'high', category: '日本・グルメ', note: '飲食店はほぼ必須。口コミ数が評価に直結' },
+  { id: 'hotpepper_beauty', name: 'ホットペッパービューティー', url: 'https://beauty.hotpepper.jp', priority: 'high', category: '日本・美容', note: '美容系は必須。予約連携も可能' },
+  { id: 'gurunavi', name: 'ぐるなび', url: 'https://gurunavi.com', priority: 'mid', category: '日本・グルメ', note: '飲食店向け。インバウンド客にも強い' },
+  { id: 'retty', name: 'Retty', url: 'https://retty.me', priority: 'mid', category: '日本・グルメ', note: '実名口コミが特徴。信頼性評価に貢献' },
+  { id: 'hotpepper', name: 'ホットペッパーグルメ', url: 'https://hotpepper.jp', priority: 'mid', category: '日本・グルメ', note: '飲食・エンタメ向け予約サイト' },
+  { id: 'ekiten', name: '駅探・エキテン', url: 'https://ekiten.jp', priority: 'mid', category: '日本・総合', note: '地域密着型の口コミサイト' },
+  { id: 'jalan', name: 'じゃらん', url: 'https://jalan.net', priority: 'mid', category: '日本・観光', note: '宿泊・観光業は必須' },
+  { id: 'tripadvisor', name: 'TripAdvisor', url: 'https://tripadvisor.jp', priority: 'mid', category: '観光・グルメ', note: '訪日外国人・観光客への訴求。AIも参照' },
+  { id: 'rakuten_travel', name: '楽天トラベル', url: 'https://travel.rakuten.co.jp', priority: 'mid', category: '日本・観光', note: '宿泊・観光向け' },
+  // ── ナビゲーション系（位置情報AIへの反映）──
+  { id: 'waze', name: 'Waze', url: 'https://waze.com', priority: 'mid', category: 'ナビ・地図', note: 'Googleが買収。カーナビユーザーへのリーチ' },
+  { id: 'tomtom', name: 'TomTom', url: 'https://tomtom.com', priority: 'mid', category: 'ナビ・地図', note: '欧州系カーナビのデータソース' },
+  // ── SNS・信頼性向上 ──
+  { id: 'instagram', name: 'Instagram ビジネスアカウント', url: 'https://instagram.com', priority: 'mid', category: 'SNS', note: '写真・動画で店舗の雰囲気を発信' },
+  { id: 'line_official', name: 'LINE公式アカウント', url: 'https://www.linebiz.com', priority: 'mid', category: 'SNS', note: '日本で最も使われるメッセージアプリ' },
+  { id: 'linkedin', name: 'LinkedIn 企業ページ', url: 'https://linkedin.com', priority: 'low', category: 'SNS', note: 'BtoB・採用向け。AIの信頼性判断に影響' },
+  // ── レビュー・信頼性サイト ──
+  { id: 'trustpilot', name: 'Trustpilot', url: 'https://trustpilot.com', priority: 'low', category: 'レビュー', note: 'グローバルな信頼性評価サイト' },
+  { id: 'hotfrog', name: 'Hotfrog', url: 'https://hotfrog.jp', priority: 'low', category: 'ディレクトリ', note: '中小企業向けビジネスディレクトリ' },
+  // ── プレスリリース（GEO対策に重要）──
+  { id: 'prtimes', name: 'PR TIMES', url: 'https://prtimes.jp', priority: 'mid', category: 'プレスリリース', note: 'AIが引用しやすいメディア。GEO対策に有効' },
+  { id: 'atpress', name: '@Press', url: 'https://atpress.ne.jp', priority: 'low', category: 'プレスリリース', note: 'プレスリリース配信でサイテーション獲得' },
 ];
 
 async function loadCitation() {
@@ -1356,28 +1425,42 @@ function renderCitationSites(registered, nap) {
   const registeredIds = registered.map(s => s.id);
   const count = registeredIds.length;
   const total = CITATION_SITES.length;
-  document.getElementById('citationScore').textContent = `${count} / ${total} 媒体登録済み`;
+  const highTotal = CITATION_SITES.filter(s => s.priority === 'high').length;
+  const highDone = CITATION_SITES.filter(s => s.priority === 'high' && registeredIds.includes(s.id)).length;
+  document.getElementById('citationScore').textContent = `${count}/${total}媒体 | 最重要 ${highDone}/${highTotal}`;
 
   const priorityLabel = { high: '⭐ 最重要', mid: '推奨', low: '任意' };
   const priorityColor = { high: 'var(--red)', mid: 'var(--gold)', low: 'var(--text-muted)' };
+  const categories = [...new Set(CITATION_SITES.map(s => s.category))];
 
-  document.getElementById('citationSites').innerHTML = CITATION_SITES.map(site => {
-    const isReg = registeredIds.includes(site.id);
-    const regData = registered.find(s => s.id === site.id) || {};
+  document.getElementById('citationSites').innerHTML = categories.map(cat => {
+    const sites = CITATION_SITES.filter(s => s.category === cat);
     return `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-        <input type="checkbox" id="cit-${site.id}" ${isReg ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:500">${site.name}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${site.url}</div>
-        </div>
-        <span style="font-size:11px;color:${priorityColor[site.priority]};font-weight:600">${priorityLabel[site.priority]}</span>
-        ${isReg ? `
-          <input type="text" id="cit-url-${site.id}" value="${regData.listingUrl || ''}" placeholder="掲載URL（任意）"
-            style="width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px">
-        ` : '<div style="width:180px"></div>'}
+      <div style="margin-bottom:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:10px 0 4px">${cat}</div>
+        ${sites.map(site => {
+          const isReg = registeredIds.includes(site.id);
+          const regData = registered.find(s => s.id === site.id) || {};
+          return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <input type="checkbox" id="cit-${site.id}" ${isReg ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;margin-top:2px" onchange="toggleCitUrl('${site.id}',this.checked)">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">${site.name}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${site.note || ''}</div>
+              <div id="curl-${site.id}" style="display:${isReg?'flex':'none'};gap:6px;margin-top:4px">
+                <input type="text" id="cit-url-${site.id}" value="${regData.listingUrl||''}" placeholder="掲載ページURL（任意）"
+                  style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px">
+                ${regData.listingUrl?`<a href="${regData.listingUrl}" target="_blank" style="font-size:11px;color:var(--accent);line-height:2.4">確認</a>`:''}
+              </div>
+            </div>
+            <span style="font-size:11px;color:${priorityColor[site.priority]};font-weight:600;white-space:nowrap">${priorityLabel[site.priority]}</span>
+          </div>`;
+        }).join('')}
       </div>`;
   }).join('');
+}
+
+function toggleCitUrl(id, checked) {
+  document.getElementById(`curl-${id}`).style.display = checked ? 'flex' : 'none';
 }
 
 async function saveCitation() {
@@ -1398,6 +1481,95 @@ async function saveCitation() {
   });
   showToast('サイテーション情報を保存しました！', 'success');
   renderCitationSites(sites, nap);
+}
+
+// ─── AIO/LLMO/GEO ───
+const AIO_CHECKS = [
+  { id: 'nap_unified', category: '基盤整備', label: 'NAP情報（店舗名・住所・電話番号）を全媒体で統一した', level: 'critical' },
+  { id: 'gbp_complete', category: '基盤整備', label: 'Googleビジネスプロフィールを100%入力した（写真・営業時間・カテゴリ含む）', level: 'critical' },
+  { id: 'citation_10', category: '基盤整備', label: '10媒体以上にサイテーション登録した', level: 'critical' },
+  { id: 'eeat_author', category: 'E-E-A-T強化', label: '公式サイトに専門家・スタッフのプロフィール・実績を掲載した', level: 'high' },
+  { id: 'eeat_review', category: 'E-E-A-T強化', label: 'Googleレビューに定期的に返信している（週1以上）', level: 'high' },
+  { id: 'eeat_update', category: 'E-E-A-T強化', label: '公式サイト・SNSを月1以上更新している', level: 'high' },
+  { id: 'eeat_stats', category: 'E-E-A-T強化', label: '実績数値（例：創業20年・顧客満足度98%）を掲載した', level: 'high' },
+  { id: 'structured_local', category: '構造化データ', label: 'LocalBusiness スキーマ（JSON-LD）を公式サイトに実装した', level: 'high' },
+  { id: 'structured_faq', category: '構造化データ', label: 'FAQページを作成してFAQSchemaを実装した', level: 'high' },
+  { id: 'structured_review', category: '構造化データ', label: 'AggregateRating スキーマで口コミ評価を構造化した', level: 'mid' },
+  { id: 'faq_page', category: '会話型コンテンツ', label: '「〇〇（地域名）で××するなら？」形式のQ&Aコンテンツを作成した', level: 'high' },
+  { id: 'faq_natural', category: '会話型コンテンツ', label: '見出しを質問形式にして、すぐ下に簡潔な回答を書いた', level: 'mid' },
+  { id: 'faq_longtail', category: '会話型コンテンツ', label: 'ロングテールキーワード（例：〇〇区 美容室 縮毛矯正 安い）のページを作成した', level: 'mid' },
+  { id: 'gbp_post', category: 'Googleポスト投稿', label: 'Googleビジネスプロフィールに週1以上投稿している', level: 'high' },
+  { id: 'gbp_photo', category: 'Googleポスト投稿', label: '店舗写真を月2枚以上追加している', level: 'mid' },
+  { id: 'gbp_qa', category: 'Googleポスト投稿', label: 'Googleのよくある質問（Q&A）に自分で回答を入力した', level: 'mid' },
+  { id: 'pr_media', category: 'サイテーション獲得', label: 'PR TIMESなどでプレスリリースを配信した', level: 'mid' },
+  { id: 'pr_media2', category: 'サイテーション獲得', label: '地域メディア・ブログに店舗を取り上げてもらった', level: 'mid' },
+  { id: 'ai_test_chatgpt', category: 'AI引用確認', label: 'ChatGPTで「〇〇（地域）でおすすめの××は？」と検索して自店舗が出るか確認した', level: 'low' },
+  { id: 'ai_test_gemini', category: 'AI引用確認', label: 'Geminiで同様の検索をして確認した', level: 'low' },
+  { id: 'ai_test_perplexity', category: 'AI引用確認', label: 'Perplexityで同様の検索をして確認した', level: 'low' },
+];
+
+async function loadAio() {
+  if (!currentLocationId) return;
+  try {
+    const res = await fetch(`/api/store-settings?action=aio&locationId=${encodeURIComponent(currentLocationId)}`);
+    const data = await res.json();
+    renderAioChecklist(data.checks || {});
+    document.getElementById('aioNotes').value = data.notes || '';
+
+    // 確認プロンプト生成
+    const kn = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r=>r.json()).catch(()=>({}));
+    const store = kn.storeName || '店舗名';
+    const kw = (kn.keywords||[]).filter(Boolean)[0] || 'キーワード';
+    document.getElementById('aioTestPrompts').innerHTML = [
+      `「${store}はどんなお店ですか？」`,
+      `「${kw}でおすすめのお店を教えてください」`,
+      `「${kn.nearbyLandmarks||'この地域'}周辺で${kn.category||'おすすめ'}のお店は？」`,
+    ].map(p => `
+      <div style="display:flex;align-items:center;gap:8px;background:var(--bg-3);border-radius:6px;padding:8px 12px">
+        <span style="font-size:13px;flex:1">${p}</span>
+        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${p}');showToast('コピーしました','success')">コピー</button>
+      </div>`).join('');
+  } catch {}
+}
+
+function renderAioChecklist(checks) {
+  const categories = [...new Set(AIO_CHECKS.map(c => c.category))];
+  const levelColor = { critical: 'var(--red)', high: 'var(--gold)', mid: 'var(--accent)', low: 'var(--text-muted)' };
+  const levelLabel = { critical: '🔴 必須', high: '🟡 重要', mid: '🔵 推奨', low: '⚪ 確認' };
+
+  const done = AIO_CHECKS.filter(c => checks[c.id]).length;
+  document.getElementById('aioProgress').textContent = `${done} / ${AIO_CHECKS.length} 完了`;
+
+  document.getElementById('aioChecklist').innerHTML = categories.map(cat => {
+    const items = AIO_CHECKS.filter(c => c.category === cat);
+    const catDone = items.filter(c => checks[c.id]).length;
+    return `
+      <div style="margin-bottom:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 4px;border-bottom:2px solid var(--border)">
+          <div style="font-size:12px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.06em">${cat}</div>
+          <div style="font-size:11px;color:var(--accent-2)">${catDone}/${items.length}</div>
+        </div>
+        ${items.map(item => `
+          <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <input type="checkbox" id="aio-${item.id}" ${checks[item.id]?'checked':''} style="width:16px;height:16px;cursor:pointer;margin-top:2px">
+            <div style="flex:1;font-size:13px;line-height:1.6">${item.label}</div>
+            <span style="font-size:11px;color:${levelColor[item.level]};font-weight:600;white-space:nowrap">${levelLabel[item.level]}</span>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+}
+
+async function saveAio() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const checks = {};
+  AIO_CHECKS.forEach(c => { checks[c.id] = document.getElementById(`aio-${c.id}`)?.checked || false; });
+  const notes = document.getElementById('aioNotes').value;
+  await fetch(`/api/store-settings?action=aio&locationId=${encodeURIComponent(currentLocationId)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ checks, notes }),
+  });
+  renderAioChecklist(checks);
+  showToast('保存しました！', 'success');
 }
 
 // ─── Knowledge ───
