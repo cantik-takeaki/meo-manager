@@ -1124,7 +1124,7 @@ let selectedClientStore = null;
 
 async function loadClientStores() {
   try {
-    const res = await fetch('/api/admin-stores');
+    const res = await fetch('/api/admin');
     const data = await res.json();
     const stores = data.stores || [];
     const el = document.getElementById('clientStoreList');
@@ -1152,7 +1152,7 @@ async function registerStore() {
   if (!storeName) return showToast('店舗名を入力してください', 'error');
 
   try {
-    const res = await fetch('/api/admin-stores', {
+    const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storeName, clientEmail }),
@@ -1185,7 +1185,7 @@ function copyCredentials() {
 
 async function deleteStore(storeId) {
   if (!confirm('この店舗を削除しますか？')) return;
-  await fetch(`/api/admin-stores?storeId=${storeId}`, { method: 'DELETE' });
+  await fetch(`/api/admin?storeId=${storeId}`, { method: 'DELETE' });
   loadClientStores();
   showToast('削除しました', 'success');
 }
@@ -1197,7 +1197,7 @@ async function openRankingInput(storeId, storeName) {
   document.getElementById('rankingInputCard').scrollIntoView({ behavior: 'smooth' });
 
   // キーワード取得（ナレッジから）
-  const res = await fetch(`/api/rankings?storeId=${storeId}`);
+  const res = await fetch(`/api/admin?action=rankings&storeId=${storeId}`);
   const data = await res.json();
   const keywords = data.keywords?.length ? data.keywords : ['キーワード1','キーワード2','キーワード3','キーワード4','キーワード5'];
   const latest = data.history?.[data.history.length - 1];
@@ -1218,10 +1218,10 @@ async function saveRankings() {
   const keywords = window._rankingKeywords || [];
   const rankings = keywords.map((_, i) => parseInt(document.getElementById(`rank-${i}`)?.value) || null);
 
-  await fetch(`/api/rankings?storeId=${selectedClientStore.storeId}`, {
+  await fetch(`/api/admin?action=rankings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keywords, rankings }),
+    body: JSON.stringify({ storeId: selectedClientStore.storeId, keywords, rankings }),
   });
   showToast('順位を保存しました！', 'success');
   document.getElementById('rankingInputCard').style.display = 'none';
@@ -1345,11 +1345,7 @@ async function checkNow() {
   if (!currentLocation || !currentLocationId) return showToast('店舗を選択してください', 'error');
   showToast('チェック中...', 'success');
   try {
-    const res = await fetch('/api/verify-store', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationName: currentLocation.name, locationId: currentLocationId }),
-    });
+    const res = await fetch(`/api/store-settings?action=verify&locationId=${encodeURIComponent(currentLocationId)}&locationName=${encodeURIComponent(currentLocation.name)}`);
     const data = await res.json();
     if (data.status === 'ok') showToast('✅ 変更なし。正常です', 'success');
     else if (data.status === 'changed') showToast(`⚠️ ${data.diffs.length}件の変更を検出！`, 'error');

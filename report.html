@@ -206,7 +206,7 @@ async function doLogin() {
   if (!storeId || !password) return;
 
   try {
-    const res = await fetch('/api/client-auth', {
+    const res = await fetch('/api/client?action=login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storeId, password }),
@@ -224,7 +224,7 @@ async function doLogin() {
 }
 
 async function doLogout() {
-  await fetch('/api/client-auth', { method: 'DELETE' });
+  await fetch('/api/client?action=login', { method: 'DELETE' });
   location.reload();
 }
 
@@ -238,7 +238,7 @@ function showApp(storeName, sid) {
 
 async function loadReport(sid) {
   try {
-    const res = await fetch(`/api/report?storeId=${sid}`);
+    const res = await fetch(`/api/client?action=report&storeId=${sid}`);
     if (!res.ok) return;
     const data = await res.json();
 
