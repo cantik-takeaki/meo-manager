@@ -1027,6 +1027,10 @@ function selectLocation(idx) {
     if (el) el.textContent = title;
   });
 
+  // 企業ナレッジパネルに自動切り替え
+  switchPanel('knowledge');
+
+  // データを全パネル分ロード
   loadReviews();
   loadPosts();
   loadKnowledge();
@@ -1319,14 +1323,24 @@ async function createPost() {
 }
 
 // ─── Navigation ───
-function showPanel(name) {
+function switchPanel(name, triggerEl) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.getElementById('panel-' + name).classList.add('active');
-  if (event?.currentTarget) event.currentTarget.classList.add('active');
+  document.getElementById('panel-' + name)?.classList.add('active');
+  if (triggerEl) triggerEl.classList.add('active');
+  else {
+    // nav-itemの中からname対応のボタンをアクティブに
+    document.querySelectorAll('.nav-item').forEach(b => {
+      if (b.getAttribute('onclick')?.includes(`'${name}'`)) b.classList.add('active');
+    });
+  }
   if (name === 'clients') loadClientStores();
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
+}
+
+function showPanel(name) {
+  switchPanel(name, event?.currentTarget);
 }
 
 // ─── Toast ───
