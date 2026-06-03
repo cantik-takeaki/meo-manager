@@ -335,6 +335,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       改ざん防止
     </button>
+    <button class="nav-item" onclick="showPanel('citation')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+      サイテーション
+    </button>
     <button class="nav-item" onclick="showPanel('guide')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       使い方ガイド
@@ -593,6 +597,64 @@ body {
       </div>
     </div>
 
+    <!-- Citation -->
+    <div class="panel" id="panel-citation">
+      <div class="page-header">
+        <div class="page-title">サイテーション管理</div>
+        <div class="page-sub" id="citationSubtitle">店舗を選択してください</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 NAP情報（統一情報）</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:14px">全媒体で統一すべき店舗情報です。表記ゆれがあるとMEO評価が下がります。</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">N: 正式店舗名</label>
+            <input id="nap-name" type="text" placeholder="例：山田美容室 渋谷店" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">P: 電話番号</label>
+            <input id="nap-phone" type="text" placeholder="例：03-1234-5678" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">A: 正式住所</label>
+            <input id="nap-address" type="text" placeholder="例：東京都渋谷区渋谷1-2-3 〇〇ビル2F" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">公式URL</label>
+            <input id="nap-url" type="url" placeholder="https://..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">業種カテゴリ</label>
+            <input id="nap-category" type="text" placeholder="例：美容室" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="saveCitation()">💾 NAP情報を保存</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🌐 媒体別登録状況</div>
+          <span id="citationScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:16px">登録済みの媒体にチェックを入れてください。登録数が多いほどMEO評価が上がります。</p>
+        <div id="citationSites"></div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="saveCitation()">登録状況を保存</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 サイテーション効果の目安</div></div>
+        <div style="font-size:13px;color:var(--text-sub);line-height:2">
+          <div>✅ 5媒体以上: 基本的なサイテーション完成</div>
+          <div>✅ 10媒体以上: 直接検索+89%、検索表示+91%（実績値）</div>
+          <div>✅ 20媒体以上: 上位表示に大きく貢献</div>
+          <div style="margin-top:10px;padding:10px;background:rgba(79,125,243,0.08);border-radius:8px">
+            💡 <strong>最重要:</strong> NAP情報（店舗名・住所・電話番号）は全媒体で完全に統一することが必須です。表記ゆれがあると逆効果になります。
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Guide -->
     <div class="panel" id="panel-guide">
       <div class="page-header">
@@ -790,37 +852,51 @@ function showLogin() {
 // ─── Locations ───
 async function loadLocations() {
   try {
-    const res = await fetch('/api/locations');
-    const data = await res.json();
-    const locations = data.locations || [];
+    // GBP店舗 + 手動登録店舗を両方取得
+    const [gbpRes, adminRes] = await Promise.all([
+      fetch('/api/locations').catch(() => ({ json: () => ({ locations: [] }) })),
+      fetch('/api/admin').catch(() => ({ json: () => ({ stores: [] }) })),
+    ]);
+    const gbpData = await gbpRes.json();
+    const adminData = await adminRes.json();
+
+    const gbpLocations = (gbpData.locations || []).map(l => ({ ...l, _type: 'gbp' }));
+    const adminLocations = (adminData.stores || []).map(s => ({
+      name: s.storeId,
+      title: s.storeName,
+      _type: 'manual',
+      storeId: s.storeId,
+      clientEmail: s.clientEmail,
+    }));
+
+    // 重複を除いてマージ
+    const locations = [...gbpLocations, ...adminLocations];
+    window._locations = locations;
 
     document.getElementById('statLocations').textContent = locations.length;
 
-    // Sidebar store list
     const storeList = document.getElementById('storeList');
     if (!locations.length) {
       storeList.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:var(--text-muted)">店舗なし</div>';
     } else {
       storeList.innerHTML = locations.map((loc, i) => `
         <button class="store-item${i === 0 ? ' active' : ''}" onclick="selectLocation(${i})" id="store-${i}">
-          <span class="store-dot"></span>
+          <span class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></span>
           ${loc.title || '店舗 ' + (i+1)}
         </button>
       `).join('');
-      window._locations = locations;
       selectLocation(0);
     }
 
-    // Dashboard location list
     document.getElementById('locationList').innerHTML = locations.length
       ? locations.map(loc => `
           <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-            <div class="store-dot"></div>
+            <div class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></div>
             <div style="flex:1">
               <div style="font-weight:600;font-size:14px">${loc.title || '—'}</div>
-              <div style="font-size:12px;color:var(--text-sub)">${formatAddress(loc.storefrontAddress)}</div>
+              <div style="font-size:12px;color:var(--text-sub)">${loc._type === 'manual' ? 'クライアント店舗' : formatAddress(loc.storefrontAddress)}</div>
             </div>
-            <span class="badge badge-active">稼働中</span>
+            <span class="badge ${loc._type === 'manual' ? 'badge-pending' : 'badge-active'}">${loc._type === 'manual' ? '手動登録' : 'GBP連携'}</span>
           </div>
         `).join('')
       : '<div class="empty-state"><p>店舗が見つかりません</p></div>';
@@ -839,19 +915,27 @@ function selectLocation(idx) {
   const loc = window._locations?.[idx];
   if (!loc) return;
   currentLocation = loc;
-  currentLocationId = loc.name.replace(/\//g, '_');
+  // IDは storeId（手動）または GBP name をスラッシュ除去して使う
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
 
   document.querySelectorAll('.store-item').forEach((el, i) => el.classList.toggle('active', i === idx));
 
-  document.getElementById('reviewsSubtitle').textContent = loc.title;
-  document.getElementById('postsSubtitle').textContent = loc.title;
-  document.getElementById('knowledgeSubtitle').textContent = loc.title;
-  document.getElementById('protectionSubtitle').textContent = loc.title;
+  const title = loc.title || '';
+  ['reviewsSubtitle','postsSubtitle','knowledgeSubtitle','protectionSubtitle','citationSubtitle'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = title;
+  });
 
   loadReviews();
   loadPosts();
   loadKnowledge();
   loadProtection();
+  loadCitation();
+}
+
+// 店舗管理から登録後にサイドバーを再読み込み
+async function refreshStores() {
+  await loadLocations();
 }
 
 // ─── Reviews ───
@@ -1109,6 +1193,7 @@ function showPanel(name) {
   document.getElementById('panel-' + name).classList.add('active');
   if (event?.currentTarget) event.currentTarget.classList.add('active');
   if (name === 'clients') loadClientStores();
+  if (name === 'citation') loadCitation();
 }
 
 // ─── Toast ───
@@ -1171,6 +1256,7 @@ async function registerStore() {
     document.getElementById('cl-storeName').value = '';
     document.getElementById('cl-email').value = '';
     loadClientStores();
+    refreshStores(); // サイドバーも更新
     showToast('店舗を登録しました！', 'success');
   } catch { showToast('エラーが発生しました', 'error'); }
 }
@@ -1225,6 +1311,93 @@ async function saveRankings() {
   });
   showToast('順位を保存しました！', 'success');
   document.getElementById('rankingInputCard').style.display = 'none';
+}
+
+// ─── Citation ───
+const CITATION_SITES = [
+  { id: 'google', name: 'Googleビジネスプロフィール', url: 'https://business.google.com', priority: 'high' },
+  { id: 'facebook', name: 'Facebook ビジネスページ', url: 'https://facebook.com', priority: 'high' },
+  { id: 'bing', name: 'Bingマップ', url: 'https://bingplaces.com', priority: 'high' },
+  { id: 'apple', name: 'Appleマップ', url: 'https://mapsconnect.apple.com', priority: 'high' },
+  { id: 'tabelog', name: '食べログ', url: 'https://tabelog.com', priority: 'high' },
+  { id: 'hotpepper', name: 'ホットペッパービューティー', url: 'https://beauty.hotpepper.jp', priority: 'high' },
+  { id: 'gurunavi', name: 'ぐるなび', url: 'https://gurunavi.com', priority: 'mid' },
+  { id: 'retty', name: 'Retty', url: 'https://retty.me', priority: 'mid' },
+  { id: 'yahoo_local', name: 'Yahoo!ロコ', url: 'https://loco.yahoo.co.jp', priority: 'mid' },
+  { id: 'itp', name: 'iタウンページ', url: 'https://itp.ne.jp', priority: 'mid' },
+  { id: 'foursquare', name: 'Foursquare', url: 'https://foursquare.com', priority: 'mid' },
+  { id: 'ekiten', name: '駅探', url: 'https://ekiten.jp', priority: 'mid' },
+  { id: 'homemate', name: 'ホームメイト', url: 'https://www.homemate.co.jp', priority: 'low' },
+  { id: 'jalan', name: 'じゃらん', url: 'https://jalan.net', priority: 'low' },
+  { id: 'rakuten', name: '楽天ビジネス', url: 'https://business.rakuten.com', priority: 'low' },
+  { id: 'townwork', name: 'タウンワーク', url: 'https://townwork.net', priority: 'low' },
+  { id: 'instagram', name: 'Instagram ビジネスアカウント', url: 'https://instagram.com', priority: 'low' },
+  { id: 'line', name: 'LINE公式アカウント', url: 'https://www.linebiz.com', priority: 'low' },
+];
+
+async function loadCitation() {
+  if (!currentLocationId) return;
+  try {
+    const res = await fetch(`/api/store-settings?action=citation&locationId=${encodeURIComponent(currentLocationId)}`);
+    const data = await res.json();
+    renderCitationSites(data.sites || [], data.nap || {});
+    // NAP情報を入力欄に反映
+    if (data.nap) {
+      document.getElementById('nap-name').value = data.nap.name || '';
+      document.getElementById('nap-phone').value = data.nap.phone || '';
+      document.getElementById('nap-address').value = data.nap.address || '';
+      document.getElementById('nap-url').value = data.nap.url || '';
+      document.getElementById('nap-category').value = data.nap.category || '';
+    }
+  } catch {}
+}
+
+function renderCitationSites(registered, nap) {
+  const registeredIds = registered.map(s => s.id);
+  const count = registeredIds.length;
+  const total = CITATION_SITES.length;
+  document.getElementById('citationScore').textContent = `${count} / ${total} 媒体登録済み`;
+
+  const priorityLabel = { high: '⭐ 最重要', mid: '推奨', low: '任意' };
+  const priorityColor = { high: 'var(--red)', mid: 'var(--gold)', low: 'var(--text-muted)' };
+
+  document.getElementById('citationSites').innerHTML = CITATION_SITES.map(site => {
+    const isReg = registeredIds.includes(site.id);
+    const regData = registered.find(s => s.id === site.id) || {};
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" id="cit-${site.id}" ${isReg ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${site.name}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${site.url}</div>
+        </div>
+        <span style="font-size:11px;color:${priorityColor[site.priority]};font-weight:600">${priorityLabel[site.priority]}</span>
+        ${isReg ? `
+          <input type="text" id="cit-url-${site.id}" value="${regData.listingUrl || ''}" placeholder="掲載URL（任意）"
+            style="width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px">
+        ` : '<div style="width:180px"></div>'}
+      </div>`;
+  }).join('');
+}
+
+async function saveCitation() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const nap = {
+    name: document.getElementById('nap-name').value,
+    phone: document.getElementById('nap-phone').value,
+    address: document.getElementById('nap-address').value,
+    url: document.getElementById('nap-url').value,
+    category: document.getElementById('nap-category').value,
+  };
+  const sites = CITATION_SITES.filter(s => document.getElementById(`cit-${s.id}`)?.checked)
+    .map(s => ({ id: s.id, name: s.name, listingUrl: document.getElementById(`cit-url-${s.id}`)?.value || '' }));
+
+  await fetch(`/api/store-settings?action=citation&locationId=${encodeURIComponent(currentLocationId)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nap, sites }),
+  });
+  showToast('サイテーション情報を保存しました！', 'success');
+  renderCitationSites(sites, nap);
 }
 
 // ─── Knowledge ───

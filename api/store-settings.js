@@ -1,4 +1,4 @@
-// api/store-settings.js — 改ざん防止用の正規店舗情報保存
+// api/store-settings.js — 改ざん防止 + サイテーション管理
 import { kvGet, kvSet } from './_kv.js';
 
 function parseCookies(req) {
@@ -19,21 +19,32 @@ export default async function handler(req, res) {
   const { access_token } = parseCookies(req);
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 
-  const { locationId } = req.query;
+  const { locationId, action } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId必須' });
 
-  const key = `settings_${locationId}`;
-
-  if (req.method === 'GET') {
-    const data = await kvGet(key) || { savedAt: null, info: null, alerts: [] };
-    return res.json(data);
+  // ── 改ざん防止 ──
+  if (!action || action === 'protection') {
+    const key = `settings_${locationId}`;
+    if (req.method === 'GET') {
+      return res.json(await kvGet(key) || { savedAt: null, info: null, alerts: [] });
+    }
+    if (req.method === 'POST') {
+      const { info } = req.body;
+      await kvSet(key, { info, savedAt: new Date().toISOString(), alerts: [] });
+      return res.json({ success: true });
+    }
   }
 
-  // 正規情報を保存（改ざん防止ベースライン）
-  if (req.method === 'POST') {
-    const { info } = req.body;
-    await kvSet(key, { info, savedAt: new Date().toISOString(), alerts: [] });
-    return res.json({ success: true });
+  // ── サイテーション ──
+  if (action === 'citation') {
+    const key = `citation_${locationId}`;
+    if (req.method === 'GET') {
+      return res.json(await kvGet(key) || { nap: {}, sites: [] });
+    }
+    if (req.method === 'POST') {
+      await kvSet(key, req.body);
+      return res.json({ success: true });
+    }
   }
 
   return res.status(405).end();
