@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEOレポート</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f9fc;--bg-2:#fff;--border:#e8eaf0;--text:#1a1a2e;--text-sub:#6b7280;
+  --accent:#4f7df3;--green:#10b981;--red:#ef4444;--gold:#f59e0b;--radius:14px;
+}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}
+.login-box{background:#fff;border-radius:20px;padding:40px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+.login-logo{font-size:22px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.login-sub{color:var(--text-sub);font-size:13px;margin-bottom:28px}
+.form-group{margin-bottom:16px}
+.form-group label{font-size:12px;color:var(--text-sub);display:block;margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;transition:border .2s}
+.form-group input:focus{outline:none;border-color:var(--accent)}
+.login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s;font-family:inherit}
+.login-btn:hover{background:#3d6be0}
+.login-error{color:var(--red);font-size:12px;margin-top:8px;display:none}
+
+/* App */
+.app{display:none}
+.app.visible{display:block}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-logo{font-size:16px;font-weight:700;color:var(--accent)}
+.topbar-store{font-size:13px;color:var(--text-sub)}
+.logout-btn{background:none;border:1px solid var(--border);color:var(--text-sub);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+
+.content{max-width:1000px;margin:0 auto;padding:28px 20px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{color:var(--text-sub);font-size:13px;margin-bottom:24px}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.stat-label{font-size:12px;color:var(--text-sub);margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700}
+.stat-value.blue{color:var(--accent)}
+.stat-value.green{color:var(--green)}
+.stat-value.gold{color:var(--gold)}
+.stat-change{font-size:11px;margin-top:4px}
+.stat-change.up{color:var(--green)}
+.stat-change.down{color:var(--red)}
+
+/* Card */
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* Ranking Table */
+.rank-table{width:100%;border-collapse:collapse}
+.rank-table th{text-align:left;padding:8px 12px;font-size:12px;color:var(--text-sub);border-bottom:2px solid var(--border);font-weight:600}
+.rank-table td{padding:12px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;font-weight:700;font-size:15px}
+.rank-1{background:rgba(245,158,11,0.15);color:var(--gold)}
+.rank-top3{background:rgba(79,125,243,0.1);color:var(--accent)}
+.rank-top10{background:rgba(16,185,129,0.1);color:var(--green)}
+.rank-low{background:rgba(239,68,68,0.1);color:var(--red)}
+.rank-change{font-size:12px;font-weight:600}
+.rank-change.up{color:var(--green)}
+.rank-change.down{color:var(--red)}
+.rank-change.same{color:var(--text-sub)}
+
+/* Challenge */
+.challenge-item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border)}
+.challenge-item:last-child{border-bottom:none}
+.challenge-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.challenge-icon.high{background:rgba(239,68,68,0.1)}
+.challenge-icon.mid{background:rgba(245,158,11,0.1)}
+.challenge-icon.low{background:rgba(16,185,129,0.1)}
+.challenge-text{font-size:13px;color:var(--text-sub);line-height:1.6}
+.challenge-label{font-size:11px;font-weight:600;margin-bottom:2px}
+.challenge-label.high{color:var(--red)}
+.challenge-label.mid{color:var(--gold)}
+.challenge-label.low{color:var(--green)}
+
+/* Chart */
+.chart-wrap{position:relative;height:220px;margin-top:8px}
+
+/* Empty */
+.empty{text-align:center;padding:40px;color:var(--text-sub);font-size:13px}
+
+/* Updated */
+.updated-at{font-size:11px;color:var(--text-sub);margin-bottom:20px}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">MEOレポート</div>
+    <p class="login-sub">ログインしてレポートを確認</p>
+    <div class="form-group">
+      <label>店舗ID</label>
+      <input id="inputStoreId" type="text" placeholder="担当者から受け取ったID">
+    </div>
+    <div class="form-group">
+      <label>パスワード</label>
+      <input id="inputPassword" type="password" placeholder="担当者から受け取ったパスワード">
+    </div>
+    <div class="login-error" id="loginError">IDまたはパスワードが違います</div>
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app" id="reportApp">
+  <div class="topbar">
+    <div class="topbar-logo">MEOレポート</div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span class="topbar-store" id="topbarStore"></span>
+      <button class="logout-btn" onclick="doLogout()">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="page-title" id="reportTitle">レポート</div>
+    <div class="page-sub">Googleビジネスプロフィール MEO分析レポート</div>
+    <div class="updated-at" id="updatedAt"></div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">管理キーワード数</div>
+        <div class="stat-value blue" id="statKeywords">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">トップ3キーワード</div>
+        <div class="stat-value green" id="statTop3">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">要改善キーワード</div>
+        <div class="stat-value" style="color:var(--red)" id="statLow">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均順位</div>
+        <div class="stat-value gold" id="statAvg">—</div>
+      </div>
+    </div>
+
+    <!-- Ranking Table -->
+    <div class="card">
+      <div class="card-title">🔑 キーワード別順位</div>
+      <div id="rankingTable"><div class="empty">データ読み込み中...</div></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card">
+      <div class="card-title">📈 順位推移グラフ</div>
+      <div class="chart-wrap"><canvas id="rankChart"></canvas></div>
+    </div>
+
+    <!-- Challenges -->
+    <div class="card">
+      <div class="card-title">🎯 現在の課題と改善ポイント</div>
+      <div id="challengeList"><div class="empty">分析中...</div></div>
+    </div>
+
+    <!-- Store Info -->
+    <div class="card">
+      <div class="card-title">🏪 店舗情報</div>
+      <div id="storeInfo" style="font-size:13px;color:var(--text-sub);line-height:2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let rankChart = null;
+const storeId = new URLSearchParams(location.search).get('store') || '';
+
+async function init() {
+  // URLにstoreIdがあれば自動セット
+  if (storeId) document.getElementById('inputStoreId').value = storeId;
+
+  // セッション確認
+  const session = getSession();
+  if (session) {
+    showApp(session.storeName, session.storeId);
+  }
+}
+
+function getSession() {
+  try {
+    const c = document.cookie.split(';').find(c => c.trim().startsWith('client_session='));
+    if (!c) return null;
+    const val = c.split('=')[1];
+    const s = JSON.parse(atob(val));
+    if (s.exp < Date.now()) return null;
+    return s;
+  } catch { return null; }
+}
+
+async function doLogin() {
+  const storeId = document.getElementById('inputStoreId').value.trim();
+  const password = document.getElementById('inputPassword').value.trim();
+  if (!storeId || !password) return;
+
+  try {
+    const res = await fetch('/api/client-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    document.getElementById('loginError').style.display = 'none';
+    showApp(data.storeName, data.storeId);
+  } catch {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+async function doLogout() {
+  await fetch('/api/client-auth', { method: 'DELETE' });
+  location.reload();
+}
+
+function showApp(storeName, sid) {
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('reportApp').classList.add('visible');
+  document.getElementById('topbarStore').textContent = storeName;
+  document.getElementById('reportTitle').textContent = storeName + ' — MEOレポート';
+  loadReport(sid);
+}
+
+async function loadReport(sid) {
+  try {
+    const res = await fetch(`/api/report?storeId=${sid}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    // Updated
+    if (data.updatedAt) {
+      document.getElementById('updatedAt').textContent = `最終更新: ${new Date(data.updatedAt).toLocaleDateString('ja-JP')}`;
+    }
+
+    const rankings = data.rankingData || [];
+
+    // Stats
+    document.getElementById('statKeywords').textContent = rankings.length;
+    document.getElementById('statTop3').textContent = rankings.filter(r => r.current && r.current <= 3).length;
+    document.getElementById('statLow').textContent = rankings.filter(r => r.current && r.current > 10).length;
+    const avg = rankings.filter(r => r.current).reduce((s, r) => s + r.current, 0) / (rankings.filter(r => r.current).length || 1);
+    document.getElementById('statAvg').textContent = avg ? Math.round(avg) + '位' : '—';
+
+    // Ranking Table
+    if (!rankings.length) {
+      document.getElementById('rankingTable').innerHTML = '<div class="empty">順位データがまだ登録されていません</div>';
+    } else {
+      document.getElementById('rankingTable').innerHTML = `
+        <table class="rank-table">
+          <thead><tr>
+            <th>キーワード</th>
+            <th>現在順位</th>
+            <th>前回比</th>
+            <th>状況</th>
+          </tr></thead>
+          <tbody>${rankings.map(r => {
+            const rank = r.current;
+            const rankClass = rank === 1 ? 'rank-1' : rank <= 3 ? 'rank-top3' : rank <= 10 ? 'rank-top10' : 'rank-low';
+            const change = r.change;
+            const changeHtml = change === null ? '<span class="rank-change same">—</span>'
+              : change > 0 ? `<span class="rank-change up">▲${change}</span>`
+              : change < 0 ? `<span class="rank-change down">▼${Math.abs(change)}</span>`
+              : '<span class="rank-change same">→</span>';
+            const status = !rank ? '未計測' : rank <= 3 ? '🥇 上位表示中' : rank <= 10 ? '✅ 1ページ目' : '⚠️ 要改善';
+            return `<tr>
+              <td><strong>${r.keyword}</strong></td>
+              <td><span class="rank-badge ${rankClass}">${rank || '—'}</span></td>
+              <td>${changeHtml}</td>
+              <td style="font-size:12px">${status}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`;
+    }
+
+    // Chart
+    renderChart(rankings, data.rankingHistory);
+
+    // Challenges
+    const challenges = data.challenges || [];
+    if (!rankings.length) {
+      document.getElementById('challengeList').innerHTML = '<div class="empty">順位データが登録されると課題が表示されます</div>';
+    } else {
+      const defaultChallenges = [];
+      if (rankings.some(r => !r.current)) defaultChallenges.push({ level: 'mid', message: '一部キーワードの順位が未計測です。担当者に計測をご依頼ください。' });
+      if (rankings.every(r => r.current && r.current <= 5)) defaultChallenges.push({ level: 'low', message: '全キーワードがトップ5以内です。引き続き口コミ返信と定期投稿で維持しましょう。' });
+
+      const allChallenges = [...challenges, ...defaultChallenges];
+      document.getElementById('challengeList').innerHTML = allChallenges.length
+        ? allChallenges.map(c => `
+          <div class="challenge-item">
+            <div class="challenge-icon ${c.level}">${c.level === 'high' ? '🔴' : c.level === 'mid' ? '🟡' : '🟢'}</div>
+            <div>
+              <div class="challenge-label ${c.level}">${c.level === 'high' ? '優先対応' : c.level === 'mid' ? '改善推奨' : '良好'}</div>
+              <div class="challenge-text">${c.message}</div>
+            </div>
+          </div>`).join('')
+        : '<div class="empty">現在課題はありません ✅</div>';
+    }
+
+    // Store Info
+    const k = data.knowledge || {};
+    document.getElementById('storeInfo').innerHTML = [
+      k.storeName && `<div><strong>店舗名:</strong> ${k.storeName}</div>`,
+      k.category && `<div><strong>業種:</strong> ${k.category}</div>`,
+      k.businessHours && `<div><strong>営業時間:</strong> ${k.businessHours}</div>`,
+      k.phone && `<div><strong>電話:</strong> ${k.phone}</div>`,
+      k.nearbyLandmarks && `<div><strong>アクセス:</strong> ${k.nearbyLandmarks}</div>`,
+      k.parking && `<div><strong>駐車場:</strong> ${k.parking}</div>`,
+    ].filter(Boolean).join('') || '<div>店舗情報が未登録です</div>';
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderChart(rankings, history) {
+  if (!history?.length || !rankings.length) return;
+
+  const labels = history.map(h => h.date);
+  const colors = ['#4f7df3','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+
+  const datasets = rankings.map((r, i) => ({
+    label: r.keyword,
+    data: history.map(h => h.rankings[i] ?? null),
+    borderColor: colors[i % colors.length],
+    backgroundColor: colors[i % colors.length] + '20',
+    tension: 0.3,
+    pointRadius: 4,
+  }));
+
+  if (rankChart) rankChart.destroy();
+  rankChart = new Chart(document.getElementById('rankChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          reverse: true, // 順位は小さいほど良い
+          min: 1,
+          ticks: { stepSize: 1 },
+          title: { display: true, text: '順位' },
+        },
+      },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.raw}位`,
+          },
+        },
+      },
+    },
+  });
+}
+
+document.getElementById('inputPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+init();
+</script>
+</body>
+</html>
