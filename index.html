@@ -356,6 +356,13 @@ body {
 
   <!-- Main -->
   <main class="main">
+    <!-- 現在選択中の店舗バー -->
+    <div id="currentStoreBar" style="display:none;background:rgba(79,125,243,0.08);border-bottom:1px solid rgba(79,125,243,0.2);padding:8px 28px;font-size:13px;display:flex;align-items:center;gap:10px">
+      <span style="color:var(--text-muted)">選択中の店舗：</span>
+      <span id="currentStoreName" style="font-weight:600;color:var(--accent)"></span>
+      <span id="currentStoreType" class="badge"></span>
+    </div>
+
     <!-- Dashboard -->
     <div class="panel active" id="panel-dashboard">
       <div class="page-header">
@@ -975,6 +982,19 @@ function selectLocation(idx) {
   document.querySelectorAll('.store-item').forEach((el, i) => el.classList.toggle('active', i === idx));
 
   const title = loc.title || '';
+
+  // 現在選択中の店舗バーを更新
+  document.getElementById('currentStoreBar').style.display = 'flex';
+  document.getElementById('currentStoreName').textContent = title;
+  const typeEl = document.getElementById('currentStoreType');
+  if (loc._type === 'manual') {
+    typeEl.textContent = '手動登録';
+    typeEl.className = 'badge badge-pending';
+  } else {
+    typeEl.textContent = 'GBP連携';
+    typeEl.className = 'badge badge-active';
+  }
+
   ['reviewsSubtitle','postsSubtitle','knowledgeSubtitle','protectionSubtitle','citationSubtitle','aioSubtitle'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = title;
@@ -985,6 +1005,7 @@ function selectLocation(idx) {
   loadKnowledge();
   loadProtection();
   loadCitation();
+  loadAio();
 }
 
 // 店舗管理から登録後にサイドバーを再読み込み
@@ -995,6 +1016,23 @@ async function refreshStores() {
 // ─── Reviews ───
 async function loadReviews() {
   if (!currentLocation) return;
+
+  // 手動登録店舗の場合はGBP未連携を表示
+  if (currentLocation._type === 'manual') {
+    document.getElementById('reviewsList').innerHTML = `
+      <div class="card" style="border-color:rgba(245,158,11,0.3)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span class="badge badge-pending">GBP未連携</span>
+          <span style="font-weight:600">「${currentLocation.title}」はGBP未連携の手動登録店舗です</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-sub);line-height:1.8">
+          口コミ管理にはGoogleビジネスプロフィールとの連携が必要です。<br>
+          Google Business Profile APIの審査完了後に自動で利用可能になります。
+        </p>
+      </div>`;
+    return;
+  }
+
   document.getElementById('reviewsList').innerHTML = '<div class="loading"><div class="spinner"></div>口コミを読み込み中...</div>';
 
   try {
@@ -1178,6 +1216,19 @@ document.getElementById('postCTA').addEventListener('change', function() {
 
 async function loadPosts() {
   if (!currentLocation) return;
+
+  if (currentLocation._type === 'manual') {
+    document.getElementById('postsList').innerHTML = `
+      <div class="card" style="border-color:rgba(245,158,11,0.3)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span class="badge badge-pending">GBP未連携</span>
+          <span style="font-weight:600">投稿管理はGBP連携後に利用可能</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-sub)">Google Business Profile APIの審査完了後に利用できます。<br>「企業ナレッジ」タブで投稿文の生成と保存はできます。</p>
+      </div>`;
+    return;
+  }
+
   document.getElementById('postsList').innerHTML = '<div class="loading"><div class="spinner"></div>投稿を読み込み中...</div>';
 
   try {
