@@ -1,5 +1,5 @@
 // api/admin.js — 店舗登録・順位入力（統合）
-import { kvGet, kvSet } from './_kv.js';
+import { kvGet, kvSet, kvDel } from './_kv.js';
 
 function parseCookies(req) {
   const c = {};
@@ -30,10 +30,20 @@ export default async function handler(req, res) {
 
   const { action } = req.query;
 
-  // ── 店舗一覧 ──
+  // ── 店舗一覧（GBP連携状況付き）──
   if (req.method === 'GET' && !action) {
     const list = await kvGet('admin_stores') || [];
-    return res.json({ stores: list });
+    const stores = await Promise.all(list.map(async (s) => {
+      const gbp = await kvGet(`gbp_tokens_${s.storeId}`);
+      return {
+        ...s,
+        gbpConnected: !!gbp,
+        gbpEmail: gbp?.email || null,
+        gbpConnectedAt: gbp?.connected_at || null,
+        connectUrl: `/api/auth/connect?store=${s.storeId}`,
+      };
+    }));
+    return res.json({ stores });
   }
 
   // ── 店舗登録 ──
@@ -51,11 +61,30 @@ export default async function handler(req, res) {
   }
 
   // ── 店舗削除 ──
-  if (req.method === 'DELETE') {
+  if (req.method === 'DELETE' && !action) {
     const { storeId } = req.query;
     const list = (await kvGet('admin_stores') || []).filter(s => s.storeId !== storeId);
     await kvSet('admin_stores', list);
+    await kvDel(`gbp_tokens_${storeId}`);
     return res.json({ success: true });
+  }
+
+  // ── GBP連携解除 ──
+  if (req.method === 'DELETE' && action === 'disconnect') {
+    const { storeId } = req.query;
+    await kvDel(`gbp_tokens_${storeId}`);
+    return res.json({ success: true });
+  }
+
+  // ── GBP連携状況確認 ──
+  if (req.method === 'GET' && action === 'gbp-status') {
+    const { storeId } = req.query;
+    const gbp = await kvGet(`gbp_tokens_${storeId}`);
+    return res.json({
+      connected: !!gbp,
+      email: gbp?.email || null,
+      connectedAt: gbp?.connected_at || null,
+    });
   }
 
   // ── 順位取得 ──

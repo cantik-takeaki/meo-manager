@@ -191,6 +191,7 @@ body {
 .btn-success { background: var(--accent-2); color: #000; }
 .btn-success:hover { background: #28c586; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
+.link-btn { background: none; border: none; color: var(--accent); font-size: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
 
 /* ─── Reply Editor ─── */
 .reply-editor { display: none; margin-top: 12px; }
@@ -952,9 +953,11 @@ async function loadLocations() {
     const adminLocations = (adminData.stores || []).map(s => ({
       name: s.storeId,
       title: s.storeName,
-      _type: 'manual',
+      _type: s.gbpConnected ? 'gbp' : 'manual',
       storeId: s.storeId,
       clientEmail: s.clientEmail,
+      gbpConnected: s.gbpConnected,
+      gbpEmail: s.gbpEmail,
     }));
 
     // 重複を除いてマージ
@@ -1048,8 +1051,9 @@ async function refreshStores() {
 async function loadReviews() {
   if (!currentLocation) return;
 
-  // 手動登録店舗の場合はGBP未連携を表示
-  if (currentLocation._type === 'manual') {
+  // 手動登録店舗の場合はGBP連携ボタンを表示
+  if (currentLocation._type === 'manual' && !currentLocation.gbpConnected) {
+    const connectUrl = `/api/auth/connect?store=${currentLocation.storeId}`;
     document.getElementById('reviewsList').innerHTML = `
       <div class="card" style="border-color:rgba(245,158,11,0.3)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -1057,9 +1061,13 @@ async function loadReviews() {
           <span style="font-weight:600">「${currentLocation.title}」はGBP未連携の手動登録店舗です</span>
         </div>
         <p style="font-size:13px;color:var(--text-sub);line-height:1.8">
-          口コミ管理にはGoogleビジネスプロフィールとの連携が必要です。<br>
-          Google Business Profile APIの審査完了後に自動で利用可能になります。
+          Googleビジネスプロフィールと連携すると口コミの確認・返信が自動化されます。<br>
+          下のボタンからお客さんに連携URLを送ってください。
         </p>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="copyConnectUrl('${connectUrl}')">連携URLをコピー</button>
+          <a href="${connectUrl}" target="_blank" class="btn btn-outline btn-sm">自分で連携テスト</a>
+        </div>
       </div>`;
     return;
   }
@@ -1067,7 +1075,7 @@ async function loadReviews() {
   document.getElementById('reviewsList').innerHTML = '<div class="loading"><div class="spinner"></div>口コミを読み込み中...</div>';
 
   try {
-    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`);
+    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`);
     const data = await res.json();
 
     if (data.pending || data.error) {
@@ -1223,7 +1231,7 @@ async function submitReply(i, reviewName) {
   if (!comment) return showToast('返信文を入力してください', 'error');
 
   try {
-    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`, {
+    const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reviewName, comment }),
@@ -1248,14 +1256,19 @@ document.getElementById('postCTA').addEventListener('change', function() {
 async function loadPosts() {
   if (!currentLocation) return;
 
-  if (currentLocation._type === 'manual') {
+  if (currentLocation._type === 'manual' && !currentLocation.gbpConnected) {
+    const connectUrl = `/api/auth/connect?store=${currentLocation.storeId}`;
     document.getElementById('postsList').innerHTML = `
       <div class="card" style="border-color:rgba(245,158,11,0.3)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <span class="badge badge-pending">GBP未連携</span>
           <span style="font-weight:600">投稿管理はGBP連携後に利用可能</span>
         </div>
-        <p style="font-size:13px;color:var(--text-sub)">Google Business Profile APIの審査完了後に利用できます。<br>「企業ナレッジ」タブで投稿文の生成と保存はできます。</p>
+        <p style="font-size:13px;color:var(--text-sub)">Googleビジネスプロフィールと連携すると投稿の作成・管理が自動化されます。</p>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="copyConnectUrl('${connectUrl}')">連携URLをコピー</button>
+          <a href="${connectUrl}" target="_blank" class="btn btn-outline btn-sm">自分で連携テスト</a>
+        </div>
       </div>`;
     return;
   }
@@ -1263,7 +1276,7 @@ async function loadPosts() {
   document.getElementById('postsList').innerHTML = '<div class="loading"><div class="spinner"></div>投稿を読み込み中...</div>';
 
   try {
-    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}`);
+    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`);
     const data = await res.json();
 
     if (data.pending || data.error) {
@@ -1304,7 +1317,7 @@ async function createPost() {
   const callToActionUrl = document.getElementById('postCTAUrl').value;
 
   try {
-    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}`, {
+    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ summary, topicType, callToActionType, callToActionUrl }),
@@ -1366,10 +1379,14 @@ async function loadClientStores() {
     }
     el.innerHTML = stores.map(s => `
       <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-        <div class="store-dot" style="background:var(--accent-2)"></div>
+        <div class="store-dot" style="background:${s.gbpConnected ? 'var(--accent)' : 'var(--accent-2)'}"></div>
         <div style="flex:1">
           <div style="font-weight:600;font-size:14px">${s.storeName}</div>
           <div style="font-size:11px;color:var(--text-muted)">ID: ${s.storeId} | 登録日: ${new Date(s.createdAt).toLocaleDateString('ja-JP')}</div>
+          ${s.gbpConnected
+            ? `<div style="font-size:11px;color:var(--green,#22c55e)">✓ GBP連携済み（${s.gbpEmail || ''}）</div>`
+            : `<div style="font-size:11px;color:var(--text-muted)">GBP未連携 — <button class="link-btn" onclick="copyConnectUrl('/api/auth/connect?store=${s.storeId}')">連携URLをコピー</button></div>`
+          }
         </div>
         <a href="/report.html?store=${s.storeId}" target="_blank" style="font-size:12px;color:var(--accent)">プレビュー</a>
         <button class="btn btn-outline btn-sm" onclick="openRankingInput('${s.storeId}','${s.storeName}')">順位入力</button>
@@ -1421,6 +1438,11 @@ async function deleteStore(storeId) {
   await fetch(`/api/admin?storeId=${storeId}`, { method: 'DELETE' });
   loadClientStores();
   showToast('削除しました', 'success');
+}
+
+function copyConnectUrl(path) {
+  const url = location.origin + path;
+  navigator.clipboard.writeText(url).then(() => showToast('連携URLをコピーしました', 'success'));
 }
 
 async function openRankingInput(storeId, storeName) {

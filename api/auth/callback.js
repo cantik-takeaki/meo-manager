@@ -1,12 +1,14 @@
 // api/auth/callback.js — Google OAuthコールバック
+import { kvSet } from '../_kv.js';
+
 export default async function handler(req, res) {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
   if (error) return res.redirect('/?error=' + error);
   if (!code) return res.redirect('/?error=no_code');
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.REDIRECT_URI || 'https://meo-manager.vercel.app/api/auth/callback';
+  const redirectUri = process.env.REDIRECT_URI || 'https://meo-manager-rho.vercel.app/api/auth/callback';
 
   // コードをトークンに交換
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -29,7 +31,21 @@ export default async function handler(req, res) {
   });
   const user = await userRes.json();
 
-  // cookieにトークンを保存（1日）
+  // stateにstoreIdが含まれる場合 → お客さんのGBP連携
+  const storeId = state?.startsWith('store:') ? state.slice(6) : null;
+  if (storeId) {
+    await kvSet(`gbp_tokens_${storeId}`, {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Date.now() + (tokens.expires_in || 3600) * 1000,
+      email: user.email,
+      name: user.name,
+      connected_at: new Date().toISOString(),
+    });
+    return res.redirect(`/?connected=${storeId}`);
+  }
+
+  // 通常の管理者ログイン → cookieに保存
   const cookieOpts = 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400';
   res.setHeader('Set-Cookie', [
     `access_token=${tokens.access_token}; ${cookieOpts}`,

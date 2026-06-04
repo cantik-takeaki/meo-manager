@@ -1,4 +1,6 @@
 // api/locations.js — 店舗一覧取得
+import { getAccessToken } from './_tokens.js';
+
 function parseCookies(req) {
   const c = {};
   (req.headers.cookie || '').split(';').forEach(s => {
@@ -10,7 +12,8 @@ function parseCookies(req) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { access_token } = parseCookies(req);
+  const { storeId } = req.query;
+  const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 
   try {

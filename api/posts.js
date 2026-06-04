@@ -1,4 +1,6 @@
 // api/posts.js — Googleポスト管理
+import { getAccessToken } from './_tokens.js';
+
 function parseCookies(req) {
   const c = {};
   (req.headers.cookie || '').split(';').forEach(s => {
@@ -14,7 +16,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { access_token } = parseCookies(req);
+  const { storeId } = req.query;
+  const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 
   const { locationName } = req.query;
