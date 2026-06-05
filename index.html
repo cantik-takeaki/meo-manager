@@ -951,13 +951,15 @@ async function loadLocations() {
 
     const gbpLocations = (gbpData.locations || []).map(l => ({ ...l, _type: 'gbp' }));
     const adminLocations = (adminData.stores || []).map(s => ({
-      name: s.storeId,
+      name: s.gbpLocationName || s.storeId,
       title: s.storeName,
       _type: s.gbpConnected ? 'gbp' : 'manual',
       storeId: s.storeId,
       clientEmail: s.clientEmail,
       gbpConnected: s.gbpConnected,
       gbpEmail: s.gbpEmail,
+      gbpLocationName: s.gbpLocationName,
+      gbpLocations: s.gbpLocations || [],
     }));
 
     // 重複を除いてマージ
