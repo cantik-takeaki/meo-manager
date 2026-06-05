@@ -1,7 +1,10 @@
-// api/auth/login.js — Google OAuthログイン開始
+// api/auth/login.js — Google OAuthログイン開始（管理者ログイン / お客さんのGBP連携 兼用）
 export default function handler(req, res) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.REDIRECT_URI || 'https://meo-manager.vercel.app/api/auth/callback';
+  const redirectUri = process.env.REDIRECT_URI || 'https://meo-manager-rho.vercel.app/api/auth/callback';
+
+  // store パラメータがある場合 = お客さんのGBP連携
+  const { store } = req.query;
 
   const scopes = [
     'https://www.googleapis.com/auth/business.manage',
@@ -16,6 +19,7 @@ export default function handler(req, res) {
   url.searchParams.set('scope', scopes);
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
+  if (store) url.searchParams.set('state', `store:${store}`);
 
   res.redirect(url.toString());
 }
