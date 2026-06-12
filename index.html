@@ -389,6 +389,27 @@ body {
         </div>
       </div>
 
+      <div class="card" id="insightsCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title">インサイト（直近3ヶ月）</div>
+          <div class="card-sub" id="insightsStore"></div>
+        </div>
+        <div class="stats-grid" id="insightsGrid">
+          <div class="stat-card"><div class="stat-label">表示回数（合計）</div><div class="stat-value blue" id="insImpressions">—</div></div>
+          <div class="stat-card"><div class="stat-label">マップ表示</div><div class="stat-value" id="insMaps">—</div></div>
+          <div class="stat-card"><div class="stat-label">検索表示</div><div class="stat-value" id="insSearch">—</div></div>
+          <div class="stat-card"><div class="stat-label">電話</div><div class="stat-value gold" id="insCalls">—</div></div>
+          <div class="stat-card"><div class="stat-label">ルート検索</div><div class="stat-value green" id="insDir">—</div></div>
+          <div class="stat-card"><div class="stat-label">サイト訪問</div><div class="stat-value" id="insWeb">—</div></div>
+        </div>
+        <div id="insightsNote" class="card-sub" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card" id="alertsCard" style="display:none">
+        <div class="card-header"><div class="card-title">⚠️ 要対応：低評価の未返信口コミ</div></div>
+        <div id="alertsList"></div>
+      </div>
+
       <div class="card">
         <div class="card-header"><div class="card-title">管理中の店舗</div></div>
         <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
@@ -1042,7 +1063,67 @@ function selectLocation(idx) {
   loadProtection();
   loadCitation();
   loadAio();
+  loadInsights();
 }
+
+// ─── インサイト（ダッシュボード概況） ───
+async function loadInsights() {
+  const card = document.getElementById('insightsCard');
+  const alertCard = document.getElementById('alertsCard');
+  if (!currentLocation) { if (card) card.style.display = 'none'; return; }
+
+  // 手動未連携は非表示
+  if (currentLocation._type === 'manual' && !currentLocation.gbpConnected) {
+    if (card) card.style.display = 'none';
+    if (alertCard) alertCard.style.display = 'none';
+    return;
+  }
+
+  const storeEl = document.getElementById('insightsStore');
+  if (storeEl) storeEl.textContent = currentLocation.title || '';
+  const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+
+  try {
+    const res = await fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${sid}`);
+    const data = await res.json();
+    if (data.error || data.pending) {
+      // API未承認等 → カードは出すが注記
+      card.style.display = '';
+      document.getElementById('insightsNote').textContent = 'インサイトはGoogle Business Profile APIの承認後に表示されます。';
+      ['insImpressions','insMaps','insSearch','insCalls','insDir','insWeb'].forEach(id => document.getElementById(id).textContent = '—');
+    } else {
+      const s = data.summary || {};
+      card.style.display = '';
+      document.getElementById('insightsNote').textContent = '';
+      const fmt = (n) => (n || 0).toLocaleString();
+      document.getElementById('insImpressions').textContent = fmt(s.impressions);
+      document.getElementById('insMaps').textContent = fmt(s.mapsImpressions);
+      document.getElementById('insSearch').textContent = fmt(s.searchImpressions);
+      document.getElementById('insCalls').textContent = fmt(s.calls);
+      document.getElementById('insDir').textContent = fmt(s.directionRequests);
+      document.getElementById('insWeb').textContent = fmt(s.websiteClicks);
+    }
+  } catch (e) {
+    if (card) card.style.display = 'none';
+  }
+}
+
+// 低評価アラート描画（loadReviewsの集計から呼ぶ）
+function renderLowAlerts(stats) {
+  const card = document.getElementById('alertsCard');
+  const list = document.getElementById('alertsList');
+  if (!card || !list) return;
+  const alerts = stats?.lowRatingAlerts || [];
+  if (!alerts.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = alerts.map(a => `
+    <div class="alert-item" style="padding:12px;border-left:3px solid #e1655a;background:#fdecea;border-radius:8px;margin-bottom:10px">
+      <div style="font-weight:700;color:#b03a2e">★${a.star} ${escapeHtml(a.reviewer)}</div>
+      <div style="font-size:13px;margin-top:4px;color:#444">${escapeHtml((a.comment || '').slice(0,120))}</div>
+      <button class="btn btn-sm" style="margin-top:8px" onclick="switchPanel('reviews')">口コミ管理で返信する</button>
+    </div>`).join('');
+}
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // 店舗管理から登録後にサイドバーを再読み込み
 async function refreshStores() {
@@ -1097,6 +1178,12 @@ async function loadReviews() {
     } else {
       allReviews = data.reviews || [];
       document.getElementById('statPending').textContent = allReviews.filter(r => !r.reviewReply).length;
+      // 集計を反映（平均評価・低評価アラート）
+      if (data.stats) {
+        const rt = document.getElementById('statRating');
+        if (rt) rt.textContent = data.stats.averageRating || '—';
+        renderLowAlerts(data.stats);
+      }
     }
 
     if (!allReviews.length) allReviews = getDemoReviews();

@@ -1,5 +1,6 @@
-// api/posts.js — Googleポスト管理
+// api/posts.js — Googleポスト管理（＋予約下書き）
 import { getAccessToken } from './_tokens.js';
+import { kvGet, kvSet } from './_kv.js';
 
 function parseCookies(req) {
   const c = {};
@@ -16,7 +17,45 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { storeId } = req.query;
+  const { storeId, action } = req.query;
+
+  // ── 予約下書き（KV保存。Google APIに予約機能が無いため自前管理） ──
+  // ここはトークン不要（自社KVのみ操作）。storeId をキーに使う。
+  if (action === 'drafts') {
+    const sid = storeId || 'default';
+    const key = `post_drafts_${sid}`;
+    if (req.method === 'GET') {
+      const list = await kvGet(key) || [];
+      return res.json({ drafts: list });
+    }
+    if (req.method === 'POST') {
+      const { id, summary, scheduledDate, topicType, callToActionType, callToActionUrl } = req.body || {};
+      const list = await kvGet(key) || [];
+      if (id) {
+        // 更新
+        const idx = list.findIndex(d => d.id === id);
+        if (idx >= 0) list[idx] = { ...list[idx], summary, scheduledDate, topicType, callToActionType, callToActionUrl };
+      } else {
+        // 新規
+        list.push({
+          id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          summary, scheduledDate: scheduledDate || '', topicType: topicType || 'STANDARD',
+          callToActionType: callToActionType || '', callToActionUrl: callToActionUrl || '',
+          status: 'scheduled', createdAt: new Date().toISOString(),
+        });
+      }
+      await kvSet(key, list);
+      return res.json({ success: true, drafts: list });
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(d => d.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, drafts: list });
+    }
+    return res.status(405).end();
+  }
+
   const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 

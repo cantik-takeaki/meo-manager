@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const { locationName } = req.query;
   if (!locationName) return res.status(400).json({ error: 'locationName必須' });
 
-  // 口コミ一覧取得
+  // 口コミ一覧取得（＋集計・低評価アラート）
   if (req.method === 'GET') {
     try {
       const r = await fetch(
@@ -32,6 +32,35 @@ export default async function handler(req, res) {
       );
       const data = await r.json();
       if (data.error) return res.status(r.status).json({ error: data.error.message, pending: true });
+
+      // ── 集計を付加 ──
+      const STAR = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+      const reviews = data.reviews || [];
+      let sum = 0, count = 0, unreplied = 0;
+      const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      const lowAlerts = [];
+      for (const rv of reviews) {
+        const star = STAR[rv.starRating] || 0;
+        if (star) { sum += star; count++; dist[star]++; }
+        const hasReply = !!rv.reviewReply;
+        if (!hasReply) unreplied++;
+        if (star && star <= 2 && !hasReply) {
+          lowAlerts.push({
+            reviewName: rv.name,
+            reviewer: rv.reviewer?.displayName || 'お客様',
+            star,
+            comment: rv.comment || '',
+            createTime: rv.createTime || '',
+          });
+        }
+      }
+      data.stats = {
+        averageRating: count ? Math.round((sum / count) * 10) / 10 : 0,
+        totalCount: count,
+        unrepliedCount: unreplied,
+        distribution: dist,
+        lowRatingAlerts: lowAlerts,
+      };
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: e.message });

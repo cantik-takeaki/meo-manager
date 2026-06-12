@@ -10,11 +10,97 @@ function parseCookies(req) {
   return c;
 }
 
+// 直近Nヶ月の日付レンジ
+function monthRange(months = 3) {
+  const end = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - months);
+  const f = (d) => ({ year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() });
+  return { start: f(start), end: f(end) };
+}
+
+// ── インサイト（パフォーマンス）取得 ──
+async function fetchInsights(access_token, locationName) {
+  const m = String(locationName).match(/locations\/[^/]+/);
+  const locPath = m ? m[0] : locationName;
+  const { start, end } = monthRange(3);
+  const metrics = [
+    'BUSINESS_IMPRESSIONS_DESKTOP_MAPS',
+    'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH',
+    'BUSINESS_IMPRESSIONS_MOBILE_MAPS',
+    'BUSINESS_IMPRESSIONS_MOBILE_SEARCH',
+    'CALL_CLICKS',
+    'WEBSITE_CLICKS',
+    'BUSINESS_DIRECTION_REQUESTS',
+    'BUSINESS_CONVERSATIONS',
+  ];
+  const params = new URLSearchParams();
+  metrics.forEach((mt) => params.append('dailyMetrics', mt));
+  params.set('dailyRange.start_date.year', start.year);
+  params.set('dailyRange.start_date.month', start.month);
+  params.set('dailyRange.start_date.day', start.day);
+  params.set('dailyRange.end_date.year', end.year);
+  params.set('dailyRange.end_date.month', end.month);
+  params.set('dailyRange.end_date.day', end.day);
+
+  const url = `https://businessprofileperformance.googleapis.com/v1/${locPath}:fetchMultiDailyMetricsTimeSeries?${params.toString()}`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${access_token}` } });
+  const data = await r.json();
+  if (data.error) return { error: data.error.message, pending: true };
+
+  const totals = {};
+  const series = {};
+  for (const mts of data.multiDailyMetricTimeSeries || []) {
+    for (const dm of mts.dailyMetricTimeSeries || []) {
+      const key = dm.dailyMetric;
+      const points = dm.timeSeries?.datedValues || [];
+      let sum = 0;
+      const line = points.map((p) => {
+        const v = Number(p.value || 0);
+        sum += v;
+        const d = p.date || {};
+        return { date: `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`, value: v };
+      });
+      totals[key] = (totals[key] || 0) + sum;
+      series[key] = line;
+    }
+  }
+  const mapsImpressions =
+    (totals.BUSINESS_IMPRESSIONS_DESKTOP_MAPS || 0) + (totals.BUSINESS_IMPRESSIONS_MOBILE_MAPS || 0);
+  const searchImpressions =
+    (totals.BUSINESS_IMPRESSIONS_DESKTOP_SEARCH || 0) + (totals.BUSINESS_IMPRESSIONS_MOBILE_SEARCH || 0);
+
+  return {
+    range: { start, end },
+    summary: {
+      impressions: mapsImpressions + searchImpressions,
+      mapsImpressions,
+      searchImpressions,
+      calls: totals.CALL_CLICKS || 0,
+      websiteClicks: totals.WEBSITE_CLICKS || 0,
+      directionRequests: totals.BUSINESS_DIRECTION_REQUESTS || 0,
+      conversations: totals.BUSINESS_CONVERSATIONS || 0,
+    },
+    totals,
+    series,
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { storeId } = req.query;
+  const { storeId, action, locationName } = req.query;
   const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
+
+  // インサイト取得モード
+  if (action === 'insights') {
+    if (!locationName) return res.status(400).json({ error: 'locationName必須' });
+    try {
+      return res.json(await fetchInsights(access_token, locationName));
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   try {
     // アカウント一覧取得
