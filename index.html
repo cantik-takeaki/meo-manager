@@ -590,9 +590,21 @@ body {
           <button class="btn btn-primary" onclick="generatePost()">✨ 生成</button>
         </div>
         <textarea id="generatedPost" placeholder="ここに生成された投稿文が表示されます" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:120px;font-family:inherit;line-height:1.6"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="generatePost()">再生成</button>
           <button class="btn btn-success btn-sm" onclick="copyToPost()">投稿管理にコピー</button>
+          <button class="btn btn-outline btn-sm" onclick="generateInstagram()">📷 Instagram用に整形</button>
+        </div>
+
+        <!-- Instagram連動（手動コピー版） -->
+        <div id="igBlock" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px">📷 Instagram用キャプション</div>
+          <textarea id="igCaption" placeholder="ここにInstagram用の整形結果が表示されます" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:140px;font-family:inherit;line-height:1.7"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-success btn-sm" onclick="copyIg()">コピーする</button>
+            <a class="btn btn-outline btn-sm" href="https://www.instagram.com/" target="_blank">Instagramを開く</a>
+          </div>
+          <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※コピーしてInstagramアプリ/Webで投稿してください（自動投稿はInstagram API審査が必要なため、現在は手動コピー方式です）。</p>
         </div>
       </div>
     </div>
@@ -1859,6 +1871,33 @@ function copyToPost() {
   document.getElementById('postText').value = text;
   showPanel('posts');
   showToast('投稿管理にコピーしました', 'success');
+}
+
+// ─── Instagram用に整形（手動コピー） ───
+async function generateInstagram() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const source = document.getElementById('generatedPost').value.trim();
+  if (!source) return showToast('先に投稿文を生成してください', 'error');
+  const block = document.getElementById('igBlock');
+  const cap = document.getElementById('igCaption');
+  block.style.display = 'block';
+  cap.value = '整形中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'instagram', sourceText: source }),
+    });
+    const data = await res.json();
+    cap.value = data.content || '整形失敗';
+  } catch { cap.value = '整形に失敗しました'; }
+}
+
+async function copyIg() {
+  const text = document.getElementById('igCaption').value;
+  if (!text) return;
+  try { await navigator.clipboard.writeText(text); showToast('コピーしました', 'success'); }
+  catch { showToast('コピーに失敗しました', 'error'); }
 }
 
 // ─── Protection ───
