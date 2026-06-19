@@ -1490,6 +1490,7 @@ async function loadClientStores() {
           }
         </div>
         <a href="/report.html?store=${s.storeId}" target="_blank" style="font-size:12px;color:var(--accent)">プレビュー</a>
+        <button class="btn btn-outline btn-sm" onclick="copyReviewRequest('${s.storeId}', ${JSON.stringify(s.storeName)})">📣 口コミ依頼URL</button>
         <button class="btn btn-outline btn-sm" onclick="openRankingInput('${s.storeId}','${s.storeName}')">順位入力</button>
         <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red);border:none" onclick="deleteStore('${s.storeId}')">削除</button>
       </div>`).join('');
@@ -1544,6 +1545,27 @@ async function deleteStore(storeId) {
 function copyConnectUrl(path) {
   const url = location.origin + path;
   navigator.clipboard.writeText(url).then(() => showToast('連携URLをコピーしました', 'success'));
+}
+
+// 口コミ依頼URLを生成してコピー（お客さん向けreview.htmlへのリンク）
+function copyReviewRequest(storeId, storeName) {
+  // 保存済みのGoogle口コミ投稿URLを取得（無ければ入力を促す）
+  const saved = localStorage.getItem('reviewUrl_' + storeId) || '';
+  const g = window.prompt(
+    `「${storeName}」のGoogle口コミ投稿URLを入力してください。\n\n（Googleビジネスプロフィール → 「クチコミを増やす」 から取得できる https://g.page/... または https://search.google.com/local/writereview?placeid=... 形式のURL）\n\n空欄のままでも依頼URLは作れますが、お客さんが投稿画面まで進めません。`,
+    saved
+  );
+  if (g === null) return; // キャンセル
+  if (g.trim()) localStorage.setItem('reviewUrl_' + storeId, g.trim());
+
+  const params = new URLSearchParams({ store: storeId, name: storeName });
+  if (g.trim()) params.set('g', g.trim());
+  const url = location.origin + '/review.html?' + params.toString();
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('口コミ依頼URLをコピーしました。LINEやQRで送れます', 'success');
+  }).catch(() => {
+    window.prompt('以下のURLをコピーしてお使いください：', url);
+  });
 }
 
 async function openRankingInput(storeId, storeName) {
