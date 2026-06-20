@@ -932,6 +932,24 @@ body {
         </div>
       </div>
 
+      <!-- 月間投稿プラン -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📅 月間投稿プラン（下書き一括生成）</div>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">AIが月5回分の投稿案を作成し、予約日付つきで下書き保存します。内容を確認・編集して「投稿する」で公開できます。</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <select id="planCount" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
+            <option value="5">月5本</option>
+            <option value="4">月4本</option>
+            <option value="8">月8本</option>
+          </select>
+          <input id="planTheme" type="text" placeholder="今月のテーマ（任意・例：梅雨の特別メニュー）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary btn-sm" onclick="generateMonthlyPlan()">✨ 投稿案を一括生成</button>
+        </div>
+        <div id="planList"></div>
+      </div>
+
       <div class="card">
         <div class="card-header"><div class="card-title">投稿一覧</div></div>
         <div id="postsList">
@@ -1923,6 +1941,87 @@ async function generatePost() {
     const data = await res.json();
     ta.value = data.content || '生成失敗';
   } catch { ta.value = '生成に失敗しました'; }
+}
+
+// ─── 月間投稿プラン（下書き一括生成） ───
+async function generateMonthlyPlan() {
+  if (!currentLocation) return showToast('店舗を選択してください', 'error');
+  const count = parseInt(document.getElementById('planCount').value) || 5;
+  const theme = document.getElementById('planTheme').value.trim();
+  const listEl = document.getElementById('planList');
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div>投稿案を作成中…（少し時間がかかります）</div>';
+
+  // 投稿の切り口（毎回違う内容になるよう変化をつける）
+  const angles = ['お店の魅力・こだわりの紹介', 'おすすめメニュー・サービスの紹介', 'キャンペーン・お得情報のお知らせ',
+    '季節の話題・旬の情報', 'スタッフの想い・お客様への感謝', '新メニュー・新サービスの案内',
+    'ご予約・ご来店のおすすめ', 'よくある質問への回答'];
+
+  const drafts = [];
+  const storeId = currentLocation.storeId || '';
+  // 月内に分散した投稿日（今日から6日おき）
+  const baseDate = new Date();
+  for (let i = 0; i < count; i++) {
+    const angle = angles[i % angles.length];
+    const instruction = (theme ? `今月のテーマ「${theme}」を踏まえて。` : '') + `切り口：${angle}`;
+    try {
+      const res = await fetch('/api/generate-content', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId: currentLocationId, type: 'post', postType: 'STANDARD', customInstruction: instruction }),
+      });
+      const data = await res.json();
+      const d = new Date(baseDate); d.setDate(d.getDate() + i * 6);
+      const scheduledDate = d.toISOString().split('T')[0];
+      drafts.push({ summary: data.content || '', scheduledDate, topicType: 'STANDARD' });
+    } catch {}
+    listEl.innerHTML = `<div class="loading"><div class="spinner"></div>投稿案を作成中… ${i + 1}/${count}本</div>`;
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // 下書きとして保存
+  for (const dr of drafts) {
+    await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dr),
+    });
+  }
+  showToast(`${drafts.length}本の投稿案を下書き保存しました`, 'success');
+  loadDrafts();
+}
+
+async function loadDrafts() {
+  if (!currentLocation) return;
+  const storeId = currentLocation.storeId || '';
+  const listEl = document.getElementById('planList');
+  try {
+    const res = await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`);
+    const data = await res.json();
+    const drafts = data.drafts || [];
+    if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">下書きはまだありません。</p>'; return; }
+    listEl.innerHTML = drafts.map(d => `
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--accent);font-weight:600">📅 投稿予定: ${d.scheduledDate || '未設定'}</span>
+          <button class="link-btn" style="color:var(--red)" onclick="deleteDraft('${d.id}')">削除</button>
+        </div>
+        <textarea id="draft-${d.id}" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;min-height:80px;font-family:inherit;line-height:1.6">${escapeHtml(d.summary)}</textarea>
+        <div style="margin-top:8px"><button class="btn btn-success btn-sm" onclick="publishDraft('${d.id}')">この内容で投稿する</button></div>
+      </div>`).join('');
+  } catch { listEl.innerHTML = ''; }
+}
+
+async function deleteDraft(id) {
+  const storeId = currentLocation?.storeId || '';
+  await fetch(`/api/posts?action=drafts&id=${id}${storeId ? '&storeId=' + storeId : ''}`, { method: 'DELETE' });
+  showToast('下書きを削除しました', 'success');
+  loadDrafts();
+}
+
+async function publishDraft(id) {
+  if (!currentLocation) return;
+  const summary = document.getElementById('draft-' + id)?.value.trim();
+  if (!summary) return showToast('投稿内容が空です', 'error');
+  document.getElementById('postText').value = summary;
+  showToast('内容を新規投稿欄にセットしました。「投稿する」で公開できます', 'success');
+  document.getElementById('postText').scrollIntoView({ behavior: 'smooth' });
 }
 
 function copyToPost() {
