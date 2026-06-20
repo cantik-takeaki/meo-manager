@@ -133,10 +133,20 @@ export default async function handler(req, res) {
         if (cdata.error) return res.status(400).json({ error: 'コンテナ作成失敗: ' + cdata.error.message });
         const creationId = cdata.id;
 
-        // 動画/リールは処理に時間がかかるため、画像のみ即時公開。
-        // 動画はcreationIdを返し、status確認後にfinalizeで公開する。
+        // 動画/リールは処理に時間がかかるため、creationIdを返してfinalizeで公開する。
         if (videoUrl) {
           return res.json({ pending: true, creationId, message: '動画処理中。statusがFINISHEDになったらfinalizeで公開してください' });
+        }
+
+        // 画像も処理完了まで一瞬ラグがある（"Media ID is not available"対策）。
+        // status_code が FINISHED になるまで最大5回ポーリングしてから公開。
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        for (let i = 0; i < 5; i++) {
+          const sr = await fetch(`${BASE}/${creationId}?fields=status_code&access_token=${IG_TOKEN}`);
+          const sdata = await sr.json();
+          if (sdata.status_code === 'FINISHED') break;
+          if (sdata.status_code === 'ERROR') return res.status(400).json({ error: '画像処理エラー', creationId });
+          await sleep(1500);
         }
 
         // step2: 公開（画像）
