@@ -1,6 +1,7 @@
-// api/posts.js — Googleポスト管理（＋予約下書き）
+// api/posts.js — Googleポスト管理（＋予約下書き／Instagram連携／クライアント別写真ライブラリ）
 import { getAccessToken } from './_tokens.js';
 import { kvGet, kvSet } from './_kv.js';
+import crypto from 'crypto';
 
 function parseCookies(req) {
   const c = {};
@@ -53,6 +54,96 @@ export default async function handler(req, res) {
       await kvSet(key, list);
       return res.json({ success: true, drafts: list });
     }
+    return res.status(405).end();
+  }
+
+  // ── クライアント別 写真ライブラリ（Cloudinary保管＋KVで一覧管理） ──
+  // storeId（クライアント）ごとに写真を蓄積。Instagram用に正方形URLも保持。
+  if (action === 'media') {
+    const sid = storeId || 'default';
+    const key = `media_${sid}`;
+    const CLOUD = process.env.CLOUDINARY_CLOUD_NAME;
+    const CKEY = process.env.CLOUDINARY_API_KEY;
+    const CSECRET = process.env.CLOUDINARY_API_SECRET;
+
+    // 一覧取得
+    if (req.method === 'GET') {
+      const list = await kvGet(key) || [];
+      return res.json({ media: list });
+    }
+
+    // アップロード（ブラウザでリサイズ済みのdataURIを受け取りCloudinaryへ）
+    if (req.method === 'POST') {
+      if (!CLOUD || !CKEY || !CSECRET) {
+        return res.status(500).json({ error: 'Cloudinary環境変数が未設定です（CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET）' });
+      }
+      const { image, note } = req.body || {};
+      if (!image) return res.status(400).json({ error: '画像データ(image)が必須です' });
+
+      const ts = Math.floor(Date.now() / 1000);
+      const folder = `meo/${sid}`;
+      // 署名対象パラメータはアルファベット順（file/api_key/resource_type除く）
+      const toSign = `folder=${folder}&timestamp=${ts}`;
+      const signature = crypto.createHash('sha1').update(toSign + CSECRET).digest('hex');
+
+      const form = new URLSearchParams();
+      form.set('file', image);          // base64 data URI
+      form.set('api_key', CKEY);
+      form.set('timestamp', String(ts));
+      form.set('folder', folder);
+      form.set('signature', signature);
+
+      try {
+        const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`, {
+          method: 'POST', body: form,
+        });
+        const data = await r.json();
+        if (data.error) return res.status(400).json({ error: 'Cloudinaryアップロード失敗: ' + data.error.message });
+
+        // 元URLと、Instagram用の正方形URL（スマート切り抜き）を生成
+        const sq = data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1080/');
+        const portrait = data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1350/');
+        const item = {
+          publicId: data.public_id,
+          url: data.secure_url,
+          squareUrl: sq,
+          portraitUrl: portrait,
+          width: data.width,
+          height: data.height,
+          note: note || '',
+          createdAt: new Date().toISOString(),
+        };
+        const list = await kvGet(key) || [];
+        list.unshift(item);
+        await kvSet(key, list);
+        return res.json({ success: true, item, media: list });
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // 削除（CloudinaryからもKVからも削除）
+    if (req.method === 'DELETE') {
+      const { publicId } = req.query;
+      if (!publicId) return res.status(400).json({ error: 'publicId必須' });
+      if (CLOUD && CKEY && CSECRET) {
+        try {
+          const ts = Math.floor(Date.now() / 1000);
+          const toSign = `public_id=${publicId}&timestamp=${ts}`;
+          const signature = crypto.createHash('sha1').update(toSign + CSECRET).digest('hex');
+          const form = new URLSearchParams();
+          form.set('public_id', publicId);
+          form.set('api_key', CKEY);
+          form.set('timestamp', String(ts));
+          form.set('signature', signature);
+          await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/destroy`, { method: 'POST', body: form });
+        } catch (e) { /* Cloudinary削除失敗してもKVは消す */ }
+      }
+      const list = (await kvGet(key) || []).filter(m => m.publicId !== publicId);
+      await kvSet(key, list);
+      return res.json({ success: true, media: list });
+    }
+
     return res.status(405).end();
   }
 
