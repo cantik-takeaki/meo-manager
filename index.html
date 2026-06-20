@@ -1166,8 +1166,16 @@ let _igSelected = null;
 async function loadMedia() {
   const gallery = document.getElementById('mediaGallery');
   const sub = document.getElementById('instagramSubtitle');
+  // 店舗切り替え時は前の店舗の状態をリセット（投稿作成欄・選択写真をクリア）
+  _igSelected = null;
+  const composeCard = document.getElementById('igComposeCard');
+  if (composeCard) composeCard.style.display = 'none';
+  const statusEl = document.getElementById('mediaUploadStatus');
+  if (statusEl) statusEl.textContent = '';
   if (!currentLocationId) {
+    _mediaList = [];
     if (gallery) gallery.innerHTML = '<p style="font-size:12px;color:var(--text-sub);grid-column:1/-1">店舗を選択してください</p>';
+    if (sub) sub.textContent = '店舗を選択してください';
     return;
   }
   if (sub) sub.textContent = currentLocation?.title || '';
