@@ -324,6 +324,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
       投稿管理
     </button>
+    <button class="nav-item" onclick="showPanel('instagram')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+      Instagram投稿
+    </button>
     <button class="nav-item" onclick="showPanel('clients')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
       店舗管理
@@ -612,6 +616,58 @@ body {
           </div>
           <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※コピーしてInstagramアプリ/Webで投稿してください（自動投稿はInstagram API審査が必要なため、現在は手動コピー方式です）。</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Instagram投稿（クライアント別 写真ライブラリ） -->
+    <div class="panel" id="panel-instagram">
+      <div class="page-header">
+        <div class="page-title">📸 Instagram投稿</div>
+        <div class="page-sub" id="instagramSubtitle">店舗を選択してください</div>
+      </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.25)">
+        <div style="font-size:13px;color:var(--text-sub);line-height:1.7">
+          クライアントごとに写真を貯めて、選んだ写真からAIがキャプションを生成し、Instagramへ投稿します。<br>
+          <b>投稿は社外公開アクションです。</b>内容を確認の上、社長承認として投稿してください。
+        </div>
+      </div>
+
+      <!-- 写真ライブラリ -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">写真ライブラリ</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">クライアントからもらった写真をアップロードして蓄積します（スマホ写真は自動でリサイズ）。</p>
+        <input type="file" id="mediaFileInput" accept="image/*" multiple style="display:none" onchange="uploadMedia(this.files)">
+        <button class="btn btn-primary" onclick="document.getElementById('mediaFileInput').click()">＋ 写真をアップロード</button>
+        <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
+        <div id="mediaGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:16px"></div>
+      </div>
+
+      <!-- 投稿作成 -->
+      <div class="card" id="igComposeCard" style="display:none">
+        <div class="card-header"><div class="card-title">この写真で投稿を作る</div></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+          <img id="igComposePreview" alt="" style="width:200px;height:200px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+          <div style="flex:1;min-width:240px">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">写真の内容・伝えたいこと（任意）</label>
+            <input id="igPhotoNote" type="text" placeholder="例：新メニューのパスタ／季節限定／店内の雰囲気" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:12px;color:var(--text-sub)">画像比率
+                <select id="igAspect" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                  <option value="portrait">縦長 4:5（推奨）</option>
+                  <option value="square">正方形 1:1</option>
+                </select>
+              </label>
+              <button class="btn btn-primary btn-sm" onclick="generateIgCaption()">✨ AIでキャプション生成</button>
+            </div>
+          </div>
+        </div>
+        <textarea id="igPostCaption" placeholder="ここにキャプションが表示されます（生成後に自由に編集できます）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:200px;font-family:inherit;line-height:1.7;margin-top:14px"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="generateIgCaption()">再生成</button>
+          <button class="btn btn-success" onclick="publishIgPost()">📤 Instagramに投稿（承認の上）</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※現在は連携済みアカウント（@cantik.ink）へ投稿します。各クライアントのアカウントへの投稿は、Instagram API審査の通過後に各社を連携して可能になります。</p>
       </div>
     </div>
 
@@ -1100,6 +1156,146 @@ function selectLocation(idx) {
   loadCitation();
   loadAio();
   loadInsights();
+  loadMedia();
+}
+
+// ─── Instagram投稿（クライアント別 写真ライブラリ） ───
+let _mediaList = [];
+let _igSelected = null;
+
+async function loadMedia() {
+  const gallery = document.getElementById('mediaGallery');
+  const sub = document.getElementById('instagramSubtitle');
+  if (!currentLocationId) {
+    if (gallery) gallery.innerHTML = '<p style="font-size:12px;color:var(--text-sub);grid-column:1/-1">店舗を選択してください</p>';
+    return;
+  }
+  if (sub) sub.textContent = currentLocation?.title || '';
+  try {
+    const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`);
+    const data = await res.json();
+    _mediaList = data.media || [];
+    renderMedia();
+  } catch (e) { /* noop */ }
+}
+
+function renderMedia() {
+  const g = document.getElementById('mediaGallery');
+  if (!g) return;
+  if (!_mediaList.length) {
+    g.innerHTML = '<p style="font-size:12px;color:var(--text-sub);grid-column:1/-1">まだ写真がありません。上のボタンからアップロードしてください。</p>';
+    return;
+  }
+  g.innerHTML = _mediaList.map((m, i) => `
+    <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
+      <img src="${m.squareUrl || m.url}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="pickPhoto(${i})" title="クリックで投稿作成">
+      <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
+    </div>`).join('');
+}
+
+// スマホ写真をブラウザ側でリサイズ（アップロード軽量化・関数の本文制限対策）
+function resizeImage(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxSize || height > maxSize) {
+        if (width > height) { height = Math.round(height * maxSize / width); width = maxSize; }
+        else { width = Math.round(width * maxSize / height); height = maxSize; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadMedia(files) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!files || !files.length) return;
+  const status = document.getElementById('mediaUploadStatus');
+  let done = 0;
+  for (let i = 0; i < files.length; i++) {
+    if (status) status.textContent = `アップロード中... (${i + 1}/${files.length})`;
+    try {
+      const dataUri = await resizeImage(files[i], 1440);
+      const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUri }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'error'); }
+      else { _mediaList = data.media; done++; }
+    } catch (e) { showToast('アップロード失敗: ' + e.message, 'error'); }
+  }
+  if (status) status.textContent = `${done}件アップロード完了`;
+  renderMedia();
+  const inp = document.getElementById('mediaFileInput');
+  if (inp) inp.value = '';
+}
+
+async function deleteMedia(publicId) {
+  if (!confirm('この写真を削除しますか？')) return;
+  try {
+    const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}&publicId=${encodeURIComponent(publicId)}`, { method: 'DELETE' });
+    const data = await res.json();
+    _mediaList = data.media || [];
+    renderMedia();
+    showToast('削除しました');
+  } catch (e) { showToast('削除失敗', 'error'); }
+}
+
+function pickPhoto(i) {
+  _igSelected = _mediaList[i];
+  if (!_igSelected) return;
+  const card = document.getElementById('igComposeCard');
+  card.style.display = 'block';
+  document.getElementById('igComposePreview').src = _igSelected.squareUrl || _igSelected.url;
+  document.getElementById('igPostCaption').value = '';
+  document.getElementById('igPhotoNote').value = _igSelected.note || '';
+  card.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function generateIgCaption() {
+  if (!_igSelected) return showToast('写真を選択してください', 'error');
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const note = document.getElementById('igPhotoNote').value;
+  const ta = document.getElementById('igPostCaption');
+  ta.value = '生成中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'instagram_post', photoNote: note }),
+    });
+    const data = await res.json();
+    ta.value = data.content || data.error || '生成失敗';
+  } catch (e) { ta.value = '生成失敗: ' + e.message; }
+}
+
+async function publishIgPost() {
+  if (!_igSelected) return showToast('写真を選択してください', 'error');
+  const caption = document.getElementById('igPostCaption').value.trim();
+  if (!caption) return showToast('キャプションを入力してください', 'error');
+  if (!confirm('この内容でInstagramに投稿します。よろしいですか？（社外公開アクション）')) return;
+  const aspect = document.getElementById('igAspect').value;
+  const imageUrl = aspect === 'portrait' ? _igSelected.portraitUrl : _igSelected.squareUrl;
+  const sid = currentLocation?.storeId ? '&storeId=' + currentLocation.storeId : '';
+  showToast('投稿中...');
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl, caption }),
+    });
+    const data = await res.json();
+    if (data.success) showToast('Instagramに投稿しました！🎉');
+    else showToast('投稿失敗: ' + (data.error || ''), 'error');
+  } catch (e) { showToast('投稿失敗: ' + e.message, 'error'); }
 }
 
 // ─── インサイト（ダッシュボード概況） ───
@@ -1475,6 +1671,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'clients') loadClientStores();
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
+  if (name === 'instagram') loadMedia();
 }
 
 function showPanel(name) {

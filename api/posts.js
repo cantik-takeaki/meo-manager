@@ -150,8 +150,14 @@ export default async function handler(req, res) {
   // ── Instagram連携（Instagram Login API / graph.instagram.com） ──
   // 認証はInstagramの長期トークン（環境変数）を使用。Google APIとは別系統。
   if (action === 'instagram') {
-    const IG_TOKEN = process.env.IG_ACCESS_TOKEN;
-    const IG_USER = process.env.IG_USER_ID;
+    // 既定はcantik共通アカウント（環境変数）。クライアントが自分のIGを連携済みなら
+    // ig_conn_{storeId} に保存されたトークンを優先（審査通過後の本番運用で各店舗へ投稿）。
+    let IG_TOKEN = process.env.IG_ACCESS_TOKEN;
+    let IG_USER = process.env.IG_USER_ID;
+    if (storeId) {
+      const conn = await kvGet(`ig_conn_${storeId}`);
+      if (conn?.token && conn?.userId) { IG_TOKEN = conn.token; IG_USER = conn.userId; }
+    }
     if (!IG_TOKEN || !IG_USER) {
       return res.status(500).json({ error: 'IG_ACCESS_TOKEN / IG_USER_ID が未設定です（Vercel環境変数）' });
     }
