@@ -20,8 +20,24 @@ export default async function handler(req, res) {
   const token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
   if (!token) return res.status(401).json({ error: 'ログインが必要です' });
 
-  const { locationName } = req.query;
+  let { locationName } = req.query;
   if (!locationName) return res.status(400).json({ error: 'locationName必須' });
+
+  // 古い連携データ対策：accounts/ が欠けた "locations/xxx" 形式を補完する
+  // v4 reviews API は accounts/{aid}/locations/{lid} 形式が必須
+  if (!String(locationName).includes('accounts/')) {
+    try {
+      const accRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const accData = await accRes.json();
+      const acc = accData.accounts?.[0]?.name; // 通常アカウントは1つ
+      if (acc) {
+        const locPart = String(locationName).match(/locations\/[^/]+/)?.[0] || locationName;
+        locationName = `${acc}/${locPart}`;
+      }
+    } catch (e) { /* 補完失敗時はそのまま進む */ }
+  }
 
   // 口コミ一覧取得（＋集計・低評価アラート）
   if (req.method === 'GET') {
