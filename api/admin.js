@@ -87,6 +87,45 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── SerpApiで順位を自動取得 ──
+  // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)
+  if (req.method === 'GET' && action === 'fetch-rank') {
+    const SERPAPI_KEY = process.env.SERPAPI_KEY;
+    if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
+    const { keyword, location, store } = req.query;
+    if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
+    try {
+      const params = new URLSearchParams({
+        engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY,
+      });
+      if (location) params.set('location', location);
+      const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+      const data = await r.json();
+      if (data.error) return res.status(502).json({ error: data.error });
+      const list = data.local_results || [];
+      const norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
+      const target = norm(store);
+      let rank = null, matched = null;
+      list.forEach((item, i) => {
+        if (rank) return;
+        const t = norm(item.title);
+        if (t && (t.includes(target) || target.includes(t))) {
+          rank = item.position || (i + 1); matched = item.title;
+        }
+      });
+      const top = list.slice(0, 20).map((item, i) => ({
+        position: item.position || (i + 1),
+        title: item.title, rating: item.rating || null, reviews: item.reviews || null,
+      }));
+      return res.json({
+        keyword, location: location || null, rank, matched,
+        found: rank !== null, top, checkedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ── 順位取得 ──
   if (req.method === 'GET' && action === 'rankings') {
     const { storeId } = req.query;

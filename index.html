@@ -482,9 +482,15 @@ body {
           <div class="card-title">📊 キーワード順位を入力</div>
           <span style="font-size:12px;color:var(--text-sub)" id="rankingInputStore"></span>
         </div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:14px">Googleマップで各キーワードを検索して、店舗が何番目に表示されるか入力してください。</p>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:14px">手動入力するか、検索地点を指定して「自動取得」で順位を取得できます。</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <input id="rankLocation" type="text" placeholder="検索地点（例：Shinjuku,Tokyo,Japan）"
+            style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
+          <button class="btn btn-outline btn-sm" onclick="autoFetchAllRanks()">⚡ 全キーワード自動取得</button>
+        </div>
         <div id="rankingInputFields"></div>
         <button class="btn btn-primary" style="margin-top:12px" onclick="saveRankings()">順位を保存</button>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">※自動取得はSerpApi経由。地点は「市区,都道府県,Japan」形式（英語）が確実です。</p>
       </div>
     </div>
 
@@ -1581,14 +1587,46 @@ async function openRankingInput(storeId, storeName) {
   const latest = data.history?.[data.history.length - 1];
 
   document.getElementById('rankingInputFields').innerHTML = keywords.map((kw, i) => `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <span style="flex:1;font-size:13px;font-weight:500">${kw}</span>
       <input id="rank-${i}" type="number" min="1" max="100" value="${latest?.rankings[i] || ''}" placeholder="順位"
-        style="width:80px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;text-align:center">
+        style="width:70px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;text-align:center">
       <span style="font-size:12px;color:var(--text-muted)">位</span>
+      <button class="btn btn-outline btn-sm" style="padding:5px 10px" onclick="fetchOneRank(${i})" title="この語で自動取得">⚡</button>
     </div>`).join('');
 
   window._rankingKeywords = keywords;
+}
+
+// 1キーワードの順位をSerpApiで自動取得
+async function fetchOneRank(i) {
+  if (!selectedClientStore) return;
+  const kw = (window._rankingKeywords || [])[i];
+  if (!kw || kw.startsWith('キーワード')) return showToast('先にナレッジでキーワードを設定してください', 'error');
+  const loc = document.getElementById('rankLocation').value.trim();
+  const input = document.getElementById('rank-' + i);
+  const old = input.value; input.value = '...';
+  try {
+    const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: selectedClientStore.storeName });
+    if (loc) p.set('location', loc);
+    const res = await fetch('/api/admin?' + p.toString());
+    const d = await res.json();
+    if (d.error) { input.value = old; return showToast('取得失敗: ' + d.error, 'error'); }
+    if (d.found) { input.value = d.rank; showToast(`「${kw}」→ ${d.rank}位`, 'success'); }
+    else { input.value = ''; showToast(`「${kw}」→ 圏外（20位以下）`, 'info'); }
+  } catch (e) { input.value = old; showToast('通信エラー', 'error'); }
+}
+
+// 全キーワードを順に自動取得（SerpApiのレート配慮で逐次）
+async function autoFetchAllRanks() {
+  const kws = window._rankingKeywords || [];
+  for (let i = 0; i < kws.length; i++) {
+    if (kws[i] && !kws[i].startsWith('キーワード')) {
+      await fetchOneRank(i);
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  }
+  showToast('全キーワードの自動取得が完了しました', 'success');
 }
 
 async function saveRankings() {
