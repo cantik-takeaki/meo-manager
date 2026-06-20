@@ -273,6 +273,37 @@ export default async function handler(req, res) {
         return res.json({ success: true, id: pdata.id, creationId });
       }
 
+      // DM：会話一覧
+      if (req.method === 'GET' && sub === 'conversations') {
+        const r = await fetch(`${BASE}/${IG_USER}/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
+        const data = await r.json();
+        if (data.error) return res.status(400).json({ error: data.error.message, pending: true });
+        return res.json(data);
+      }
+
+      // DM：会話内のメッセージ取得
+      if (req.method === 'GET' && sub === 'messages') {
+        const { conversationId } = req.query;
+        if (!conversationId) return res.status(400).json({ error: 'conversationId必須' });
+        const r = await fetch(`${BASE}/${conversationId}?fields=messages{id,created_time,from,to,message}&access_token=${IG_TOKEN}`);
+        const data = await r.json();
+        if (data.error) return res.status(400).json({ error: data.error.message });
+        return res.json(data);
+      }
+
+      // DM：メッセージ送信（※相手の最終メッセージから24時間以内のみ送信可）
+      if (req.method === 'POST' && sub === 'send-dm') {
+        const { recipientId, text } = req.body || {};
+        if (!recipientId || !text) return res.status(400).json({ error: 'recipientId・text必須' });
+        const r = await fetch(`${BASE}/${IG_USER}/messages?access_token=${IG_TOKEN}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+        });
+        const data = await r.json();
+        if (data.error) return res.status(400).json({ error: data.error.message });
+        return res.json({ success: true, ...data });
+      }
+
       // コメント返信
       if (req.method === 'POST' && sub === 'reply') {
         const { commentId, message } = req.body || {};

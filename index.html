@@ -669,6 +669,39 @@ body {
         </div>
         <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※現在は連携済みアカウント（@cantik.ink）へ投稿します。各クライアントのアカウントへの投稿は、Instagram API審査の通過後に各社を連携して可能になります。</p>
       </div>
+
+      <!-- DM管理 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">💬 メッセージ（DM）</div>
+          <button class="btn btn-outline btn-sm" onclick="loadConversations()">更新</button>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div id="igConvList" style="flex:0 0 240px;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
+            <p style="font-size:12px;color:var(--text-sub);padding:12px">「更新」で会話を読み込み</p>
+          </div>
+          <div style="flex:1;min-width:260px;display:flex;flex-direction:column">
+            <div id="igMsgThread" style="flex:1;min-height:200px;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;background:var(--bg-3)">
+              <p style="font-size:12px;color:var(--text-sub)">会話を選択してください</p>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <input id="igDmInput" type="text" placeholder="返信メッセージ" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              <button class="btn btn-success btn-sm" onclick="sendDm()">送信</button>
+            </div>
+            <p style="font-size:11px;color:var(--text-sub);margin-top:6px">※相手の最新メッセージから24時間以内のみ返信できます（Instagramの仕様）。送信は社外アクションのため承認の上で行ってください。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- コメント管理 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">💬 投稿のコメント</div>
+          <button class="btn btn-outline btn-sm" onclick="loadIgPostsForComments()">投稿を読み込み</button>
+        </div>
+        <select id="igCommentPostSelect" onchange="loadPostComments()" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:10px">
+          <option value="">投稿を選択してください</option>
+        </select>
+        <div id="igCommentsList" style="max-height:340px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- Protection -->
@@ -1304,6 +1337,119 @@ async function publishIgPost() {
     if (data.success) showToast('Instagramに投稿しました！🎉');
     else showToast('投稿失敗: ' + (data.error || ''), 'error');
   } catch (e) { showToast('投稿失敗: ' + e.message, 'error'); }
+}
+
+// ─── Instagram DM ───
+let _igBizId = null;
+let _igRecipientId = null;
+function _igSid() { return currentLocation?.storeId ? '&storeId=' + currentLocation.storeId : ''; }
+
+async function loadConversations() {
+  const list = document.getElementById('igConvList');
+  list.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:12px">読み込み中...</p>';
+  try {
+    // 自アカウントID（送信相手の判定に使用）
+    if (!_igBizId) {
+      const acc = await fetch(`/api/posts?action=instagram&sub=account${_igSid()}`).then(r => r.json());
+      _igBizId = acc.id;
+    }
+    const res = await fetch(`/api/posts?action=instagram&sub=conversations${_igSid()}`);
+    const data = await res.json();
+    if (data.error) { list.innerHTML = `<p style="font-size:12px;color:var(--text-sub);padding:12px">${data.error}</p>`; return; }
+    const convs = data.data || [];
+    if (!convs.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:12px">会話がありません</p>'; return; }
+    list.innerHTML = convs.map(c => {
+      const other = (c.participants?.data || []).find(p => p.id !== _igBizId) || {};
+      return `<div onclick="openConversation('${c.id}','${other.id || ''}','${(other.username || 'ユーザー').replace(/'/g, '')}')" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px">
+        <b>@${other.username || 'ユーザー'}</b><div style="font-size:11px;color:var(--text-sub)">${(c.updated_time || '').slice(0, 10)}</div></div>`;
+    }).join('');
+  } catch (e) { list.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:12px">読み込み失敗</p>'; }
+}
+
+async function openConversation(convId, recipientId, username) {
+  _igRecipientId = recipientId;
+  const thread = document.getElementById('igMsgThread');
+  thread.innerHTML = '読み込み中...';
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=messages&conversationId=${encodeURIComponent(convId)}${_igSid()}`);
+    const data = await res.json();
+    if (data.error) { thread.innerHTML = `<p style="font-size:12px;color:var(--text-sub)">${data.error}</p>`; return; }
+    const msgs = (data.messages?.data || []).slice().reverse();
+    thread.innerHTML = msgs.map(m => {
+      const mine = m.from?.id === _igBizId;
+      return `<div style="margin:6px 0;text-align:${mine ? 'right' : 'left'}">
+        <span style="display:inline-block;max-width:80%;padding:7px 11px;border-radius:12px;font-size:13px;background:${mine ? 'var(--accent)' : 'var(--bg-2,#e9eef5)'};color:${mine ? '#fff' : 'var(--text)'}">${escapeHtml(m.message || '')}</span></div>`;
+    }).join('') || '<p style="font-size:12px;color:var(--text-sub)">メッセージなし</p>';
+    thread.scrollTop = thread.scrollHeight;
+  } catch (e) { thread.innerHTML = '読み込み失敗'; }
+}
+
+async function sendDm() {
+  const text = document.getElementById('igDmInput').value.trim();
+  if (!text) return;
+  if (!_igRecipientId) return showToast('会話を選択してください', 'error');
+  if (!confirm('このメッセージを送信します。よろしいですか？（社外アクション）')) return;
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=send-dm${_igSid()}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientId: _igRecipientId, text }),
+    });
+    const data = await res.json();
+    if (data.success) { showToast('送信しました'); document.getElementById('igDmInput').value = ''; }
+    else showToast('送信失敗: ' + (data.error || ''), 'error');
+  } catch (e) { showToast('送信失敗: ' + e.message, 'error'); }
+}
+
+// ─── Instagram コメント ───
+async function loadIgPostsForComments() {
+  const sel = document.getElementById('igCommentPostSelect');
+  sel.innerHTML = '<option value="">読み込み中...</option>';
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=media${_igSid()}`);
+    const data = await res.json();
+    const posts = data.data || [];
+    sel.innerHTML = '<option value="">投稿を選択してください</option>' + posts.map(p =>
+      `<option value="${p.id}">${(p.caption || '(キャプションなし)').slice(0, 30).replace(/\n/g, ' ')}… (💬${p.comments_count || 0})</option>`
+    ).join('');
+  } catch (e) { sel.innerHTML = '<option value="">読み込み失敗</option>'; }
+}
+
+async function loadPostComments() {
+  const mediaId = document.getElementById('igCommentPostSelect').value;
+  const box = document.getElementById('igCommentsList');
+  if (!mediaId) { box.innerHTML = ''; return; }
+  box.innerHTML = '読み込み中...';
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=comments&mediaId=${mediaId}${_igSid()}`);
+    const data = await res.json();
+    if (data.error) { box.innerHTML = `<p style="font-size:12px;color:var(--text-sub)">${data.error}</p>`; return; }
+    const cms = data.data || [];
+    if (!cms.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">コメントはまだありません</p>'; return; }
+    box.innerHTML = cms.map(c => `
+      <div style="padding:10px;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px"><b>@${c.username || 'ユーザー'}</b> ${escapeHtml(c.text || '')}</div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input id="creply_${c.id}" type="text" placeholder="返信..." style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+          <button class="btn btn-success btn-sm" onclick="replyToComment('${c.id}')">返信</button>
+        </div>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = '読み込み失敗'; }
+}
+
+async function replyToComment(commentId) {
+  const inp = document.getElementById('creply_' + commentId);
+  const message = inp.value.trim();
+  if (!message) return;
+  if (!confirm('このコメントに返信します。よろしいですか？（社外アクション）')) return;
+  try {
+    const res = await fetch(`/api/posts?action=instagram&sub=reply${_igSid()}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commentId, message }),
+    });
+    const data = await res.json();
+    if (data.success) { showToast('返信しました'); inp.value = ''; }
+    else showToast('返信失敗: ' + (data.error || ''), 'error');
+  } catch (e) { showToast('返信失敗: ' + e.message, 'error'); }
 }
 
 // ─── インサイト（ダッシュボード概況） ───
