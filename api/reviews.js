@@ -1,5 +1,5 @@
 // api/reviews.js — 口コミ一覧・返信
-import { getAccessToken } from './_tokens.js';
+import { getAccessToken, getValidCookieToken } from './_tokens.js';
 
 function parseCookies(req) {
   const c = {};
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { storeId } = req.query;
-  const token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
+  const token = storeId ? await getAccessToken(storeId) : await getValidCookieToken(req, res);
   if (!token) return res.status(401).json({ error: 'ログインが必要です' });
 
   let { locationName } = req.query;

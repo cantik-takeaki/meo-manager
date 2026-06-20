@@ -1,5 +1,5 @@
 // api/locations.js — 店舗一覧取得
-import { getAccessToken } from './_tokens.js';
+import { getAccessToken, getValidCookieToken } from './_tokens.js';
 
 function parseCookies(req) {
   const c = {};
@@ -89,7 +89,7 @@ async function fetchInsights(access_token, locationName) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { storeId, action, locationName } = req.query;
-  const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
+  const access_token = storeId ? await getAccessToken(storeId) : await getValidCookieToken(req, res);
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 
   // インサイト取得モード

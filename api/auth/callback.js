@@ -114,14 +114,18 @@ export default async function handler(req, res) {
     return res.redirect(`/?${q.toString()}`);
   }
 
-  // 通常の管理者ログイン → cookieに保存
-  const cookieOpts = 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400';
+  // 通常の管理者ログイン → cookieに保存（30日持続・Secure・トークン期限も保存）
+  const MAXAGE = 60 * 60 * 24 * 30; // 30日
+  const cookieOpts = `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAXAGE}`;
+  const pubOpts = `Path=/; Secure; SameSite=Lax; Max-Age=${MAXAGE}`;
+  const tokenExp = Date.now() + (tokens.expires_in || 3600) * 1000;
   res.setHeader('Set-Cookie', [
     `access_token=${tokens.access_token}; ${cookieOpts}`,
     `refresh_token=${tokens.refresh_token || ''}; ${cookieOpts}`,
-    `user_email=${user.email}; Path=/; SameSite=Lax; Max-Age=86400`,
-    `user_name=${encodeURIComponent(user.name || '')}; Path=/; SameSite=Lax; Max-Age=86400`,
-    `user_picture=${encodeURIComponent(user.picture || '')}; Path=/; SameSite=Lax; Max-Age=86400`,
+    `token_expires_at=${tokenExp}; ${pubOpts}`,
+    `user_email=${user.email}; ${pubOpts}`,
+    `user_name=${encodeURIComponent(user.name || '')}; ${pubOpts}`,
+    `user_picture=${encodeURIComponent(user.picture || '')}; ${pubOpts}`,
   ]);
 
   res.redirect('/');

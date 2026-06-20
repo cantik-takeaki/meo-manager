@@ -1,5 +1,5 @@
 // api/posts.js — Googleポスト管理（＋予約下書き／Instagram連携／クライアント別写真ライブラリ）
-import { getAccessToken } from './_tokens.js';
+import { getAccessToken, getValidCookieToken } from './_tokens.js';
 import { kvGet, kvSet } from './_kv.js';
 import crypto from 'crypto';
 
@@ -325,7 +325,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const access_token = storeId ? await getAccessToken(storeId) : parseCookies(req).access_token;
+  const access_token = storeId ? await getAccessToken(storeId) : await getValidCookieToken(req, res);
   if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
 
   let { locationName } = req.query;
