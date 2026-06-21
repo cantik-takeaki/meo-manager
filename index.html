@@ -655,7 +655,7 @@ body {
 
         <div id="imageGenPanel" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
           <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <canvas id="genCanvas" width="1080" height="1080" style="width:200px;height:200px;border-radius:8px;border:1px solid var(--border);flex-shrink:0"></canvas>
+            <canvas id="genCanvas" width="1080" height="1080" style="width:200px;height:200px;border-radius:8px;border:1px solid var(--border);flex-shrink:0;align-self:flex-start"></canvas>
             <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px">
               <div>
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">見出し（キャッチコピー）</label>
@@ -673,6 +673,13 @@ body {
                 <div id="genBgPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
               </div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <label style="font-size:12px;color:var(--text-sub)">サイズ
+                  <select id="genAspect" onchange="changeGenAspect()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="portrait">縦長 4:5（投稿推奨）</option>
+                    <option value="square">正方形 1:1</option>
+                    <option value="story">ストーリー/リール 9:16</option>
+                  </select>
+                </label>
                 <label style="font-size:12px;color:var(--text-sub)">配色/濃さ
                   <select id="genColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
                     <option value="blue">ブルー</option>
@@ -688,6 +695,7 @@ body {
                     <option value="center">中央</option>
                   </select>
                 </label>
+                <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genEnhance" checked onchange="changeGenAspect()"> 自動補正</label>
                 <button class="btn btn-success btn-sm" onclick="saveGenImage()">💾 ライブラリに保存</button>
               </div>
               <p style="font-size:11px;color:var(--text-sub)">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります（無料・ブラウザ内生成）。</p>
@@ -1412,7 +1420,26 @@ const GEN_PALETTES = {
   dark: { from: '#0f172a', to: '#334155', accent: '#94a3b8' },
 };
 
-let _genBg = null; // 背景に使う画像(Image) or null=グラデ
+let _genBg = null;        // 背景に使う画像(Image) or null=グラデ
+let _genBgBaseUrl = null; // 背景写真の元URL（比率変更時に再変換するため保持）
+const GEN_ASPECTS = { square: { w: 1080, h: 1080 }, portrait: { w: 1080, h: 1350 }, story: { w: 1080, h: 1920 } };
+function _genDims() { return GEN_ASPECTS[document.getElementById('genAspect')?.value] || GEN_ASPECTS.portrait; }
+
+// 元URLから、選択中の比率＋スマートクロップ＋自動補正の背景URLを作る
+function buildGenBgUrl(baseUrl) {
+  const { w, h } = _genDims();
+  const enhance = document.getElementById('genEnhance')?.checked;
+  const tr = `c_fill,g_auto,w_${w},h_${h},q_auto${enhance ? ',e_improve' : ''}`;
+  // 既存の変換を除去して付け直す
+  const clean = baseUrl.replace(/\/upload\/[^/]*\//, '/upload/');
+  return clean.replace('/upload/', `/upload/${tr}/`);
+}
+
+// 比率・補正の変更時：背景を作り直して再描画
+function changeGenAspect() {
+  if (_genBgBaseUrl) selectGenBg(_genBgBaseUrl);
+  else renderGenImage();
+}
 
 // 選択した写真を背景に使って画像生成（ギャラリーの🎨生成から）
 function genFromPhoto(i) {
@@ -1420,8 +1447,8 @@ function genFromPhoto(i) {
   if (!m || m.isVideo) return showToast('画像を選んでください', 'error');
   const panel = document.getElementById('imageGenPanel');
   panel.style.display = 'block';
-  selectGenBg(m.squareUrl || m.url); // 背景に設定＋描画
-  aiCatchCopy();                      // キャッチコピーをAIで自動生成
+  selectGenBg(m.url || m.squareUrl); // 元URLを背景に設定＋描画
+  aiCatchCopy();
   renderGenBgPicker();
   panel.scrollIntoView({ behavior: 'smooth' });
 }
@@ -1445,20 +1472,20 @@ async function renderGenBgPicker() {
   const gradSel = !_genBg;
   let html = `<div onclick="selectGenBg(null)" style="width:64px;height:64px;border-radius:8px;border:2px solid ${gradSel ? 'var(--accent)' : 'var(--border)'};background:linear-gradient(135deg,#0a2a4d,#0e5fb5);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;cursor:pointer">グラデ</div>`;
   html += list.filter(m => !m.isVideo).map(m => {
-    const sel = _genBg && _genBg.dataset && _genBg.dataset.url === (m.url);
-    return `<img src="${m.squareUrl || m.url}" crossorigin="anonymous" onclick='selectGenBg(${JSON.stringify(m.squareUrl || m.url)})' style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">`;
+    const sel = _genBgBaseUrl === m.url;
+    return `<img src="${m.squareUrl || m.url}" onclick='selectGenBg(${JSON.stringify(m.url)})' style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">`;
   }).join('');
   box.innerHTML = html;
 }
 
-function selectGenBg(url) {
-  if (!url) { _genBg = null; renderGenBgPicker(); renderGenImage(); return; }
+function selectGenBg(baseUrl) {
+  if (!baseUrl) { _genBg = null; _genBgBaseUrl = null; renderGenBgPicker(); renderGenImage(); return; }
+  _genBgBaseUrl = baseUrl;
   const img = new Image();
   img.crossOrigin = 'anonymous';
-  img.dataset.url = url;
   img.onload = () => { _genBg = img; renderGenBgPicker(); renderGenImage(); };
   img.onerror = () => { showToast('背景画像の読み込みに失敗しました', 'error'); };
-  img.src = url;
+  img.src = buildGenBgUrl(baseUrl); // 比率＋スマートクロップ＋補正済みを読み込む
 }
 
 function _wrapText(ctx, text, maxWidth) {
@@ -1477,77 +1504,92 @@ function _wrapText(ctx, text, maxWidth) {
 function renderGenImage() {
   const canvas = document.getElementById('genCanvas');
   if (!canvas) return;
+  const { w: W, h: H } = _genDims();
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  // プレビュー表示サイズも比率に合わせる
+  canvas.style.width = '200px';
+  canvas.style.height = (200 * H / W) + 'px';
+
   const ctx = canvas.getContext('2d');
-  const W = 1080, H = 1080;
   const pal = GEN_PALETTES[document.getElementById('genColor').value] || GEN_PALETTES.blue;
   const layout = document.getElementById('genLayout')?.value || 'bottom';
   const headline = document.getElementById('genHeadline').value || 'キャッチコピーを入力';
   const sub = document.getElementById('genSub').value || '';
   const store = currentLocation?.title || '';
   const FONT = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif';
+  const M = 90; // 左右マージン
 
   ctx.clearRect(0, 0, W, H);
 
   if (_genBg) {
-    // 写真背景を cover で描画
+    // 背景はCloudinanで既に比率ぴったり＋スマートクロップ＋補正済み
     const iw = _genBg.naturalWidth, ih = _genBg.naturalHeight;
     const scale = Math.max(W / iw, H / ih);
     const dw = iw * scale, dh = ih * scale;
     ctx.drawImage(_genBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    // 文字を読みやすくするスクリム（テキスト側を濃く）
-    const sc = ctx.createLinearGradient(0, layout === 'center' ? 0 : H * 0.35, 0, H);
+    // スクリム（読みやすさ）
     if (layout === 'center') {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+      const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.7);
+      rg.addColorStop(0, 'rgba(0,0,0,0.55)'); rg.addColorStop(1, 'rgba(0,0,0,0.2)');
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
     } else {
-      sc.addColorStop(0, 'rgba(0,0,0,0)'); sc.addColorStop(0.55, 'rgba(0,0,0,0.45)'); sc.addColorStop(1, 'rgba(0,0,0,0.82)');
+      const sc = ctx.createLinearGradient(0, H * 0.3, 0, H);
+      sc.addColorStop(0, 'rgba(0,0,0,0)'); sc.addColorStop(0.5, 'rgba(0,0,0,0.4)'); sc.addColorStop(1, 'rgba(0,0,0,0.85)');
       ctx.fillStyle = sc; ctx.fillRect(0, 0, W, H);
     }
+    // 上部の軽いビネット
+    const tg = ctx.createLinearGradient(0, 0, 0, H * 0.25);
+    tg.addColorStop(0, 'rgba(0,0,0,0.3)'); tg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, W, H * 0.25);
   } else {
-    // グラデーション背景
     const g = ctx.createLinearGradient(0, 0, W, H);
     g.addColorStop(0, pal.from); g.addColorStop(1, pal.to);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, 460);
+    const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, W * 0.5);
     rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00');
     ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
   }
 
-  // テキスト群の配置（下/中央）
+  // 見出し（自動縮小・折返し）
   ctx.textBaseline = 'alphabetic';
-  let fs = 100; ctx.font = `900 ${fs}px ${FONT}`;
-  let lines = _wrapText(ctx, headline, W - 200);
-  while (lines.length > 3 && fs > 58) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - 200); }
+  let fs = Math.round(W / 10.4); ctx.font = `900 ${fs}px ${FONT}`;
+  let lines = _wrapText(ctx, headline, W - M * 2);
+  while (lines.length > 3 && fs > 56) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - M * 2); }
   const lh = fs * 1.3;
-  const blockH = lines.length * lh + (sub ? 70 : 0);
+  const subFs = Math.round(fs * 0.46);
+  const blockH = lines.length * lh + (sub ? subFs + 26 : 0);
 
   let topY;
   if (layout === 'center') topY = H / 2 - blockH / 2 + fs;
-  else topY = H - 150 - blockH + fs;
+  else topY = H - Math.round(H * 0.11) - blockH + fs;
 
-  // アクセントライン（見出しの上）
+  // アクセントライン
   ctx.fillStyle = pal.accent;
-  ctx.fillRect(100, topY - fs - 36, 84, 11);
+  ctx.fillRect(M, topY - fs - 34, 80, 10);
 
   // 見出し
   ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+  ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4;
   let y = topY;
-  lines.forEach(l => { ctx.fillText(l, 100, y); y += lh; });
+  lines.forEach(l => { ctx.fillText(l, M, y); y += lh; });
   ctx.shadowColor = 'transparent';
 
   // サブテキスト
   if (sub) {
     ctx.fillStyle = _genBg ? '#ffffff' : pal.accent;
-    ctx.font = `700 44px ${FONT}`;
-    ctx.fillText(sub, 100, y + 8);
-    y += 60;
+    ctx.font = `700 ${subFs}px ${FONT}`;
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 10;
+    ctx.fillText(sub, M, y + 6);
+    ctx.shadowColor = 'transparent';
+    y += subFs + 18;
   }
 
   // 店名
   if (store) {
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = `700 38px ${FONT}`;
-    ctx.fillText(store, 100, layout === 'center' ? H - 70 : Math.min(y + 56, H - 60));
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `700 ${Math.round(fs * 0.38)}px ${FONT}`;
+    const sy = layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05));
+    ctx.fillText(store, M, sy);
   }
 }
 
