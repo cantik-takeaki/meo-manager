@@ -83,6 +83,59 @@ ${pageText}
     }
   }
 
+  // ── HPを読んでAIO/LLMO/GEOの対応済み項目を自動判定 ──
+  if (type === 'aio_detect') {
+    const url = req.body.url;
+    if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: '有効なURLを入力してください' });
+    let html = '';
+    try {
+      const pr = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; cantik-meo-bot/1.0)' } });
+      html = await pr.text();
+    } catch (e) { return res.status(400).json({ error: 'URLの取得に失敗しました: ' + e.message }); }
+
+    const detected = [];
+    // 構造化データ（JSON-LD）を正規表現で確実に判定
+    if (/"@type"\s*:\s*"(LocalBusiness|Dentist|MedicalClinic|Restaurant|HealthAndBeautyBusiness|Store|ProfessionalService)"/i.test(html)) detected.push('structured_local');
+    if (/"@type"\s*:\s*"FAQPage"/i.test(html) || /"@type"\s*:\s*"Question"/i.test(html)) detected.push('structured_faq');
+    if (/"@type"\s*:\s*"AggregateRating"|"aggregateRating"\s*:/i.test(html)) detected.push('structured_review');
+
+    // 本文テキスト化してAIで内容系の項目を判定
+    let pageText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
+    const aiPrompt = `以下は店舗Webページのテキストです。各項目がページ上で「対応済み」と言えるか、true/falseのJSONのみで答えてください。推測で甘く判定せず、明確に該当する場合のみtrue。
+
+【ページ内容】
+${pageText}
+
+【判定項目】
+- faq_page: 「〇〇するなら？」等のQ&A・よくある質問コンテンツがある
+- faq_natural: 見出しが質問形式で、その下に回答が書かれている
+- eeat_author: 専門家・スタッフのプロフィールや実績の掲載がある
+- eeat_stats: 実績数値（創業〇年・顧客満足度〇%・施術数など）の記載がある
+- nap_unified: 店名・住所・電話番号がページに明記されている
+
+【出力JSON】
+{"faq_page":false,"faq_natural":false,"eeat_author":false,"eeat_stats":false,"nap_unified":false}
+JSON以外は出力しない。`;
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: aiPrompt }], max_tokens: 200, temperature: 0.1 }),
+      });
+      const data = await r.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const s = content.indexOf('{'), e = content.lastIndexOf('}');
+      if (s !== -1 && e !== -1) {
+        try {
+          const j = JSON.parse(content.slice(s, e + 1));
+          ['faq_page', 'faq_natural', 'eeat_author', 'eeat_stats', 'nap_unified'].forEach(k => { if (j[k] === true) detected.push(k); });
+        } catch (er) { /* AI判定失敗時は構造化データのみ返す */ }
+      }
+    } catch (e) { /* AI失敗時も構造化データの結果は返す */ }
+
+    return res.json({ detected: [...new Set(detected)] });
+  }
+
   // ── 既存ナレッジをMEO最適化して強化（より詳しく・検索されやすく） ──
   if (type === 'meo_enrich') {
     const cur = req.body.current || {};
