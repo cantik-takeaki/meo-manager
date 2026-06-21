@@ -647,7 +647,9 @@ body {
         <div class="card-header"><div class="card-title">写真ライブラリ</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">クライアントからもらった写真をアップロードして蓄積します（スマホ写真は自動でリサイズ）。</p>
         <input type="file" id="mediaFileInput" accept="image/*" multiple style="display:none" onchange="uploadMedia(this.files)">
+        <input type="file" id="mediaVideoInput" accept="video/*" style="display:none" onchange="uploadVideo(this.files[0])">
         <button class="btn btn-primary" onclick="document.getElementById('mediaFileInput').click()">＋ 写真をアップロード</button>
+        <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()">🎬 動画をアップロード</button>
         <button class="btn btn-outline" onclick="toggleImageGen()">🎨 画像を生成</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
 
@@ -1316,7 +1318,8 @@ function renderMedia() {
   }
   g.innerHTML = _mediaList.map((m, i) => `
     <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
-      <img src="${m.squareUrl || m.url}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="pickPhoto(${i})" title="クリックで投稿作成">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="pickPhoto(${i})" title="クリックで投稿作成">
+      ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
 }
@@ -1342,6 +1345,37 @@ function resizeImage(file, maxSize) {
     img.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// 動画アップロード（署名をもらってCloudinaryへ直接アップ→ライブラリ登録）
+async function uploadVideo(file) {
+  if (!file) return;
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (file.size > 100 * 1024 * 1024) return showToast('動画は100MB以下にしてください', 'error');
+  const status = document.getElementById('mediaUploadStatus');
+  status.textContent = '動画をアップロード中...（サイズにより時間がかかります）';
+  try {
+    const sig = await fetch(`/api/posts?action=media&sub=sign&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    if (sig.error) { status.textContent = '⚠️ ' + sig.error; return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('api_key', sig.apiKey);
+    fd.append('timestamp', sig.timestamp);
+    fd.append('folder', sig.folder);
+    fd.append('signature', sig.signature);
+    const up = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/video/upload`, { method: 'POST', body: fd }).then(r => r.json());
+    if (up.error) { status.textContent = '⚠️ アップロード失敗: ' + up.error.message; return; }
+    const reg = await fetch(`/api/posts?action=media&sub=register&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicId: up.public_id, url: up.secure_url, isVideo: true, width: up.width, height: up.height }),
+    }).then(r => r.json());
+    if (reg.error) { status.textContent = '⚠️ ' + reg.error; return; }
+    _mediaList = reg.media || _mediaList;
+    renderMedia();
+    status.textContent = '✅ 動画を保存しました';
+    showToast('動画をライブラリに保存しました', 'success');
+  } catch (e) { status.textContent = '⚠️ 動画アップロード失敗: ' + e.message; }
+  document.getElementById('mediaVideoInput').value = '';
 }
 
 async function uploadMedia(files) {
@@ -2039,6 +2073,24 @@ async function loadPosts() {
   }
 }
 
+// 動画(リール)の処理完了を待って公開を確定
+async function pollAndFinalizeIg(creationId, sid) {
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const s = await fetch(`/api/posts?action=instagram&sub=status&creationId=${creationId}${sid}`).then(r => r.json());
+      if (s.status_code === 'FINISHED') {
+        const f = await fetch(`/api/posts?action=instagram&sub=finalize${sid}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creationId }),
+        }).then(r => r.json());
+        return !!f.success;
+      }
+      if (s.status_code === 'ERROR') return false;
+    } catch (e) {}
+  }
+  return false;
+}
+
 // 投稿用の画像ライブラリを読み込んで選択UIを表示（複数選択＝カルーセル対応）
 let _postImages = [];
 async function loadPostImages() {
@@ -2053,7 +2105,8 @@ async function loadPostImages() {
       const idx = _postImages.findIndex(x => x.publicId === m.publicId);
       const sel = idx >= 0;
       return `<div style="position:relative;display:inline-flex">
-        <img src="${m.squareUrl || m.url}" onclick='togglePostImage(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">
+        <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" onclick='togglePostImage(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">
+        ${m.isVideo ? '<span style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,0.6);color:#fff;border-radius:4px;font-size:10px;padding:1px 4px;pointer-events:none">▶動画</span>' : ''}
         ${sel ? `<span style="position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${idx + 1}</span>` : ''}
       </div>`;
     }).join('');
@@ -2102,22 +2155,34 @@ async function createPost() {
     } catch { okMsg.push('Google：エラー'); }
   }
 
-  // Instagram（1枚＝通常／2枚以上＝カルーセル）
+  // Instagram（動画＝Reels／画像1枚＝通常／2枚以上＝カルーセル）
   if (toInstagram) {
     try {
-      let body;
-      if (_postImages.length >= 2) {
-        body = { imageUrls: _postImages.map(m => m.squareUrl || m.url), caption: summary };
+      const video = _postImages.find(m => m.isVideo);
+      if (video) {
+        // 動画＝Reels（処理待ち→finalize）
+        const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: video.url, caption: summary }),
+        });
+        const data = await res.json();
+        if (data.creationId) {
+          showToast('動画を処理中…公開まで少しお待ちください', 'success');
+          const ok = await pollAndFinalizeIg(data.creationId, sid);
+          okMsg.push(ok ? 'Instagram：動画(リール)を投稿しました' : 'Instagram：動画は処理中（完了後に公開されます）');
+        } else if (data.success) okMsg.push('Instagram：動画を投稿しました');
+        else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       } else {
-        const m = _postImages[0];
-        body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary };
+        let body;
+        if (_postImages.length >= 2) body = { imageUrls: _postImages.map(m => m.squareUrl || m.url), caption: summary };
+        else { const m = _postImages[0]; body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary }; }
+        const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + _postImages.length + '枚）' : ''}`);
+        else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       }
-      const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + _postImages.length + '枚）' : ''}`);
-      else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
     } catch (e) { okMsg.push('Instagram：エラー'); }
   }
 

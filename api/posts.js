@@ -73,14 +73,43 @@ export default async function handler(req, res) {
     const CKEY = process.env.CLOUDINARY_API_KEY;
     const CSECRET = process.env.CLOUDINARY_API_SECRET;
 
-    // 一覧取得
+    // 一覧取得 ／ 直接アップロード用の署名発行（動画など大きいファイル用）
     if (req.method === 'GET') {
+      if (req.query.sub === 'sign') {
+        if (!CLOUD || !CKEY || !CSECRET) return res.status(500).json({ error: 'Cloudinary環境変数が未設定です' });
+        const ts = Math.floor(Date.now() / 1000);
+        const folder = `meo/${sid}`;
+        const signature = crypto.createHash('sha1').update(`folder=${folder}&timestamp=${ts}` + CSECRET).digest('hex');
+        return res.json({ cloudName: CLOUD, apiKey: CKEY, timestamp: ts, folder, signature });
+      }
       const list = await kvGet(key) || [];
       return res.json({ media: list });
     }
 
-    // アップロード（ブラウザでリサイズ済みのdataURIを受け取りCloudinaryへ）
+    // アップロード（画像dataURI）／ 直接アップ済みメディアの登録（sub=register・主に動画）
     if (req.method === 'POST') {
+      if (req.query.sub === 'register') {
+        const { publicId, url, isVideo, width, height, note } = req.body || {};
+        if (!publicId || !url) return res.status(400).json({ error: 'publicId・url必須' });
+        const sq = url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1080/');
+        const portrait = url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1350/');
+        const thumb = isVideo
+          ? url.replace('/upload/', '/upload/so_0,c_fill,w_400,h_400/').replace(/\.\w+$/, '.jpg')
+          : sq;
+        const item = {
+          publicId, url,
+          squareUrl: isVideo ? url : sq,
+          portraitUrl: isVideo ? url : portrait,
+          thumbnailUrl: thumb,
+          isVideo: !!isVideo,
+          width: width || null, height: height || null,
+          note: note || '', createdAt: new Date().toISOString(),
+        };
+        const list = await kvGet(key) || [];
+        list.unshift(item);
+        await kvSet(key, list);
+        return res.json({ success: true, item, media: list });
+      }
       if (!CLOUD || !CKEY || !CSECRET) {
         return res.status(500).json({ error: 'Cloudinary環境変数が未設定です（CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET）' });
       }
@@ -133,6 +162,9 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { publicId } = req.query;
       if (!publicId) return res.status(400).json({ error: 'publicId必須' });
+      const fullList = await kvGet(key) || [];
+      const target = fullList.find(m => m.publicId === publicId);
+      const rtype = target?.isVideo ? 'video' : 'image';
       if (CLOUD && CKEY && CSECRET) {
         try {
           const ts = Math.floor(Date.now() / 1000);
@@ -143,10 +175,10 @@ export default async function handler(req, res) {
           form.set('api_key', CKEY);
           form.set('timestamp', String(ts));
           form.set('signature', signature);
-          await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/destroy`, { method: 'POST', body: form });
+          await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/${rtype}/destroy`, { method: 'POST', body: form });
         } catch (e) { /* Cloudinary削除失敗してもKVは消す */ }
       }
-      const list = (await kvGet(key) || []).filter(m => m.publicId !== publicId);
+      const list = fullList.filter(m => m.publicId !== publicId);
       await kvSet(key, list);
       return res.json({ success: true, media: list });
     }
