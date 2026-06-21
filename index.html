@@ -666,8 +666,12 @@ body {
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">サブテキスト（任意）</label>
                 <input id="genSub" type="text" maxlength="30" placeholder="例：ご予約受付中／月〜土 17:00〜" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
               </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">背景（お店の写真を使うと雰囲気に合います）</label>
+                <div id="genBgPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+              </div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                <label style="font-size:12px;color:var(--text-sub)">配色
+                <label style="font-size:12px;color:var(--text-sub)">配色/濃さ
                   <select id="genColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
                     <option value="blue">ブルー</option>
                     <option value="green">グリーン</option>
@@ -676,9 +680,15 @@ body {
                     <option value="dark">ダーク</option>
                   </select>
                 </label>
+                <label style="font-size:12px;color:var(--text-sub)">文字位置
+                  <select id="genLayout" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="bottom">下</option>
+                    <option value="center">中央</option>
+                  </select>
+                </label>
                 <button class="btn btn-success btn-sm" onclick="saveGenImage()">💾 ライブラリに保存</button>
               </div>
-              <p style="font-size:11px;color:var(--text-sub)">保存するとライブラリに追加され、投稿に使えます（無料・ブラウザ内生成）。</p>
+              <p style="font-size:11px;color:var(--text-sub)">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります（無料・ブラウザ内生成）。</p>
             </div>
           </div>
         </div>
@@ -1277,6 +1287,7 @@ async function loadMedia() {
   const sub = document.getElementById('instagramSubtitle');
   // 店舗切り替え時は前の店舗の状態をリセット（投稿作成欄・選択写真をクリア）
   _igSelected = null;
+  _genBg = null;
   const composeCard = document.getElementById('igComposeCard');
   if (composeCard) composeCard.style.display = 'none';
   const statusEl = document.getElementById('mediaUploadStatus');
@@ -1366,12 +1377,41 @@ const GEN_PALETTES = {
   dark: { from: '#0f172a', to: '#334155', accent: '#94a3b8' },
 };
 
+let _genBg = null; // 背景に使う画像(Image) or null=グラデ
+
 function toggleImageGen() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
   const p = document.getElementById('imageGenPanel');
   const show = p.style.display === 'none';
   p.style.display = show ? 'block' : 'none';
-  if (show) renderGenImage();
+  if (show) { renderGenBgPicker(); renderGenImage(); }
+}
+
+// 背景ピッカー（グラデ＋ライブラリの写真）
+async function renderGenBgPicker() {
+  const box = document.getElementById('genBgPicker');
+  if (!box) return;
+  let list = _mediaList;
+  if (!list || !list.length) {
+    try { list = (await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json())).media || []; } catch (e) { list = []; }
+  }
+  const gradSel = !_genBg;
+  let html = `<div onclick="selectGenBg(null)" style="width:64px;height:64px;border-radius:8px;border:2px solid ${gradSel ? 'var(--accent)' : 'var(--border)'};background:linear-gradient(135deg,#0a2a4d,#0e5fb5);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;cursor:pointer">グラデ</div>`;
+  html += list.filter(m => !m.isVideo).map(m => {
+    const sel = _genBg && _genBg.dataset && _genBg.dataset.url === (m.url);
+    return `<img src="${m.squareUrl || m.url}" crossorigin="anonymous" onclick='selectGenBg(${JSON.stringify(m.squareUrl || m.url)})' style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">`;
+  }).join('');
+  box.innerHTML = html;
+}
+
+function selectGenBg(url) {
+  if (!url) { _genBg = null; renderGenBgPicker(); renderGenImage(); return; }
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.dataset.url = url;
+  img.onload = () => { _genBg = img; renderGenBgPicker(); renderGenImage(); };
+  img.onerror = () => { showToast('背景画像の読み込みに失敗しました', 'error'); };
+  img.src = url;
 }
 
 function _wrapText(ctx, text, maxWidth) {
@@ -1393,45 +1433,74 @@ function renderGenImage() {
   const ctx = canvas.getContext('2d');
   const W = 1080, H = 1080;
   const pal = GEN_PALETTES[document.getElementById('genColor').value] || GEN_PALETTES.blue;
+  const layout = document.getElementById('genLayout')?.value || 'bottom';
   const headline = document.getElementById('genHeadline').value || 'キャッチコピーを入力';
   const sub = document.getElementById('genSub').value || '';
   const store = currentLocation?.title || '';
-
-  // 背景グラデーション
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, pal.from); g.addColorStop(1, pal.to);
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  // 装飾の光
-  const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, 460);
-  rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00');
-  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-
   const FONT = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif';
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (_genBg) {
+    // 写真背景を cover で描画
+    const iw = _genBg.naturalWidth, ih = _genBg.naturalHeight;
+    const scale = Math.max(W / iw, H / ih);
+    const dw = iw * scale, dh = ih * scale;
+    ctx.drawImage(_genBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    // 文字を読みやすくするスクリム（テキスト側を濃く）
+    const sc = ctx.createLinearGradient(0, layout === 'center' ? 0 : H * 0.35, 0, H);
+    if (layout === 'center') {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+    } else {
+      sc.addColorStop(0, 'rgba(0,0,0,0)'); sc.addColorStop(0.55, 'rgba(0,0,0,0.45)'); sc.addColorStop(1, 'rgba(0,0,0,0.82)');
+      ctx.fillStyle = sc; ctx.fillRect(0, 0, W, H);
+    }
+  } else {
+    // グラデーション背景
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, pal.from); g.addColorStop(1, pal.to);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, 460);
+    rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  }
+
+  // テキスト群の配置（下/中央）
+  ctx.textBaseline = 'alphabetic';
+  let fs = 100; ctx.font = `900 ${fs}px ${FONT}`;
+  let lines = _wrapText(ctx, headline, W - 200);
+  while (lines.length > 3 && fs > 58) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - 200); }
+  const lh = fs * 1.3;
+  const blockH = lines.length * lh + (sub ? 70 : 0);
+
+  let topY;
+  if (layout === 'center') topY = H / 2 - blockH / 2 + fs;
+  else topY = H - 150 - blockH + fs;
+
+  // アクセントライン（見出しの上）
+  ctx.fillStyle = pal.accent;
+  ctx.fillRect(100, topY - fs - 36, 84, 11);
+
   // 見出し
   ctx.fillStyle = '#ffffff';
-  ctx.textBaseline = 'alphabetic';
-  let fs = 104; ctx.font = `900 ${fs}px ${FONT}`;
-  let lines = _wrapText(ctx, headline, W - 200);
-  while (lines.length > 3 && fs > 60) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - 200); }
-  const lh = fs * 1.3;
-  let y = H / 2 - (lines.length - 1) * lh / 2;
-  ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+  let y = topY;
   lines.forEach(l => { ctx.fillText(l, 100, y); y += lh; });
   ctx.shadowColor = 'transparent';
 
   // サブテキスト
   if (sub) {
-    ctx.fillStyle = pal.accent;
-    ctx.font = `700 46px ${FONT}`;
-    ctx.fillText(sub, 100, y + 20);
+    ctx.fillStyle = _genBg ? '#ffffff' : pal.accent;
+    ctx.font = `700 44px ${FONT}`;
+    ctx.fillText(sub, 100, y + 8);
+    y += 60;
   }
-  // アクセントライン
-  ctx.fillStyle = pal.accent; ctx.fillRect(100, 150, 90, 12);
-  // 店名（下部）
+
+  // 店名
   if (store) {
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.font = `700 40px ${FONT}`;
-    ctx.fillText(store, 100, H - 90);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = `700 38px ${FONT}`;
+    ctx.fillText(store, 100, layout === 'center' ? H - 70 : Math.min(y + 56, H - 60));
   }
 }
 
