@@ -348,10 +348,6 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v4l3 3"/></svg>
       AIO/LLMO/GEO対策
     </button>
-    <button class="nav-item" onclick="showPanel('guide')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-      使い方ガイド
-    </button>
 
     <div class="sidebar-section">店舗</div>
     <div class="store-list" id="storeList">
@@ -586,37 +582,6 @@ body {
       </div>
 
       <button class="btn btn-primary" onclick="saveKnowledge()" style="margin-bottom:16px">💾 ナレッジを保存</button>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">✍️ 投稿文を生成</div></div>
-        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:center">
-          <select id="postGenType" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
-            <option value="一般投稿">一般投稿</option>
-            <option value="キャンペーン">キャンペーン告知</option>
-            <option value="季節">季節のご挨拶</option>
-            <option value="スタッフ紹介">スタッフ紹介</option>
-          </select>
-          <input id="postGenInstruction" type="text" placeholder="追加の指示（任意）" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary" onclick="generatePost()">✨ 生成</button>
-        </div>
-        <textarea id="generatedPost" placeholder="ここに生成された投稿文が表示されます" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:120px;font-family:inherit;line-height:1.6"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="generatePost()">再生成</button>
-          <button class="btn btn-success btn-sm" onclick="copyToPost()">投稿管理にコピー</button>
-          <button class="btn btn-outline btn-sm" onclick="generateInstagram()">📷 Instagram用に整形</button>
-        </div>
-
-        <!-- Instagram連動（手動コピー版） -->
-        <div id="igBlock" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px">📷 Instagram用キャプション</div>
-          <textarea id="igCaption" placeholder="ここにInstagram用の整形結果が表示されます" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:140px;font-family:inherit;line-height:1.7"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-            <button class="btn btn-success btn-sm" onclick="copyIg()">コピーする</button>
-            <a class="btn btn-outline btn-sm" href="https://www.instagram.com/" target="_blank">Instagramを開く</a>
-          </div>
-          <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※コピーしてInstagramアプリ/Webで投稿してください（自動投稿はInstagram API審査が必要なため、現在は手動コピー方式です）。</p>
-        </div>
-      </div>
     </div>
 
     <!-- Instagram投稿（クライアント別 写真ライブラリ） -->
@@ -873,122 +838,6 @@ body {
     </div>
 
     <!-- Guide -->
-    <div class="panel" id="panel-guide">
-      <div class="page-header">
-        <div class="page-title">使い方ガイド</div>
-        <div class="page-sub">MEO Managerの機能と使い方</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">📋 機能一覧と現在の状態</div></div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:10px 8px;color:var(--text-sub)">機能</th>
-            <th style="text-align:left;padding:10px 8px;color:var(--text-sub)">状態</th>
-            <th style="text-align:left;padding:10px 8px;color:var(--text-sub)">説明</th>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:10px 8px">Googleログイン</td>
-            <td style="padding:10px 8px"><span class="badge badge-active">✅ 利用可</span></td>
-            <td style="padding:10px 8px;color:var(--text-sub)">Googleアカウントで安全にログイン</td>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:10px 8px">店舗一覧表示</td>
-            <td style="padding:10px 8px"><span class="badge badge-active">✅ 利用可</span></td>
-            <td style="padding:10px 8px;color:var(--text-sub)">管理中のGoogleビジネスプロフィール店舗を一覧表示</td>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:10px 8px">AI返信文生成</td>
-            <td style="padding:10px 8px"><span class="badge badge-active">✅ 利用可</span></td>
-            <td style="padding:10px 8px;color:var(--text-sub)">口コミに対するAI返信文を自動生成（トーン選択可）</td>
-          </tr>
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:10px 8px">口コミ一覧・返信投稿</td>
-            <td style="padding:10px 8px"><span class="badge badge-pending">⏳ 審査待ち</span></td>
-            <td style="padding:10px 8px;color:var(--text-sub)">Google API審査完了後に有効化（7〜10営業日）</td>
-          </tr>
-          <tr>
-            <td style="padding:10px 8px">Googleポスト投稿</td>
-            <td style="padding:10px 8px"><span class="badge badge-pending">⏳ 審査待ち</span></td>
-            <td style="padding:10px 8px;color:var(--text-sub)">Google API審査完了後に有効化（7〜10営業日）</td>
-          </tr>
-        </table>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">🚀 基本的な使い方</div></div>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div style="display:flex;gap:16px;align-items:flex-start">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(79,125,243,0.2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">1</div>
-            <div>
-              <div style="font-weight:600;margin-bottom:4px">Googleでログイン</div>
-              <div style="font-size:13px;color:var(--text-sub)">Googleビジネスプロフィールに登録しているGoogleアカウントでログインしてください。</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:16px;align-items:flex-start">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(79,125,243,0.2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">2</div>
-            <div>
-              <div style="font-weight:600;margin-bottom:4px">店舗を選択</div>
-              <div style="font-size:13px;color:var(--text-sub)">左サイドバーに管理中の店舗が表示されます。クリックで切り替えができます。</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:16px;align-items:flex-start">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(79,125,243,0.2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">3</div>
-            <div>
-              <div style="font-weight:600;margin-bottom:4px">口コミ管理</div>
-              <div style="font-size:13px;color:var(--text-sub)">「口コミ管理」タブで口コミ一覧を確認。「✨ AI返信生成」ボタンでAIが返信文を自動作成します。トーンは「丁寧」「温かみ」「フォーマル」から選択可能です。</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:16px;align-items:flex-start">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(79,125,243,0.2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">4</div>
-            <div>
-              <div style="font-weight:600;margin-bottom:4px">投稿管理（審査後）</div>
-              <div style="font-size:13px;color:var(--text-sub)">「投稿管理」タブでGoogleポストの作成・一覧確認ができます。一般投稿・イベント・クーポンの種類を選べます。</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">✨ AI返信生成の使い方</div></div>
-        <div style="font-size:13px;color:var(--text-sub);line-height:1.9">
-          <p style="margin-bottom:10px">口コミに対してAIが自動で返信文を作成します。</p>
-          <ol style="padding-left:20px;display:flex;flex-direction:column;gap:8px">
-            <li>口コミ管理画面で返信したい口コミの「返信する」をクリック</li>
-            <li>返信エリアが開いたら、右上のトーンを選択（丁寧・温かみ・フォーマル）</li>
-            <li>「✨ AI返信生成」をクリックするとAIが返信文を自動作成</li>
-            <li>内容を確認・修正してから「返信を投稿」をクリック（※審査完了後）</li>
-          </ol>
-          <div style="margin-top:14px;padding:12px;background:rgba(79,125,243,0.08);border-radius:8px;border:1px solid rgba(79,125,243,0.2)">
-            <strong style="color:var(--accent)">💡 ポイント</strong><br>
-            低評価（★1〜2）の口コミはフィルターで絞り込んで優先対応できます。
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">❓ よくある質問</div></div>
-        <div style="display:flex;flex-direction:column;gap:14px;font-size:13px">
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Q. 店舗が表示されない</div>
-            <div style="color:var(--text-sub)">A. ログインしているGoogleアカウントにGoogleビジネスプロフィールが登録されているか確認してください。</div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Q. 口コミがデモデータで表示される</div>
-            <div style="color:var(--text-sub)">A. Google APIの審査待ちです。審査完了後（7〜10営業日）に実際の口コミが表示されます。ケースID: 4-4439000040934</div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Q. 何店舗まで管理できますか？</div>
-            <div style="color:var(--text-sub)">A. 現在100店舗まで対応。必要に応じて拡張可能です。</div>
-          </div>
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Q. 料金はかかりますか？</div>
-            <div style="color:var(--text-sub)">A. 現在は無料で利用できます。Google APIとVercelの無料枠で運用しています。</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Posts -->
     <div class="panel" id="panel-posts">
       <div class="page-header">
