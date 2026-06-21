@@ -248,24 +248,31 @@ JSON以外は一切出力しない。`;
   // Googleポスト生成
   if (type === 'post') {
     const { customInstruction } = req.body;
+    // 値のある項目だけを情報ブロックに含める（未設定の項目はそもそも見せない）
+    const infoLines = [];
+    if (knowledge.storeName) infoLines.push(`店名: ${knowledge.storeName}`);
+    if (knowledge.category) infoLines.push(`業種: ${knowledge.category}`);
+    const area = [knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ');
+    if (area) infoLines.push(`地域/アクセス: ${area}`);
+    if (strengths) infoLines.push(`強み・特徴: ${strengths}`);
+    if (services) infoLines.push(`提供サービス・メニュー: ${services}`);
+    if (knowledge.targetCustomer) infoLines.push(`客層: ${knowledge.targetCustomer}`);
+    if (keywords.length) infoLines.push(`キーワード: ${keywords.join('、')}`);
+    const infoBlock = infoLines.length ? infoLines.join('\n') : '（店舗情報が未登録）';
+
     prompt = `あなたは「${knowledge.storeName || storeName}」で実際に働くスタッフです。
 この店のGoogleビジネスプロフィール投稿を、下記の「実際の店舗情報」だけに基づいて書いてください。
 
-【この店舗の実際の情報】
-- 店名: ${knowledge.storeName || '（未設定）'}
-- 業種: ${knowledge.category || '（未設定）'}
-- 地域/住所: ${[knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ') || '（未設定）'}
-- 強み・特徴: ${strengths || '（未設定）'}
-- 提供サービス・メニュー: ${services || '（未設定）'}
-- 客層: ${knowledge.targetCustomer || '（未設定）'}
-- キーワード: ${keywords.join('、') || '（未設定）'}
+【実際の店舗情報】
+${infoBlock}
 
 【今回の投稿の切り口・指示】${customInstruction || '一般的なお店の紹介'}
 
 【絶対に守るルール】
-- 上記の「実際の情報」に書かれていることだけを使う。書かれていない事実（架空の店名・地域・メニュー・価格・イベント・店のコンセプト）を創作しない
-- 「切り口・指示」は投稿の方向性として使うだけ。指示やテーマの言葉を、店名やお店のコンセプトとして扱わない（例：テーマが「MEO」でも、MEOという店や概念の話を作らない。あくまでこの店の宣伝にする）
-- 「（未設定）」の項目には触れない。情報が乏しければ、無理に具体を作らず、シンプルな来店案内にする
+- 上記に書かれている情報だけを使う。書かれていない事実（架空の店名・地域・メニュー・価格・イベント・店のコンセプト）を創作しない
+- 「店名:」「業種:」などの項目名やラベルは絶対に投稿文に書かない。情報を自然な文章に溶け込ませる
+- 「切り口・指示」は投稿の方向性として使うだけ。指示やテーマの言葉を、店名やお店のコンセプトとして扱わない（例：テーマが「MEO」でも、MEOという店や概念の話は作らない。あくまでこの店の宣伝にする）
+- 店舗情報が未登録/乏しい場合は、具体を創作せず「気軽に来店してほしい」程度の短く自然な案内文にする
 - 実在するこの店の自然な宣伝文にする。地域名・サービス名を自然に含める
 - 150〜250文字程度・読みやすい改行・絵文字1〜2個まで
 - 「ぜひお気軽にお越しください」等の来店促進を1つ含める
