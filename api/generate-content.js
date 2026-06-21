@@ -18,6 +18,59 @@ export default async function handler(req, res) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY未設定' });
 
+  // ── URLから店舗情報を自動抽出（HP/ぐるなび等のWebページ） ──
+  if (type === 'autofill') {
+    const url = req.body.url;
+    if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: '有効なURLを入力してください' });
+    let pageText = '';
+    try {
+      const pr = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; cantik-meo-bot/1.0)' } });
+      let html = await pr.text();
+      html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+      pageText = html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 7000);
+    } catch (e) {
+      return res.status(400).json({ error: 'URLの取得に失敗しました: ' + e.message });
+    }
+    if (pageText.length < 50) return res.status(400).json({ error: 'ページから十分な情報を取得できませんでした（JS主体のページの可能性）' });
+
+    const exPrompt = `以下はある店舗のWebページ（ホームページやグルメサイト等）から抽出したテキストです。
+ここから店舗情報を読み取り、指定のJSONのみを出力してください。
+
+【ページ内容】
+${pageText}
+
+【ルール】
+- 分からない項目は空文字 "" にする。テキストに無い情報を推測・捏造しない
+- keywords は「地域名＋業種」など集客で狙うべき語を読点区切りで3〜5個提案してよい
+- services・strengths はページから読み取れる範囲で簡潔にまとめる
+- JSON以外（説明・前置き・コードブロック記号）は一切出力しない
+
+【出力JSON】
+{"storeName":"","category":"","address":"","phone":"","businessHours":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: exPrompt }],
+          max_tokens: 700, temperature: 0.3,
+        }),
+      });
+      const data = await r.json();
+      let content = data.choices?.[0]?.message?.content?.trim() || '';
+      // JSON部分を抽出
+      const s = content.indexOf('{'), e = content.lastIndexOf('}');
+      if (s === -1 || e === -1) return res.status(500).json({ error: 'AI抽出に失敗しました（JSON取得不可）' });
+      let fields;
+      try { fields = JSON.parse(content.slice(s, e + 1)); }
+      catch (er) { return res.status(500).json({ error: 'AI抽出結果の解析に失敗しました' }); }
+      return res.json({ fields });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ナレッジ取得
   const knowledge = await kvGet(`knowledge_${locationId}`) || {};
   const storeName = knowledge.storeName || '当店';

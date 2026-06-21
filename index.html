@@ -526,6 +526,17 @@ body {
         <div class="page-title">企業ナレッジ</div>
         <div class="page-sub" id="knowledgeSubtitle">店舗を選択してください</div>
       </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.3)">
+        <div class="card-header"><div class="card-title">⚡ URLから自動取得</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">店舗のHP・ぐるなび・食べログなどのURLを入れると、AIが店名・業種・営業時間・強み・サービス・キーワードを読み取って下記フォームに反映します（反映後に内容を確認して保存してください）。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="autofillUrl" type="url" placeholder="https://（店舗HP・ぐるなび等のURL）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary" onclick="autofillFromUrl()">⚡ 取得して反映</button>
+        </div>
+        <div id="autofillStatus" style="font-size:12px;color:var(--text-sub);margin-top:8px"></div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div class="card-title">📋 基本情報</div>
@@ -2228,6 +2239,40 @@ async function loadKnowledge() {
       if (el) el.value = kw;
     });
   } catch {}
+}
+
+// URLから店舗情報を自動取得してフォームに反映
+async function autofillFromUrl() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const url = document.getElementById('autofillUrl').value.trim();
+  if (!url) return showToast('URLを入力してください', 'error');
+  const status = document.getElementById('autofillStatus');
+  status.textContent = '取得中...（ページの読み込みとAI解析に10〜20秒）';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'autofill', url }),
+    });
+    const d = await res.json();
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    const f = d.fields || {};
+    // 空でない項目だけ反映（既存入力を勝手に消さない）
+    const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
+    set('kn-storeName', f.storeName);
+    set('kn-category', f.category);
+    set('kn-phone', f.phone);
+    set('kn-businessHours', f.businessHours);
+    set('kn-description', f.description);
+    set('kn-strengths', f.strengths);
+    set('kn-services', f.services);
+    set('kn-targetCustomer', f.targetCustomer);
+    if (f.keywords) {
+      const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
+      kws.slice(0, 5).forEach((kw, i) => { const el = document.getElementById('kn-kw' + i); if (el && !el.value) el.value = kw; });
+    }
+    status.textContent = '✅ 反映しました。内容を確認して「ナレッジを保存」を押してください。';
+    showToast('自動取得しました', 'success');
+  } catch (e) { status.textContent = '⚠️ 取得失敗: ' + e.message; }
 }
 
 async function saveKnowledge() {
