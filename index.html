@@ -648,7 +648,41 @@ body {
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">クライアントからもらった写真をアップロードして蓄積します（スマホ写真は自動でリサイズ）。</p>
         <input type="file" id="mediaFileInput" accept="image/*" multiple style="display:none" onchange="uploadMedia(this.files)">
         <button class="btn btn-primary" onclick="document.getElementById('mediaFileInput').click()">＋ 写真をアップロード</button>
+        <button class="btn btn-outline" onclick="toggleImageGen()">🎨 画像を生成</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
+
+        <div id="imageGenPanel" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <canvas id="genCanvas" width="1080" height="1080" style="width:200px;height:200px;border-radius:8px;border:1px solid var(--border);flex-shrink:0"></canvas>
+            <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px">
+              <div>
+                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">見出し（キャッチコピー）</label>
+                <div style="display:flex;gap:6px">
+                  <input id="genHeadline" type="text" maxlength="22" placeholder="例：本格炭火焼きを、相模原で" oninput="renderGenImage()" style="flex:1;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                  <button class="btn btn-outline btn-sm" onclick="aiCatchCopy()" title="AIで生成">✨AI</button>
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">サブテキスト（任意）</label>
+                <input id="genSub" type="text" maxlength="30" placeholder="例：ご予約受付中／月〜土 17:00〜" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <label style="font-size:12px;color:var(--text-sub)">配色
+                  <select id="genColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="blue">ブルー</option>
+                    <option value="green">グリーン</option>
+                    <option value="warm">ウォーム</option>
+                    <option value="pink">ピンク</option>
+                    <option value="dark">ダーク</option>
+                  </select>
+                </label>
+                <button class="btn btn-success btn-sm" onclick="saveGenImage()">💾 ライブラリに保存</button>
+              </div>
+              <p style="font-size:11px;color:var(--text-sub)">保存するとライブラリに追加され、投稿に使えます（無料・ブラウザ内生成）。</p>
+            </div>
+          </div>
+        </div>
+
         <div id="mediaGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:16px"></div>
       </div>
 
@@ -1301,6 +1335,118 @@ async function uploadMedia(files) {
   renderMedia();
   const inp = document.getElementById('mediaFileInput');
   if (inp) inp.value = '';
+}
+
+// ─── 投稿画像の生成（無料・canvas） ───
+const GEN_PALETTES = {
+  blue: { from: '#0a2a4d', to: '#0e5fb5', accent: '#38e0c8' },
+  green: { from: '#064e3b', to: '#059669', accent: '#a7f3d0' },
+  warm: { from: '#7c2d12', to: '#ea580c', accent: '#ffe0b2' },
+  pink: { from: '#831843', to: '#db2777', accent: '#fbcfe8' },
+  dark: { from: '#0f172a', to: '#334155', accent: '#94a3b8' },
+};
+
+function toggleImageGen() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const p = document.getElementById('imageGenPanel');
+  const show = p.style.display === 'none';
+  p.style.display = show ? 'block' : 'none';
+  if (show) renderGenImage();
+}
+
+function _wrapText(ctx, text, maxWidth) {
+  const lines = [];
+  let line = '';
+  for (const ch of String(text)) {
+    if (ch === '\n') { lines.push(line); line = ''; continue; }
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = ch; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function renderGenImage() {
+  const canvas = document.getElementById('genCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = 1080, H = 1080;
+  const pal = GEN_PALETTES[document.getElementById('genColor').value] || GEN_PALETTES.blue;
+  const headline = document.getElementById('genHeadline').value || 'キャッチコピーを入力';
+  const sub = document.getElementById('genSub').value || '';
+  const store = currentLocation?.title || '';
+
+  // 背景グラデーション
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, pal.from); g.addColorStop(1, pal.to);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 装飾の光
+  const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, 460);
+  rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+
+  const FONT = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif';
+  // 見出し
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'alphabetic';
+  let fs = 104; ctx.font = `900 ${fs}px ${FONT}`;
+  let lines = _wrapText(ctx, headline, W - 200);
+  while (lines.length > 3 && fs > 60) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - 200); }
+  const lh = fs * 1.3;
+  let y = H / 2 - (lines.length - 1) * lh / 2;
+  ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  lines.forEach(l => { ctx.fillText(l, 100, y); y += lh; });
+  ctx.shadowColor = 'transparent';
+
+  // サブテキスト
+  if (sub) {
+    ctx.fillStyle = pal.accent;
+    ctx.font = `700 46px ${FONT}`;
+    ctx.fillText(sub, 100, y + 20);
+  }
+  // アクセントライン
+  ctx.fillStyle = pal.accent; ctx.fillRect(100, 150, 90, 12);
+  // 店名（下部）
+  if (store) {
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `700 40px ${FONT}`;
+    ctx.fillText(store, 100, H - 90);
+  }
+}
+
+async function aiCatchCopy() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const inp = document.getElementById('genHeadline');
+  const old = inp.value; inp.value = '生成中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'catchcopy' }),
+    });
+    const d = await res.json();
+    inp.value = (d.content || old).replace(/[「」『』"']/g, '').trim().slice(0, 22);
+    renderGenImage();
+  } catch (e) { inp.value = old; showToast('生成に失敗しました', 'error'); }
+}
+
+async function saveGenImage() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.9);
+  const status = document.getElementById('mediaUploadStatus');
+  status.textContent = '生成画像を保存中...';
+  try {
+    const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUri, note: '生成画像' }),
+    });
+    const d = await res.json();
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    _mediaList = d.media || _mediaList;
+    renderMedia();
+    status.textContent = '✅ ライブラリに保存しました';
+    showToast('生成画像をライブラリに保存しました', 'success');
+  } catch (e) { status.textContent = '⚠️ 保存失敗: ' + e.message; }
 }
 
 async function deleteMedia(publicId) {

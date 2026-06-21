@@ -411,6 +411,23 @@ ${context}
     }
   }
 
+  // 画像に載せる短いキャッチコピー
+  if (type === 'catchcopy') {
+    prompt = `あなたは${storeName}の広告担当です。Instagram/Googleポストの画像に載せる短いキャッチコピーを1つだけ作ってください。
+
+【店舗情報】
+- 店名: ${knowledge.storeName || storeName}
+- 業種: ${knowledge.category || ''}
+- 強み: ${strengths}
+- サービス: ${services}
+- 切り口の指定: ${req.body.customInstruction || 'お店の魅力が伝わるもの'}
+
+【ルール】
+- 18文字以内。短く印象的に
+- 店の実情報に基づく。架空の事実や誇大表現・効果断定はしない
+- 鉤括弧や記号で囲わない。キャッチコピーの言葉だけを出力`;
+  }
+
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
