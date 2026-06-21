@@ -2548,7 +2548,9 @@ async function loadDrafts() {
     listEl.innerHTML = drafts.map(d => `
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--accent);font-weight:600">📅 投稿予定: ${d.scheduledDate || '未設定'}</span>
+          <span style="font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:6px">📅 投稿予定
+            <input type="date" id="draftdate-${d.id}" value="${d.scheduledDate || ''}" onchange="saveDraftDate('${d.id}')" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:6px;font-size:12px;font-family:inherit">
+          </span>
           <button class="link-btn" style="color:var(--red)" onclick="deleteDraft('${d.id}')">削除</button>
         </div>
         <textarea id="draft-${d.id}" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;min-height:80px;font-family:inherit;line-height:1.6">${escapeHtml(d.summary)}</textarea>
@@ -2562,6 +2564,20 @@ async function deleteDraft(id) {
   await fetch(`/api/posts?action=drafts&id=${id}${storeId ? '&storeId=' + storeId : ''}`, { method: 'DELETE' });
   showToast('下書きを削除しました', 'success');
   loadDrafts();
+}
+
+// 投稿予定日を変更して保存
+async function saveDraftDate(id) {
+  const storeId = currentLocation?.storeId || '';
+  const scheduledDate = document.getElementById('draftdate-' + id)?.value || '';
+  const summary = document.getElementById('draft-' + id)?.value || '';
+  try {
+    await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, summary, scheduledDate }),
+    });
+    showToast('投稿予定日を更新しました', 'success');
+  } catch { showToast('更新に失敗しました', 'error'); }
 }
 
 async function publishDraft(id) {

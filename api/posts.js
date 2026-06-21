@@ -33,9 +33,16 @@ export default async function handler(req, res) {
       const { id, summary, scheduledDate, topicType, callToActionType, callToActionUrl } = req.body || {};
       const list = await kvGet(key) || [];
       if (id) {
-        // 更新
+        // 更新（送られたフィールドだけ上書き。未指定の既存値は保持）
         const idx = list.findIndex(d => d.id === id);
-        if (idx >= 0) list[idx] = { ...list[idx], summary, scheduledDate, topicType, callToActionType, callToActionUrl };
+        if (idx >= 0) list[idx] = {
+          ...list[idx],
+          ...(summary !== undefined && { summary }),
+          ...(scheduledDate !== undefined && { scheduledDate }),
+          ...(topicType !== undefined && { topicType }),
+          ...(callToActionType !== undefined && { callToActionType }),
+          ...(callToActionUrl !== undefined && { callToActionUrl }),
+        };
       } else {
         // 新規
         list.push({
