@@ -1,6 +1,9 @@
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
 import { kvGet } from './_kv.js';
 
+// 生成モデル（高性能なllama-3.3-70b。Groqで無料・日本語の質が高い）
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -64,7 +67,7 @@ ${pageText}
         method: 'POST',
         headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: GROQ_MODEL,
           messages: [{ role: 'user', content: exPrompt }],
           max_tokens: 700, temperature: 0.3,
         }),
@@ -120,7 +123,7 @@ JSON以外は出力しない。`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: aiPrompt }], max_tokens: 200, temperature: 0.1 }),
+        body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: aiPrompt }], max_tokens: 200, temperature: 0.1 }),
       });
       const data = await r.json();
       const content = data.choices?.[0]?.message?.content || '';
@@ -170,7 +173,7 @@ JSON以外は一切出力しない。`;
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: enPrompt }], max_tokens: 900, temperature: 0.5 }),
+        body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: enPrompt }], max_tokens: 900, temperature: 0.5 }),
       });
       const data = await r.json();
       const content = data.choices?.[0]?.message?.content?.trim() || '';
@@ -460,7 +463,7 @@ ${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 500,
         temperature: 0.85,
