@@ -1326,9 +1326,9 @@ function renderMedia() {
   }
   g.innerHTML = _mediaList.map((m, i) => `
     <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
-      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="pickPhoto(${i})" title="クリックで投稿作成">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="${m.isVideo ? `pickPhoto(${i})` : `genFromPhoto(${i})`}" title="${m.isVideo ? 'クリックで選択' : 'クリックでこの写真から画像生成'}">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
-      ${m.isVideo ? '' : `<button onclick="genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">🎨 生成</button>`}
+      ${m.isVideo ? '' : `<button onclick="genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1">🎨 生成</button>`}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
 }
@@ -1478,14 +1478,23 @@ async function renderGenBgPicker() {
   box.innerHTML = html;
 }
 
+let _genBgTainted = false; // CORSなしで読んだ＝保存時に注意
 function selectGenBg(baseUrl) {
-  if (!baseUrl) { _genBg = null; _genBgBaseUrl = null; renderGenBgPicker(); renderGenImage(); return; }
+  if (!baseUrl) { _genBg = null; _genBgBaseUrl = null; _genBgTainted = false; renderGenBgPicker(); renderGenImage(); return; }
   _genBgBaseUrl = baseUrl;
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => { _genBg = img; renderGenBgPicker(); renderGenImage(); };
-  img.onerror = () => { showToast('背景画像の読み込みに失敗しました', 'error'); };
-  img.src = buildGenBgUrl(baseUrl); // 比率＋スマートクロップ＋補正済みを読み込む
+  const url = buildGenBgUrl(baseUrl);
+  // まずCORSありで読み込み（保存可能）。失敗したらCORSなしで再試行（プレビューは出る）
+  const load = (useCors) => {
+    const img = new Image();
+    if (useCors) img.crossOrigin = 'anonymous';
+    img.onload = () => { _genBg = img; _genBgTainted = !useCors; renderGenBgPicker(); renderGenImage(); };
+    img.onerror = () => {
+      if (useCors) load(false);
+      else showToast('背景画像の読み込みに失敗しました', 'error');
+    };
+    img.src = url + (url.includes('?') ? '&' : '?') + 'r=' + (useCors ? 'c' : 'n');
+  };
+  load(true);
 }
 
 function _wrapText(ctx, text, maxWidth) {
@@ -1610,7 +1619,12 @@ async function aiCatchCopy() {
 
 async function saveGenImage() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.92);
+  let dataUri;
+  try {
+    dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.92);
+  } catch (e) {
+    return showToast('この背景写真はブラウザの制約で保存できません。別の写真を選ぶか、Chromeでお試しください', 'error');
+  }
   const status = document.getElementById('mediaUploadStatus');
   status.textContent = '生成画像を保存中...';
   try {
