@@ -811,6 +811,14 @@ body {
         <button class="btn btn-primary" style="margin-top:14px" onclick="saveCitation()">登録状況を保存</button>
       </div>
 
+      <div class="card" style="border-color:rgba(79,125,243,0.3)">
+        <div class="card-header"><div class="card-title">🤖 AI診断・やることリスト</div>
+          <button class="btn btn-primary btn-sm" onclick="citationAdvice()">⚡ 診断する</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:8px">現在の媒体登録状況をAIが見て、優先して登録すべき媒体・次の一手を提案します。</p>
+        <div id="citationAdvice" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)">「診断する」を押してください</div>
+      </div>
+
       <div class="card">
         <div class="card-header"><div class="card-title">📊 サイテーション効果の目安</div></div>
         <div style="font-size:13px;color:var(--text-sub);line-height:2">
@@ -857,6 +865,14 @@ body {
 
         <div id="aioChecklist"></div>
         <button class="btn btn-primary" style="margin-top:16px" onclick="saveAio()">💾 チェック状況を保存</button>
+      </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.3)">
+        <div class="card-header"><div class="card-title">🤖 AI診断・やることリスト</div>
+          <button class="btn btn-primary btn-sm" onclick="aioAdvice()">⚡ 診断する</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:8px">現在の対策状況をAIが見て、未対応で優先すべき項目・具体的なアクションを提案します。</p>
+        <div id="aioAdvice" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)">「診断する」を押してください</div>
       </div>
 
       <div class="card">
@@ -2054,6 +2070,51 @@ async function loadCitation() {
       document.getElementById('nap-category').value = data.nap.category || '';
     }
   } catch {}
+}
+
+// 媒体登録状況のAI診断（やることリスト）
+async function citationAdvice() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('citationAdvice');
+  const sites = (typeof CITATION_SITES !== 'undefined') ? CITATION_SITES : [];
+  const pLabel = { high: '最重要', mid: '推奨', low: '任意' };
+  const reg = [], notReg = [];
+  sites.forEach(s => {
+    const cb = document.getElementById('cit-' + s.id);
+    (cb && cb.checked ? reg : notReg).push(`${s.name}(${pLabel[s.priority] || ''})`);
+  });
+  const context = `登録済み媒体: ${reg.join('、') || 'なし'}\n未登録の媒体: ${notReg.join('、') || 'なし'}`;
+  box.textContent = '診断中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'advice', topic: 'citation', context }),
+    });
+    const d = await res.json();
+    box.textContent = d.content || d.error || '—';
+  } catch (e) { box.textContent = '診断に失敗しました'; }
+}
+
+// AIO/LLMO/GEO のAI診断（やることリスト）
+async function aioAdvice() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('aioAdvice');
+  const checks = (typeof AIO_CHECKS !== 'undefined') ? AIO_CHECKS : [];
+  const done = [], todo = [];
+  checks.forEach(c => {
+    const cb = document.getElementById('aio-' + c.id);
+    (cb && cb.checked ? done : todo).push(c.label);
+  });
+  const context = `対応済み: ${done.join('、') || 'なし'}\n未対応: ${todo.join('、') || 'なし'}`;
+  box.textContent = '診断中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'advice', topic: 'aio', context }),
+    });
+    const d = await res.json();
+    box.textContent = d.content || d.error || '—';
+  } catch (e) { box.textContent = '診断に失敗しました'; }
 }
 
 function renderCitationSites(registered, nap) {
