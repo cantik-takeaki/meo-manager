@@ -428,6 +428,28 @@ ${context}
 - 鉤括弧や記号で囲わない。キャッチコピーの言葉だけを出力`;
   }
 
+  // 業種に合わせた月間投稿テーマを複数生成（月間プランの土台）
+  if (type === 'post_themes') {
+    const count = Math.min(Math.max(parseInt(req.body.count) || 5, 1), 12);
+    const monthTheme = req.body.theme || '';
+    prompt = `あなたは${storeName}（業種：${knowledge.category || '不明'}）のローカル集客（MEO）専門家です。
+この業種・この店舗に最適な、来店や問い合わせにつながるGoogleビジネスプロフィール投稿のテーマを${count}個提案してください。
+
+【店舗情報】
+- 業種: ${knowledge.category || '不明'}
+- 強み: ${strengths || '未設定'}
+- 提供サービス: ${services || '未設定'}
+- ターゲット: ${knowledge.targetCustomer || '未設定'}
+- 地域: ${knowledge.address || ''}
+${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
+
+【ルール】
+- その業種ならではの、検索・来店・予約につながる具体的なテーマにする（一般論や架空のキャンペーンにしない）
+  例）整骨院→「肩こりの原因と自宅でできる予防」「産後骨盤矯正のご案内」、美容室→「梅雨時のうねり対策」「白髪染めの色持ちのコツ」、飲食→「今月の旬の食材を使った一品」「ランチの人気メニュー」
+- 各テーマは15〜35文字程度の短いフレーズ
+- ${count}個を改行区切りで出力。番号・記号・前置きは付けない。テーマのみ`;
+  }
+
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {

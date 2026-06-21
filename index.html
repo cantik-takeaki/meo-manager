@@ -2926,20 +2926,34 @@ async function generateMonthlyPlan() {
   const count = parseInt(document.getElementById('planCount').value) || 5;
   const theme = document.getElementById('planTheme').value.trim();
   const listEl = document.getElementById('planList');
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div>投稿案を作成中…（少し時間がかかります）</div>';
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div>業種に合わせたテーマを作成中…</div>';
 
-  // 投稿の切り口（毎回違う内容になるよう変化をつける）
-  const angles = ['お店の魅力・こだわりの紹介', 'おすすめメニュー・サービスの紹介', 'キャンペーン・お得情報のお知らせ',
-    '季節の話題・旬の情報', 'スタッフの想い・お客様への感謝', '新メニュー・新サービスの案内',
-    'ご予約・ご来店のおすすめ', 'よくある質問への回答'];
+  // ① 業種に合わせた投稿テーマをAIで生成
+  let angles = [];
+  try {
+    const tr = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'post_themes', count, theme }),
+    });
+    const td = await tr.json();
+    angles = (td.content || '').split('\n').map(s => s.replace(/^[\d０-９.\-・\s]+/, '').trim()).filter(Boolean);
+  } catch (e) {}
+  // フォールバック（テーマ生成に失敗したら汎用の切り口）
+  if (angles.length < count) {
+    const generic = ['お店の魅力・こだわりの紹介', 'おすすめメニュー・サービスの紹介', 'キャンペーン・お得情報のお知らせ',
+      '季節の話題・旬の情報', 'スタッフの想い・お客様への感謝', '新メニュー・新サービスの案内',
+      'ご予約・ご来店のおすすめ', 'よくある質問への回答'];
+    for (let k = 0; angles.length < count; k++) angles.push(generic[k % generic.length]);
+  }
 
   const drafts = [];
   const storeId = currentLocation.storeId || '';
   // 月内に分散した投稿日（今日から6日おき）
   const baseDate = new Date();
   for (let i = 0; i < count; i++) {
-    const angle = angles[i % angles.length];
-    const instruction = (theme ? `今月のテーマ「${theme}」を踏まえて。` : '') + `切り口：${angle}`;
+    const angle = angles[i];
+    const instruction = `この投稿のテーマ：${angle}`;
+    listEl.innerHTML = `<div class="loading"><div class="spinner"></div>投稿案を作成中… ${i + 1}/${count}本（テーマ：${angle}）</div>`;
     try {
       const res = await fetch('/api/generate-content', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2950,7 +2964,6 @@ async function generateMonthlyPlan() {
       const scheduledDate = d.toISOString().split('T')[0];
       drafts.push({ summary: data.content || '', scheduledDate, topicType: 'STANDARD' });
     } catch {}
-    listEl.innerHTML = `<div class="loading"><div class="spinner"></div>投稿案を作成中… ${i + 1}/${count}本</div>`;
     await new Promise(r => setTimeout(r, 400));
   }
 
