@@ -1971,10 +1971,17 @@ async function openRankingInput(storeId, storeName) {
   document.getElementById('rankingInputCard').style.display = 'block';
   document.getElementById('rankingInputCard').scrollIntoView({ behavior: 'smooth' });
 
-  // キーワード取得（ナレッジから）
+  // キーワード取得：①過去の順位データ → ②企業ナレッジのキーワード → ③プレースホルダ
   const res = await fetch(`/api/admin?action=rankings&storeId=${storeId}`);
   const data = await res.json();
-  const keywords = data.keywords?.length ? data.keywords : ['キーワード1','キーワード2','キーワード3','キーワード4','キーワード5'];
+  let keywords = data.keywords?.length ? data.keywords.filter(Boolean) : [];
+  if (!keywords.length) {
+    try {
+      const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(storeId)}`).then(r => r.json());
+      keywords = (k.keywords || []).filter(Boolean);
+    } catch (e) {}
+  }
+  if (!keywords.length) keywords = ['キーワード1','キーワード2','キーワード3','キーワード4','キーワード5'];
   const latest = data.history?.[data.history.length - 1];
 
   document.getElementById('rankingInputFields').innerHTML = keywords.map((kw, i) => `
