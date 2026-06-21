@@ -804,6 +804,7 @@ body {
         </div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="btn btn-primary" onclick="saveCitation()">💾 NAP情報を保存</button>
+          <button class="btn btn-outline" onclick="importNapFromKnowledge()">⚡ 企業ナレッジから取り込む</button>
           <button class="btn btn-outline" onclick="copyNAP()">📋 NAP情報をコピー（登録用）</button>
         </div>
       </div>
@@ -2164,6 +2165,20 @@ function renderCitationSites(registered, nap) {
 
 function toggleCitUrl(id, checked) {
   document.getElementById(`curl-${id}`).style.display = checked ? 'flex' : 'none';
+}
+
+// NAP情報を企業ナレッジから取り込む（サイテーション登録の手間を削減）
+async function importNapFromKnowledge() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  try {
+    const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
+    set('nap-name', k.storeName);
+    set('nap-phone', k.phone);
+    set('nap-address', k.address);
+    set('nap-category', k.category);
+    showToast('ナレッジから取り込みました。確認して保存してください', 'success');
+  } catch (e) { showToast('取り込みに失敗しました', 'error'); }
 }
 
 function copyNAP() {
