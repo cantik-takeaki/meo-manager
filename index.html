@@ -951,6 +951,16 @@ body {
         <div class="card-header"><div class="card-title">新規投稿</div></div>
         <div class="post-form">
           <textarea id="postText" placeholder="投稿内容を入力（キャンペーン情報・お知らせなど）"></textarea>
+
+          <div style="margin:4px 0 8px">
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              投稿画像（Instagramは必須・Googleは任意）
+              <button class="link-btn" onclick="showPanel('instagram')">＋ ライブラリで追加/生成</button>
+              <button class="link-btn" onclick="loadPostImages()">🔄 更新</button>
+            </div>
+            <div id="postImageList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+          </div>
+
           <div class="form-row">
             <select id="postType">
               <option value="STANDARD">一般投稿</option>
@@ -968,7 +978,15 @@ body {
           <div class="form-row" id="ctaUrlRow" style="display:none">
             <input id="postCTAUrl" type="url" placeholder="リンクURL（https://...）">
           </div>
+
+          <div class="form-row" style="gap:18px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--text-sub)">投稿先：</span>
+            <label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="targetGoogle" checked> Googleビジネスプロフィール</label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="targetInstagram"> Instagram（@cantik.ink）</label>
+          </div>
+
           <button class="btn btn-primary" onclick="createPost()">投稿する</button>
+          <p style="font-size:11px;color:var(--text-sub);margin-top:4px">※投稿は社外公開アクションです。内容を確認の上、承認として投稿してください。</p>
         </div>
       </div>
 
@@ -1154,6 +1172,8 @@ function selectLocation(idx) {
   loadAio();
   loadInsights();
   loadMedia();
+  _postImage = null;
+  loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
 }
 
@@ -1950,32 +1970,77 @@ async function loadPosts() {
   }
 }
 
+// 投稿用の画像ライブラリを読み込んで選択UIを表示
+let _postImage = null;
+async function loadPostImages() {
+  const box = document.getElementById('postImageList');
+  if (!box) return;
+  if (!currentLocationId) { box.innerHTML = ''; return; }
+  try {
+    const data = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const list = data.media || [];
+    const noneSel = !_postImage;
+    let html = `<div onclick="selectPostImage(null)" style="width:74px;height:74px;border-radius:8px;border:2px solid ${noneSel ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-sub);cursor:pointer;text-align:center">画像なし</div>`;
+    html += list.map(m => {
+      const sel = _postImage && _postImage.publicId === m.publicId;
+      return `<img src="${m.squareUrl || m.url}" onclick='selectPostImage(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">`;
+    }).join('');
+    if (!list.length) html += '<span style="font-size:11px;color:var(--text-sub);align-self:center">ライブラリに画像なし（＋から追加/生成）</span>';
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = ''; }
+}
+function selectPostImage(m) { _postImage = m; loadPostImages(); }
+
 async function createPost() {
   const summary = document.getElementById('postText').value.trim();
   if (!summary) return showToast('投稿内容を入力してください', 'error');
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
 
-  const topicType = document.getElementById('postType').value;
-  const callToActionType = document.getElementById('postCTA').value;
-  const callToActionUrl = document.getElementById('postCTAUrl').value;
+  const toGoogle = document.getElementById('targetGoogle').checked;
+  const toInstagram = document.getElementById('targetInstagram').checked;
+  if (!toGoogle && !toInstagram) return showToast('投稿先を1つ以上選んでください', 'error');
+  if (toInstagram && !_postImage) return showToast('Instagramに投稿するには画像を選択してください', 'error');
 
-  try {
-    const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ summary, topicType, callToActionType, callToActionUrl }),
-    });
-    const data = await res.json();
-    if (data.pending || data.error) {
-      showToast('APIの審査完了後に投稿できます（デモモード）', 'error');
-    } else {
-      showToast('投稿しました！', 'success');
-      document.getElementById('postText').value = '';
-      loadPosts();
-    }
-  } catch {
-    showToast('エラーが発生しました', 'error');
+  const targets = [toGoogle && 'Google', toInstagram && 'Instagram'].filter(Boolean).join(' と ');
+  if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
+
+  const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+  let okMsg = [];
+
+  // Googleビジネスプロフィール
+  if (toGoogle) {
+    try {
+      const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${sid}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary,
+          topicType: document.getElementById('postType').value,
+          callToActionType: document.getElementById('postCTA').value,
+          callToActionUrl: document.getElementById('postCTAUrl').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.pending || data.error) okMsg.push('Google：審査完了後に投稿可（デモ）');
+      else okMsg.push('Google：投稿しました');
+    } catch { okMsg.push('Google：エラー'); }
   }
+
+  // Instagram
+  if (toInstagram) {
+    try {
+      const imageUrl = _postImage.portraitUrl || _postImage.squareUrl || _postImage.url;
+      const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, caption: summary }),
+      });
+      const data = await res.json();
+      if (data.success) okMsg.push('Instagram：投稿しました');
+      else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
+    } catch (e) { okMsg.push('Instagram：エラー'); }
+  }
+
+  showToast(okMsg.join(' ／ '), 'success');
+  if (toGoogle) { document.getElementById('postText').value = ''; loadPosts(); }
 }
 
 // ─── Navigation ───
@@ -1994,6 +2059,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
   if (name === 'instagram') loadMedia();
+  if (name === 'posts') loadPostImages();
 }
 
 function showPanel(name) {
