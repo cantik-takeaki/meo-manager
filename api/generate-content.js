@@ -83,6 +83,55 @@ ${pageText}
     }
   }
 
+  // ── 既存ナレッジをMEO最適化して強化（より詳しく・検索されやすく） ──
+  if (type === 'meo_enrich') {
+    const cur = req.body.current || {};
+    const curKw = Array.isArray(cur.keywords) ? cur.keywords.filter(Boolean) : [];
+    const enPrompt = `あなたはMEO（Googleマップ集客）の専門家です。
+以下の店舗情報を、Googleマップ・地域検索で上位表示と評価向上につながるよう、より具体的で検索されやすい内容に強化してください。
+事実は変えず（捏造・誇大・効果断定なし）、表現と情報の粒度をMEO最適化します。
+
+【店舗名】${cur.storeName || ''}
+【業種】${cur.category || ''}
+【地域/住所】${cur.address || ''}
+【近隣ランドマーク】${cur.nearbyLandmarks || ''}
+【現在の強み】${cur.strengths || ''}
+【現在のサービス】${cur.services || ''}
+【現在のターゲット】${cur.targetCustomer || ''}
+【現在の説明】${cur.description || ''}
+【現在のキーワード】${curKw.join('、') || 'なし'}
+
+【強化ルール】
+- keywords: 「地域名×業種」「地域名×業種×ニーズ/メニュー」「地域名×悩み」など実際に検索される語を5個。ロングテールも混ぜ、読点区切り
+- strengths: 検索意図と差別化を意識し、具体的な特徴を1〜3文で（地域名・サービス名を自然に含む）
+- services: 主要メニュー/サービスを検索される語を含め具体的に（価格があれば残す）
+- description: 来店を促す自然な紹介文（120〜200字・地域名と業種を自然に含む）
+- targetCustomer: 主な客層を具体的に
+- nearbyLandmarks: 分かれば最寄り駅・目印・徒歩分（無ければ現状維持/空）
+- tips: さらにMEO順位・評価を上げる具体アクションを5個（GBP属性設定・写真追加・口コミ依頼・投稿テーマ・FAQ登録など）。各行「・」始まり。効果断定や捏造はしない
+
+【出力JSON】（tipsは改行区切りの文字列、他は文字列）
+{"keywords":"","strengths":"","services":"","description":"","targetCustomer":"","nearbyLandmarks":"","tips":""}
+JSON以外は一切出力しない。`;
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: enPrompt }], max_tokens: 900, temperature: 0.5 }),
+      });
+      const data = await r.json();
+      const content = data.choices?.[0]?.message?.content?.trim() || '';
+      const s = content.indexOf('{'), e = content.lastIndexOf('}');
+      if (s === -1 || e === -1) return res.status(500).json({ error: 'MEO強化に失敗しました（JSON取得不可）' });
+      let fields;
+      try { fields = JSON.parse(content.slice(s, e + 1)); }
+      catch (er) { return res.status(500).json({ error: 'MEO強化結果の解析に失敗しました' }); }
+      return res.json({ fields });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // ナレッジ取得
   const knowledge = await kvGet(`knowledge_${locationId}`) || {};
   const storeName = knowledge.storeName || '当店';

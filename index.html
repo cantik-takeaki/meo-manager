@@ -618,7 +618,14 @@ body {
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="saveKnowledge()" style="margin-bottom:16px">💾 ナレッジを保存</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="saveKnowledge()">💾 ナレッジを保存</button>
+        <button class="btn btn-outline" onclick="meoEnrich()">🚀 AIでMEO強化（より詳しく）</button>
+      </div>
+      <div class="card" id="meoEnrichCard" style="display:none;border-color:rgba(52,211,153,0.4)">
+        <div class="card-header"><div class="card-title">🚀 さらにMEOを上げる施策</div></div>
+        <div id="meoEnrichTips" style="font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text)"></div>
+      </div>
     </div>
 
     <!-- Instagram投稿（クライアント別 写真ライブラリ） -->
@@ -2336,6 +2343,50 @@ async function autofillFromUrl() {
     status.textContent = '✅ 反映しました。内容を確認して「ナレッジを保存」を押してください。';
     showToast('自動取得しました', 'success');
   } catch (e) { status.textContent = '⚠️ 取得失敗: ' + e.message; }
+}
+
+// 既存ナレッジをAIでMEO強化（より詳しく・検索されやすく）＋追加施策を提案
+async function meoEnrich() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const current = {
+    storeName: document.getElementById('kn-storeName').value,
+    category: document.getElementById('kn-category').value,
+    address: document.getElementById('nap-address')?.value || '',
+    nearbyLandmarks: document.getElementById('kn-nearbyLandmarks').value,
+    strengths: document.getElementById('kn-strengths').value,
+    services: document.getElementById('kn-services').value,
+    targetCustomer: document.getElementById('kn-targetCustomer').value,
+    description: document.getElementById('kn-description').value,
+    keywords: [0,1,2,3,4].map(i => document.getElementById('kn-kw' + i)?.value || '').filter(Boolean),
+  };
+  if (!current.storeName && !current.category && !current.strengths) {
+    return showToast('先に基本情報を入力（またはURL自動取得）してください', 'error');
+  }
+  const card = document.getElementById('meoEnrichCard');
+  const tipsBox = document.getElementById('meoEnrichTips');
+  card.style.display = 'block';
+  tipsBox.textContent = 'AIがMEO強化中...（10〜20秒）';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'meo_enrich', current }),
+    });
+    const d = await res.json();
+    if (d.error) { tipsBox.textContent = '⚠️ ' + d.error; return; }
+    const f = d.fields || {};
+    const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
+    set('kn-strengths', f.strengths);
+    set('kn-services', f.services);
+    set('kn-targetCustomer', f.targetCustomer);
+    set('kn-description', f.description);
+    set('kn-nearbyLandmarks', f.nearbyLandmarks);
+    if (f.keywords) {
+      const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
+      kws.slice(0, 5).forEach((kw, i) => { const el = document.getElementById('kn-kw' + i); if (el) el.value = kw; });
+    }
+    tipsBox.textContent = f.tips || '強化しました。内容を確認して保存してください。';
+    showToast('MEO強化しました。確認して保存してください', 'success');
+  } catch (e) { tipsBox.textContent = '⚠️ 強化に失敗しました: ' + e.message; }
 }
 
 async function saveKnowledge() {
