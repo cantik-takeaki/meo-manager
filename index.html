@@ -2487,6 +2487,14 @@ async function generatePost() {
 // ─── 月間投稿プラン（下書き一括生成） ───
 async function generateMonthlyPlan() {
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
+  // 企業ナレッジが空だと内容が的外れになるため事前チェック
+  try {
+    const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const hasInfo = (k.storeName || k.category || k.strengths || k.services);
+    if (!hasInfo) {
+      return showToast('先に「企業ナレッジ」で店名・業種・強み・サービスを入力してください（空だと無関係な内容になります）', 'error');
+    }
+  } catch (e) {}
   const count = parseInt(document.getElementById('planCount').value) || 5;
   const theme = document.getElementById('planTheme').value.trim();
   const listEl = document.getElementById('planList');
