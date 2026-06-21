@@ -758,6 +758,7 @@ body {
         <div id="baselineInfo" style="display:none;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;font-size:12px;color:var(--accent-2)"></div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" onclick="saveBaseline()">💾 正規情報として保存</button>
+          <button class="btn btn-outline" onclick="importBaselineFromKnowledge()">⚡ 企業ナレッジから取り込む</button>
           <button class="btn btn-outline" onclick="checkNow()">🔍 変更チェック</button>
         </div>
       </div>
@@ -2622,6 +2623,21 @@ async function loadProtection() {
           </div>`).join('')
       : '<div class="empty-state"><p>✅ アラートなし（正常です）</p></div>';
   } catch {}
+}
+
+// 改ざん防止の正規情報を企業ナレッジから取り込む
+async function importBaselineFromKnowledge() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  try {
+    const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
+    set('bl-title', k.storeName);
+    set('bl-phone', k.phone);
+    set('bl-address', k.address);
+    set('bl-category', k.category);
+    set('bl-hours', k.businessHours);
+    showToast('ナレッジから取り込みました。確認して保存してください', 'success');
+  } catch (e) { showToast('取り込みに失敗しました', 'error'); }
 }
 
 async function saveBaseline() {
