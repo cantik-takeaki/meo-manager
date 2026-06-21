@@ -389,6 +389,32 @@ body {
         </div>
       </div>
 
+      <div class="card" id="meoDiagCard" style="display:none">
+        <div class="card-header">
+          <div class="card-title">📊 MEO診断</div>
+          <div class="card-sub" id="meoDiagStore"></div>
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+          <div style="text-align:center;min-width:150px">
+            <div style="font-size:13px;color:var(--text-sub)">MEOスコア</div>
+            <div style="font-size:54px;font-weight:900;line-height:1.1"><span id="meoScoreNum">—</span><span style="font-size:22px;color:var(--text-sub)">/100</span></div>
+            <div id="meoScoreLabel" style="font-size:13px;font-weight:700"></div>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <div id="meoChecklist" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:5px 14px"></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:6px">改善アドバイス（AI）</div>
+          <div id="meoAdvice" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)">店舗を選択すると診断します</div>
+        </div>
+      </div>
+
+      <div class="card" id="rankDashCard" style="display:none">
+        <div class="card-header"><div class="card-title">🔍 キーワード順位</div><div class="card-sub" id="rankDashDate"></div></div>
+        <div id="rankDashList"></div>
+      </div>
+
       <div class="card" id="insightsCard" style="display:none">
         <div class="card-header">
           <div class="card-title">インサイト（直近3ヶ月）</div>
@@ -1052,6 +1078,98 @@ function selectLocation(idx) {
   loadAio();
   loadInsights();
   loadMedia();
+  loadDashboardRankings().then(loadDiagnosis);
+}
+
+// ─── ダッシュボード：キーワード順位 ───
+let _dashRankings = [];
+async function loadDashboardRankings() {
+  const card = document.getElementById('rankDashCard');
+  _dashRankings = [];
+  const sid = currentLocation?.storeId;
+  if (!sid) { if (card) card.style.display = 'none'; return; }
+  try {
+    const data = await fetch(`/api/admin?action=rankings&storeId=${sid}`).then(r => r.json());
+    const keywords = (data.keywords || []).filter(k => k && !k.startsWith('キーワード'));
+    const latest = data.history?.[data.history.length - 1];
+    if (!keywords.length || !latest) { if (card) card.style.display = 'none'; return; }
+    _dashRankings = keywords.map((kw, i) => ({ keyword: kw, rank: latest.rankings?.[i] || null }));
+    document.getElementById('rankDashDate').textContent = latest.date || '';
+    document.getElementById('rankDashList').innerHTML = _dashRankings.map(r => {
+      const color = r.rank && r.rank <= 3 ? 'var(--green)' : r.rank && r.rank <= 10 ? 'var(--gold)' : 'var(--text-sub)';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span>${escapeHtml(r.keyword)}</span>
+        <b style="color:${color};font-size:15px">${r.rank ? r.rank + '位' : '圏外'}</b></div>`;
+    }).join('');
+    card.style.display = 'block';
+  } catch (e) { if (card) card.style.display = 'none'; }
+}
+
+// ─── ダッシュボード：MEO診断（スコアは機械算出・助言はAI） ───
+async function loadDiagnosis() {
+  const card = document.getElementById('meoDiagCard');
+  if (!currentLocationId) { if (card) card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('meoDiagStore').textContent = currentLocation?.title || '';
+
+  let k = {};
+  try { k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
+  const gbpConnected = currentLocation?._type === 'gbp' || currentLocation?.gbpConnected;
+  let rv = {};
+  if (gbpConnected && currentLocation?.name) {
+    try {
+      const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+      const r = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${sid}`).then(r => r.json());
+      rv = r.stats || {};
+    } catch (e) {}
+  }
+  const kw = (k.keywords || []).filter(Boolean);
+  const items = [
+    { label: '店名', w: 6, ok: !!k.storeName },
+    { label: '業種カテゴリ', w: 6, ok: !!k.category },
+    { label: '住所', w: 6, ok: !!k.address },
+    { label: '電話番号', w: 6, ok: !!k.phone },
+    { label: '営業時間', w: 6, ok: !!k.businessHours },
+    { label: '店舗説明', w: 6, ok: !!k.description },
+    { label: '強み・特徴', w: 8, ok: !!k.strengths },
+    { label: '提供サービス', w: 8, ok: !!k.services },
+    { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
+    { label: 'キーワード設定', w: 8, ok: kw.length >= 3 },
+    { label: 'GBP連携', w: 10, ok: !!gbpConnected },
+    { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
+    { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
+    { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0 },
+  ];
+  const total = items.reduce((s, i) => s + i.w, 0);
+  const earned = items.reduce((s, i) => s + (i.ok ? i.w : 0), 0);
+  const score = Math.round((earned / total) * 100);
+
+  document.getElementById('meoScoreNum').textContent = score;
+  const lbl = score >= 80 ? '良好' : score >= 60 ? '改善の余地あり' : '要改善';
+  const col = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--gold)' : 'var(--red)';
+  const le = document.getElementById('meoScoreLabel'); le.textContent = lbl; le.style.color = col;
+  document.getElementById('meoChecklist').innerHTML = items.map(i =>
+    `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`
+  ).join('');
+
+  const adv = document.getElementById('meoAdvice');
+  adv.textContent = '診断中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId: currentLocationId, type: 'diagnosis',
+        diagnosis: {
+          score,
+          filled: items.filter(i => i.ok).map(i => i.label),
+          missing: items.filter(i => !i.ok).map(i => i.label),
+          reviewStats: rv, rankings: _dashRankings,
+        },
+      }),
+    });
+    const d = await res.json();
+    adv.textContent = d.content || d.error || '—';
+  } catch (e) { adv.textContent = '—'; }
 }
 
 // ─── Instagram投稿（クライアント別 写真ライブラリ） ───
