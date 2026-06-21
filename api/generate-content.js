@@ -33,20 +33,32 @@ export default async function handler(req, res) {
     }
     if (pageText.length < 50) return res.status(400).json({ error: 'ページから十分な情報を取得できませんでした（JS主体のページの可能性）' });
 
-    const exPrompt = `以下はある店舗のWebページ（ホームページやグルメサイト等）から抽出したテキストです。
-ここから店舗情報を読み取り、指定のJSONのみを出力してください。
+    const exPrompt = `あなたはMEO（Googleマップ集客）の専門家です。
+以下は店舗のWebページ（ホームページやグルメサイト等）から抽出したテキストです。
+このページを読み、MEOで上位表示・評価向上につながる「企業ナレッジ」を作成し、指定のJSONのみを出力してください。
 
 【ページ内容】
 ${pageText}
 
 【ルール】
-- 分からない項目は空文字 "" にする。テキストに無い情報を推測・捏造しない
-- keywords は「地域名＋業種」など集客で狙うべき語を読点区切りで3〜5個提案してよい
-- services・strengths はページから読み取れる範囲で簡潔にまとめる
+■事実情報（捏造厳禁・ページに無ければ空文字 ""）
+- storeName / phone / businessHours / address / parking はページに書かれた事実のみ。推測しない。
+
+■MEO最適化して記載する項目（事実をもとに、検索で見つかりやすい書き方にする）
+- category: 検索で使われる業種名（例「美容室」「整骨院」「焼き鳥居酒屋」）
+- nearbyLandmarks: ページにある最寄り駅・目印・徒歩分などのアクセス情報（地域検索に効く。無ければ空）
+- keywords: 「地域名×業種」「地域名×業種×ニーズ/メニュー」の検索されやすい語を読点区切りで5個。実際に検索されそうな組み合わせにする（例「相模原 焼き鳥」「相模原 居酒屋 個室」）
+- strengths: ページから読み取れる強み・特徴を、検索意図に合うキーワードを自然に含めて簡潔に
+- services: 主要なサービス・メニューを（あれば価格も）具体的に。検索される語を含める
+- targetCustomer: ページから推測できる主な客層
+- description: 来店を促す自然な紹介文（誇大表現・効果の断定はしない）
+
+■共通
+- ページに無い事実・実績・数値を創作しない
 - JSON以外（説明・前置き・コードブロック記号）は一切出力しない
 
 【出力JSON】
-{"storeName":"","category":"","address":"","phone":"","businessHours":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
+{"storeName":"","category":"","address":"","phone":"","businessHours":"","parking":"","nearbyLandmarks":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
