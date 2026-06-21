@@ -1320,6 +1320,7 @@ function renderMedia() {
     <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
       <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="pickPhoto(${i})" title="クリックで投稿作成">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
+      ${m.isVideo ? '' : `<button onclick="genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">🎨 生成</button>`}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
 }
@@ -1412,6 +1413,18 @@ const GEN_PALETTES = {
 };
 
 let _genBg = null; // 背景に使う画像(Image) or null=グラデ
+
+// 選択した写真を背景に使って画像生成（ギャラリーの🎨生成から）
+function genFromPhoto(i) {
+  const m = _mediaList[i];
+  if (!m || m.isVideo) return showToast('画像を選んでください', 'error');
+  const panel = document.getElementById('imageGenPanel');
+  panel.style.display = 'block';
+  selectGenBg(m.squareUrl || m.url); // 背景に設定＋描画
+  aiCatchCopy();                      // キャッチコピーをAIで自動生成
+  renderGenBgPicker();
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
 
 function toggleImageGen() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
