@@ -957,8 +957,21 @@ async function loadLocations() {
       gbpLocations: s.gbpLocations || [],
     }));
 
-    // 重複を除いてマージ
-    const locations = [...gbpLocations, ...adminLocations];
+    // 重複を除いてマージ（同じ店舗がGBP一覧と登録店舗で二重に出るのを防ぐ）
+    // キー: GBPロケーション名（あれば）＞ 正規化した店舗名。優先度: 登録店舗(storeId付き)＞GBP連携＞その他
+    const _normKey = (loc) => {
+      const byLoc = (loc.gbpLocationName || loc.name || '').match(/locations\/[^/]+/)?.[0];
+      if (byLoc) return 'L:' + byLoc;
+      return 'T:' + (loc.title || loc.storeId || '').trim().toLowerCase();
+    };
+    const _score = (l) => (l.storeId ? 2 : 0) + (l.gbpConnected ? 1 : 0);
+    const _seen = new Map();
+    for (const loc of [...adminLocations, ...gbpLocations]) { // 登録店舗を優先
+      const key = _normKey(loc);
+      const cur = _seen.get(key);
+      if (!cur || _score(loc) > _score(cur)) _seen.set(key, loc);
+    }
+    const locations = [..._seen.values()];
     window._locations = locations;
 
     document.getElementById('statLocations').textContent = locations.length;
