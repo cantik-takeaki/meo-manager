@@ -113,7 +113,7 @@ export default async function handler(req, res) {
       if (!CLOUD || !CKEY || !CSECRET) {
         return res.status(500).json({ error: 'Cloudinary環境変数が未設定です（CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET）' });
       }
-      const { image, note } = req.body || {};
+      const { image, note, noCrop } = req.body || {};
       if (!image) return res.status(400).json({ error: '画像データ(image)が必須です' });
 
       const ts = Math.floor(Date.now() / 1000);
@@ -136,9 +136,9 @@ export default async function handler(req, res) {
         const data = await r.json();
         if (data.error) return res.status(400).json({ error: 'Cloudinaryアップロード失敗: ' + data.error.message });
 
-        // 元URLと、Instagram用の正方形URL（スマート切り抜き）を生成
-        const sq = data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1080/');
-        const portrait = data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1350/');
+        // 生成画像(noCrop)は選んだ比率のまま使う。通常写真はInstagram用に正方形/縦長へスマート切り抜き
+        const sq = noCrop ? data.secure_url : data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1080/');
+        const portrait = noCrop ? data.secure_url : data.secure_url.replace('/upload/', '/upload/c_fill,g_auto,w_1080,h_1350/');
         const item = {
           publicId: data.public_id,
           url: data.secure_url,
@@ -146,6 +146,7 @@ export default async function handler(req, res) {
           portraitUrl: portrait,
           width: data.width,
           height: data.height,
+          isGenerated: !!noCrop,
           note: note || '',
           createdAt: new Date().toISOString(),
         };

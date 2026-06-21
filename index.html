@@ -1447,9 +1447,9 @@ function genFromPhoto(i) {
   if (!m || m.isVideo) return showToast('画像を選んでください', 'error');
   const panel = document.getElementById('imageGenPanel');
   panel.style.display = 'block';
-  selectGenBg(m.url || m.squareUrl); // 元URLを背景に設定＋描画
+  showToast('この写真を背景に画像を生成します', 'success');
+  selectGenBg(m.url || m.squareUrl); // 元URLを背景に設定＋描画（読み込み後に自動描画）
   aiCatchCopy();
-  renderGenBgPicker();
   panel.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -1610,13 +1610,13 @@ async function aiCatchCopy() {
 
 async function saveGenImage() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.9);
+  const dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.92);
   const status = document.getElementById('mediaUploadStatus');
   status.textContent = '生成画像を保存中...';
   try {
     const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUri, note: '生成画像' }),
+      body: JSON.stringify({ image: dataUri, note: '生成画像', noCrop: true }),
     });
     const d = await res.json();
     if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
