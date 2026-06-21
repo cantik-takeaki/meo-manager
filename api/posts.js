@@ -221,13 +221,52 @@ export default async function handler(req, res) {
       // 投稿公開（2段階：media コンテナ作成 → media_publish）
       // ※会社ルール：実公開は社長承認後にこのエンドポイントを叩く設計（自動全公開はしない）
       if (req.method === 'POST' && sub === 'publish') {
-        const { imageUrl, videoUrl, caption, mediaType } = req.body || {};
-        if (!imageUrl && !videoUrl) return res.status(400).json({ error: '画像または動画の公開URLが必須です' });
+        const { imageUrl, imageUrls, videoUrl, caption, mediaType } = req.body || {};
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        const waitFinished = async (cid) => {
+          for (let i = 0; i < 6; i++) {
+            const sr = await fetch(`${BASE}/${cid}?fields=status_code&access_token=${IG_TOKEN}`);
+            const sd = await sr.json();
+            if (sd.status_code === 'FINISHED') return true;
+            if (sd.status_code === 'ERROR') return false;
+            await sleep(1500);
+          }
+          return true;
+        };
 
-        // step1: コンテナ作成
+        // ── カルーセル（複数画像2〜10枚） ──
+        const imgs = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+        if (imgs.length >= 2) {
+          const childIds = [];
+          for (const u of imgs.slice(0, 10)) {
+            const cp = new URLSearchParams();
+            cp.set('image_url', u); cp.set('is_carousel_item', 'true'); cp.set('access_token', IG_TOKEN);
+            const cr = await fetch(`${BASE}/${IG_USER}/media`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: cp.toString() });
+            const cd = await cr.json();
+            if (cd.error) return res.status(400).json({ error: 'カルーセル子作成失敗: ' + cd.error.message });
+            childIds.push(cd.id);
+          }
+          const pp = new URLSearchParams();
+          pp.set('media_type', 'CAROUSEL'); pp.set('children', childIds.join(','));
+          if (caption) pp.set('caption', caption); pp.set('access_token', IG_TOKEN);
+          const pr = await fetch(`${BASE}/${IG_USER}/media`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: pp.toString() });
+          const pd = await pr.json();
+          if (pd.error) return res.status(400).json({ error: 'カルーセル作成失敗: ' + pd.error.message });
+          await waitFinished(pd.id);
+          const fp = new URLSearchParams(); fp.set('creation_id', pd.id); fp.set('access_token', IG_TOKEN);
+          const fr = await fetch(`${BASE}/${IG_USER}/media_publish`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fp.toString() });
+          const fd = await fr.json();
+          if (fd.error) return res.status(400).json({ error: '公開失敗: ' + fd.error.message, creationId: pd.id });
+          return res.json({ success: true, id: fd.id, creationId: pd.id, carousel: true });
+        }
+
+        // ── 単一画像 / 動画 ──
+        const singleImage = imageUrl || imgs[0];
+        if (!singleImage && !videoUrl) return res.status(400).json({ error: '画像または動画の公開URLが必須です' });
+
         const p1 = new URLSearchParams();
         if (videoUrl) { p1.set('video_url', videoUrl); p1.set('media_type', mediaType || 'REELS'); }
-        else { p1.set('image_url', imageUrl); }
+        else { p1.set('image_url', singleImage); }
         if (caption) p1.set('caption', caption);
         p1.set('access_token', IG_TOKEN);
         const cr = await fetch(`${BASE}/${IG_USER}/media`, {
@@ -242,18 +281,10 @@ export default async function handler(req, res) {
           return res.json({ pending: true, creationId, message: '動画処理中。statusがFINISHEDになったらfinalizeで公開してください' });
         }
 
-        // 画像も処理完了まで一瞬ラグがある（"Media ID is not available"対策）。
-        // status_code が FINISHED になるまで最大5回ポーリングしてから公開。
-        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-        for (let i = 0; i < 5; i++) {
-          const sr = await fetch(`${BASE}/${creationId}?fields=status_code&access_token=${IG_TOKEN}`);
-          const sdata = await sr.json();
-          if (sdata.status_code === 'FINISHED') break;
-          if (sdata.status_code === 'ERROR') return res.status(400).json({ error: '画像処理エラー', creationId });
-          await sleep(1500);
-        }
+        // 画像は処理完了まで待ってから公開（"Media ID is not available"対策）
+        const okImg = await waitFinished(creationId);
+        if (!okImg) return res.status(400).json({ error: '画像処理エラー', creationId });
 
-        // step2: 公開（画像）
         const p2 = new URLSearchParams();
         p2.set('creation_id', creationId);
         p2.set('access_token', IG_TOKEN);

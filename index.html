@@ -1182,7 +1182,7 @@ function selectLocation(idx) {
   loadAio();
   loadInsights();
   loadMedia();
-  _postImage = null;
+  _postImages = [];
   loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
 }
@@ -2039,8 +2039,8 @@ async function loadPosts() {
   }
 }
 
-// 投稿用の画像ライブラリを読み込んで選択UIを表示
-let _postImage = null;
+// 投稿用の画像ライブラリを読み込んで選択UIを表示（複数選択＝カルーセル対応）
+let _postImages = [];
 async function loadPostImages() {
   const box = document.getElementById('postImageList');
   if (!box) return;
@@ -2048,17 +2048,25 @@ async function loadPostImages() {
   try {
     const data = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
     const list = data.media || [];
-    const noneSel = !_postImage;
-    let html = `<div onclick="selectPostImage(null)" style="width:74px;height:74px;border-radius:8px;border:2px solid ${noneSel ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-sub);cursor:pointer;text-align:center">画像なし</div>`;
+    let html = `<div onclick="clearPostImages()" style="width:74px;height:74px;border-radius:8px;border:2px solid ${!_postImages.length ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-sub);cursor:pointer;text-align:center">画像なし</div>`;
     html += list.map(m => {
-      const sel = _postImage && _postImage.publicId === m.publicId;
-      return `<img src="${m.squareUrl || m.url}" onclick='selectPostImage(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">`;
+      const idx = _postImages.findIndex(x => x.publicId === m.publicId);
+      const sel = idx >= 0;
+      return `<div style="position:relative;display:inline-flex">
+        <img src="${m.squareUrl || m.url}" onclick='togglePostImage(${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:2px solid ${sel ? 'var(--accent)' : 'var(--border)'};cursor:pointer">
+        ${sel ? `<span style="position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">${idx + 1}</span>` : ''}
+      </div>`;
     }).join('');
     if (!list.length) html += '<span style="font-size:11px;color:var(--text-sub);align-self:center">ライブラリに画像なし（＋から追加/生成）</span>';
     box.innerHTML = html;
   } catch (e) { box.innerHTML = ''; }
 }
-function selectPostImage(m) { _postImage = m; loadPostImages(); }
+function togglePostImage(m) {
+  const i = _postImages.findIndex(x => x.publicId === m.publicId);
+  if (i >= 0) _postImages.splice(i, 1); else _postImages.push(m);
+  loadPostImages();
+}
+function clearPostImages() { _postImages = []; loadPostImages(); }
 
 async function createPost() {
   const summary = document.getElementById('postText').value.trim();
@@ -2068,7 +2076,7 @@ async function createPost() {
   const toGoogle = document.getElementById('targetGoogle').checked;
   const toInstagram = document.getElementById('targetInstagram').checked;
   if (!toGoogle && !toInstagram) return showToast('投稿先を1つ以上選んでください', 'error');
-  if (toInstagram && !_postImage) return showToast('Instagramに投稿するには画像を選択してください', 'error');
+  if (toInstagram && !_postImages.length) return showToast('Instagramに投稿するには画像を1枚以上選択してください', 'error');
 
   const targets = [toGoogle && 'Google', toInstagram && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
@@ -2094,16 +2102,21 @@ async function createPost() {
     } catch { okMsg.push('Google：エラー'); }
   }
 
-  // Instagram
+  // Instagram（1枚＝通常／2枚以上＝カルーセル）
   if (toInstagram) {
     try {
-      const imageUrl = _postImage.portraitUrl || _postImage.squareUrl || _postImage.url;
+      let body;
+      if (_postImages.length >= 2) {
+        body = { imageUrls: _postImages.map(m => m.squareUrl || m.url), caption: summary };
+      } else {
+        const m = _postImages[0];
+        body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary };
+      }
       const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, caption: summary }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.success) okMsg.push('Instagram：投稿しました');
+      if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + _postImages.length + '枚）' : ''}`);
       else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
     } catch (e) { okMsg.push('Instagram：エラー'); }
   }
