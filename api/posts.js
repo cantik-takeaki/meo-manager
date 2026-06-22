@@ -30,7 +30,8 @@ export default async function handler(req, res) {
       return res.json({ drafts: list });
     }
     if (req.method === 'POST') {
-      const { id, summary, scheduledDate, topicType, callToActionType, callToActionUrl } = req.body || {};
+      const b = req.body || {};
+      const { id, summary, scheduledDate, scheduledTime, topicType, callToActionType, callToActionUrl, images, targetGoogle, targetInstagram } = b;
       const list = await kvGet(key) || [];
       if (id) {
         // 更新（送られたフィールドだけ上書き。未指定の既存値は保持）
@@ -39,16 +40,22 @@ export default async function handler(req, res) {
           ...list[idx],
           ...(summary !== undefined && { summary }),
           ...(scheduledDate !== undefined && { scheduledDate }),
+          ...(scheduledTime !== undefined && { scheduledTime }),
           ...(topicType !== undefined && { topicType }),
           ...(callToActionType !== undefined && { callToActionType }),
           ...(callToActionUrl !== undefined && { callToActionUrl }),
+          ...(images !== undefined && { images }),
+          ...(targetGoogle !== undefined && { targetGoogle }),
+          ...(targetInstagram !== undefined && { targetInstagram }),
         };
       } else {
         // 新規
         list.push({
           id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-          summary, scheduledDate: scheduledDate || '', topicType: topicType || 'STANDARD',
+          summary, scheduledDate: scheduledDate || '', scheduledTime: scheduledTime || '',
+          topicType: topicType || 'STANDARD',
           callToActionType: callToActionType || '', callToActionUrl: callToActionUrl || '',
+          images: images || [], targetGoogle: targetGoogle !== false, targetInstagram: !!targetInstagram,
           status: 'scheduled', createdAt: new Date().toISOString(),
         });
       }

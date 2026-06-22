@@ -970,7 +970,12 @@ body {
       <div class="card">
         <div class="card-header"><div class="card-title">新規投稿</div></div>
         <div class="post-form">
-          <textarea id="postText" placeholder="投稿内容を入力（キャンペーン情報・お知らせなど）"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <input id="postGenTopic" type="text" placeholder="投稿テーマ/指示（任意・例：週末ランチの告知）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <button class="btn btn-primary btn-sm" onclick="generateNewPost()">✨ AIで文章生成</button>
+          </div>
+          <textarea id="postText" placeholder="投稿内容を入力（または「✨AIで文章生成」）" oninput="updatePostCount()"></textarea>
+          <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google目安150〜300字／Instagram150〜250字）</div>
 
           <div style="margin:4px 0 8px">
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -2190,6 +2195,29 @@ function togglePostImage(m) {
 }
 function clearPostImages() { _postImages = []; loadPostImages(); }
 
+function updatePostCount() {
+  const n = (document.getElementById('postText').value || '').length;
+  const el = document.getElementById('postCount');
+  if (el) el.textContent = `${n}字（Google目安150〜300字／Instagram150〜250字）`;
+}
+
+// 新規投稿の文章をAI生成
+async function generateNewPost() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const ta = document.getElementById('postText');
+  const topic = document.getElementById('postGenTopic').value.trim();
+  ta.value = '生成中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'post', postType: 'STANDARD', customInstruction: topic || 'お店の魅力が伝わる投稿' }),
+    });
+    const d = await res.json();
+    ta.value = d.content || d.error || '生成に失敗しました';
+  } catch (e) { ta.value = '生成に失敗しました'; }
+  updatePostCount();
+}
+
 async function createPost() {
   const summary = document.getElementById('postText').value.trim();
   if (!summary) return showToast('投稿内容を入力してください', 'error');
@@ -2203,60 +2231,57 @@ async function createPost() {
   const targets = [toGoogle && 'Google', toInstagram && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
 
-  const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
-  let okMsg = [];
+  const okMsg = await publishToTargets(summary, _postImages, toGoogle, toInstagram, {
+    topicType: document.getElementById('postType').value,
+    cta: document.getElementById('postCTA').value,
+    ctaUrl: document.getElementById('postCTAUrl').value,
+  });
+  showToast(okMsg.join(' ／ '), 'success');
+  if (toGoogle) { document.getElementById('postText').value = ''; updatePostCount(); loadPosts(); }
+}
 
-  // Googleビジネスプロフィール
+// Google／Instagramへの投稿を行う共通処理（新規投稿・予約投稿の両方で使用）
+async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {}) {
+  const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+  const okMsg = [];
   if (toGoogle) {
     try {
       const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${sid}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          summary,
-          topicType: document.getElementById('postType').value,
-          callToActionType: document.getElementById('postCTA').value,
-          callToActionUrl: document.getElementById('postCTAUrl').value,
-        }),
+        body: JSON.stringify({ summary, topicType: opts.topicType || 'STANDARD', callToActionType: opts.cta || '', callToActionUrl: opts.ctaUrl || '' }),
       });
       const data = await res.json();
-      if (data.pending || data.error) okMsg.push('Google：審査完了後に投稿可（デモ）');
-      else okMsg.push('Google：投稿しました');
+      okMsg.push((data.pending || data.error) ? 'Google：審査完了後に投稿可（デモ）' : 'Google：投稿しました');
     } catch { okMsg.push('Google：エラー'); }
   }
-
-  // Instagram（動画＝Reels／画像1枚＝通常／2枚以上＝カルーセル）
   if (toInstagram) {
     try {
-      const video = _postImages.find(m => m.isVideo);
+      const video = (images || []).find(m => m.isVideo);
       if (video) {
-        // 動画＝Reels（処理待ち→finalize）
         const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: video.url, caption: summary }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: video.url, caption: summary }),
         });
         const data = await res.json();
         if (data.creationId) {
           showToast('動画を処理中…公開まで少しお待ちください', 'success');
           const ok = await pollAndFinalizeIg(data.creationId, sid);
-          okMsg.push(ok ? 'Instagram：動画(リール)を投稿しました' : 'Instagram：動画は処理中（完了後に公開されます）');
+          okMsg.push(ok ? 'Instagram：動画(リール)を投稿しました' : 'Instagram：動画は処理中（完了後に公開）');
         } else if (data.success) okMsg.push('Instagram：動画を投稿しました');
         else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       } else {
         let body;
-        if (_postImages.length >= 2) body = { imageUrls: _postImages.map(m => m.squareUrl || m.url), caption: summary };
-        else { const m = _postImages[0]; body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary }; }
+        if ((images || []).length >= 2) body = { imageUrls: images.map(m => m.squareUrl || m.url), caption: summary };
+        else { const m = images[0]; body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary }; }
         const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + _postImages.length + '枚）' : ''}`);
+        if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + images.length + '枚）' : ''}`);
         else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       }
-    } catch (e) { okMsg.push('Instagram：エラー'); }
+    } catch { okMsg.push('Instagram：エラー'); }
   }
-
-  showToast(okMsg.join(' ／ '), 'success');
-  if (toGoogle) { document.getElementById('postText').value = ''; loadPosts(); }
+  return okMsg;
 }
 
 // ─── Navigation ───
@@ -2977,57 +3002,122 @@ async function generateMonthlyPlan() {
   loadDrafts();
 }
 
+let _draftImages = {};      // draftId -> 選択中の画像[]
+let _draftMediaList = [];    // ライブラリ画像
+
 async function loadDrafts() {
   if (!currentLocation) return;
   const storeId = currentLocation.storeId || '';
   const listEl = document.getElementById('planList');
   try {
-    const res = await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`);
-    const data = await res.json();
-    const drafts = data.drafts || [];
-    if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">下書きはまだありません。</p>'; return; }
+    const [draftsData, mediaData] = await Promise.all([
+      fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`).then(r => r.json()),
+      fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()).catch(() => ({ media: [] })),
+    ]);
+    const drafts = draftsData.drafts || [];
+    _draftMediaList = mediaData.media || [];
+    if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">予約投稿はまだありません。「投稿案を一括生成」または新規投稿から追加してください。</p>'; return; }
+    _draftImages = {};
+    drafts.forEach(d => { _draftImages[d.id] = d.images || []; });
     listEl.innerHTML = drafts.map(d => `
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:6px">📅 投稿予定
-            <input type="date" id="draftdate-${d.id}" value="${d.scheduledDate || ''}" onchange="saveDraftDate('${d.id}')" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:6px;font-size:12px;font-family:inherit">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap">📅 予定
+            <input type="date" id="draftdate-${d.id}" value="${d.scheduledDate || ''}" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;font-family:inherit">
+            <input type="time" id="drafttime-${d.id}" value="${d.scheduledTime || ''}" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;font-family:inherit">
           </span>
           <button class="link-btn" style="color:var(--red)" onclick="deleteDraft('${d.id}')">削除</button>
         </div>
-        <textarea id="draft-${d.id}" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;min-height:80px;font-family:inherit;line-height:1.6">${escapeHtml(d.summary)}</textarea>
-        <div style="margin-top:8px"><button class="btn btn-success btn-sm" onclick="publishDraft('${d.id}')">この内容で投稿する</button></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:13px">
+          <span style="color:var(--text-sub)">投稿先：</span>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="draftG-${d.id}" ${d.targetGoogle !== false ? 'checked' : ''}> Google</label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="draftI-${d.id}" ${d.targetInstagram ? 'checked' : ''}> Instagram</label>
+        </div>
+        <textarea id="draft-${d.id}" oninput="updateDraftCount('${d.id}')" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;min-height:80px;font-family:inherit;line-height:1.6">${escapeHtml(d.summary)}</textarea>
+        <div id="draftcount-${d.id}" style="font-size:11px;color:var(--text-sub);text-align:right">${(d.summary || '').length}字</div>
+        <div style="font-size:12px;color:var(--text-sub);margin:6px 0 4px">画像（複数選択でカルーセル／動画＝リール）</div>
+        <div id="draftimg-${d.id}" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="saveDraft('${d.id}')">💾 保存</button>
+          <button class="btn btn-success btn-sm" onclick="publishDraftNow('${d.id}')">📤 今すぐ投稿</button>
+        </div>
       </div>`).join('');
+    drafts.forEach(d => renderDraftImages(d.id));
   } catch { listEl.innerHTML = ''; }
 }
 
+function renderDraftImages(id) {
+  const box = document.getElementById('draftimg-' + id);
+  if (!box) return;
+  const sel = _draftImages[id] || [];
+  if (!_draftMediaList.length) { box.innerHTML = '<span style="font-size:11px;color:var(--text-sub)">ライブラリに画像なし（Instagram投稿タブで追加/生成）</span>'; return; }
+  box.innerHTML = _draftMediaList.map(m => {
+    const i = sel.findIndex(x => x.publicId === m.publicId);
+    const on = i >= 0;
+    return `<div style="position:relative;display:inline-flex">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" onclick='toggleDraftImage("${id}",${JSON.stringify(m).replace(/'/g, "&#39;")})' style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:2px solid ${on ? 'var(--accent)' : 'var(--border)'};cursor:pointer">
+      ${m.isVideo ? '<span style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border-radius:3px;font-size:9px;padding:0 3px;pointer-events:none">▶</span>' : ''}
+      ${on ? `<span style="position:absolute;top:2px;left:2px;background:var(--accent);color:#fff;width:17px;height:17px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">${i + 1}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleDraftImage(id, m) {
+  const sel = _draftImages[id] || (_draftImages[id] = []);
+  const i = sel.findIndex(x => x.publicId === m.publicId);
+  if (i >= 0) sel.splice(i, 1); else sel.push(m);
+  renderDraftImages(id);
+}
+
+function updateDraftCount(id) {
+  const n = (document.getElementById('draft-' + id)?.value || '').length;
+  const el = document.getElementById('draftcount-' + id);
+  if (el) el.textContent = n + '字';
+}
+
 async function deleteDraft(id) {
+  if (!confirm('この予約投稿を削除しますか？')) return;
   const storeId = currentLocation?.storeId || '';
   await fetch(`/api/posts?action=drafts&id=${id}${storeId ? '&storeId=' + storeId : ''}`, { method: 'DELETE' });
-  showToast('下書きを削除しました', 'success');
+  showToast('削除しました', 'success');
   loadDrafts();
 }
 
-// 投稿予定日を変更して保存
-async function saveDraftDate(id) {
+// 予約投稿の内容を保存（日付・時間・媒体・画像・本文）
+async function saveDraft(id, silent) {
   const storeId = currentLocation?.storeId || '';
-  const scheduledDate = document.getElementById('draftdate-' + id)?.value || '';
-  const summary = document.getElementById('draft-' + id)?.value || '';
+  const body = {
+    id,
+    summary: document.getElementById('draft-' + id)?.value || '',
+    scheduledDate: document.getElementById('draftdate-' + id)?.value || '',
+    scheduledTime: document.getElementById('drafttime-' + id)?.value || '',
+    images: _draftImages[id] || [],
+    targetGoogle: document.getElementById('draftG-' + id)?.checked,
+    targetInstagram: document.getElementById('draftI-' + id)?.checked,
+  };
   try {
     await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, summary, scheduledDate }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
-    showToast('投稿予定日を更新しました', 'success');
-  } catch { showToast('更新に失敗しました', 'error'); }
+    if (!silent) showToast('保存しました', 'success');
+  } catch { if (!silent) showToast('保存に失敗しました', 'error'); }
 }
 
-async function publishDraft(id) {
+// 予約投稿を今すぐ投稿（社長承認の上）
+async function publishDraftNow(id) {
   if (!currentLocation) return;
-  const summary = document.getElementById('draft-' + id)?.value.trim();
+  const summary = (document.getElementById('draft-' + id)?.value || '').trim();
   if (!summary) return showToast('投稿内容が空です', 'error');
-  document.getElementById('postText').value = summary;
-  showToast('内容を新規投稿欄にセットしました。「投稿する」で公開できます', 'success');
-  document.getElementById('postText').scrollIntoView({ behavior: 'smooth' });
+  const toG = document.getElementById('draftG-' + id)?.checked;
+  const toI = document.getElementById('draftI-' + id)?.checked;
+  if (!toG && !toI) return showToast('投稿先を1つ以上選んでください', 'error');
+  const imgs = _draftImages[id] || [];
+  if (toI && !imgs.length) return showToast('Instagramには画像が必要です。画像を選択してください', 'error');
+  const targets = [toG && 'Google', toI && 'Instagram'].filter(Boolean).join(' と ');
+  if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
+  await saveDraft(id, true);
+  const okMsg = await publishToTargets(summary, imgs, toG, toI);
+  showToast(okMsg.join(' ／ '), 'success');
 }
 
 function copyToPost() {
