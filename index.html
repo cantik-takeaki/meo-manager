@@ -554,6 +554,10 @@ body {
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">電話番号</label>
             <input id="kn-phone" type="text" placeholder="03-0000-0000" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
+          <div style="grid-column:1 / -1">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">正式住所</label>
+            <input id="kn-address" type="text" placeholder="例：〒252-0314 神奈川県相模原市南区南台5-21-17" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業時間</label>
             <input id="kn-businessHours" type="text" placeholder="例：10:00〜20:00（火曜定休）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
@@ -1155,6 +1159,18 @@ async function loadLocations() {
 function formatAddress(addr) {
   if (!addr) return '住所未設定';
   return [addr.locality, addr.administrativeArea].filter(Boolean).join(', ');
+}
+
+// GBPの正式住所をフル整形（郵便番号＋都道府県＋市区町村＋番地）
+function fullGbpAddress(addr) {
+  if (!addr) return '';
+  const lines = (addr.addressLines || []).join(' ');
+  return [addr.postalCode ? '〒' + addr.postalCode : '', addr.administrativeArea, addr.locality, lines].filter(Boolean).join(' ').trim();
+}
+// 正式住所：GBP連携店舗はGBPの正式住所を優先、無ければナレッジの住所
+function getOfficialAddress(k) {
+  const gbp = fullGbpAddress(currentLocation?.storefrontAddress);
+  return gbp || (k && k.address) || '';
 }
 
 function selectLocation(idx) {
@@ -2664,9 +2680,9 @@ async function importNapFromKnowledge() {
     const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
     set('nap-name', k.storeName);
     set('nap-phone', k.phone);
-    set('nap-address', k.address);
+    set('nap-address', getOfficialAddress(k));
     set('nap-category', k.category);
-    showToast('ナレッジから取り込みました。確認して保存してください', 'success');
+    showToast('正式情報を取り込みました。確認して保存してください', 'success');
   } catch (e) { showToast('取り込みに失敗しました', 'error'); }
 }
 
@@ -2799,6 +2815,7 @@ async function loadKnowledge() {
     document.getElementById('kn-storeName').value = d.storeName || '';
     document.getElementById('kn-category').value = d.category || '';
     document.getElementById('kn-phone').value = d.phone || '';
+    document.getElementById('kn-address').value = d.address || '';
     document.getElementById('kn-businessHours').value = d.businessHours || '';
     document.getElementById('kn-parking').value = d.parking || '';
     document.getElementById('kn-nearbyLandmarks').value = d.nearbyLandmarks || '';
@@ -2833,6 +2850,7 @@ async function autofillFromUrl() {
     set('kn-storeName', f.storeName);
     set('kn-category', f.category);
     set('kn-phone', f.phone);
+    set('kn-address', f.address);
     set('kn-businessHours', f.businessHours);
     set('kn-parking', f.parking);
     set('kn-nearbyLandmarks', f.nearbyLandmarks);
@@ -2900,6 +2918,7 @@ async function saveKnowledge() {
     storeName: document.getElementById('kn-storeName').value,
     category: document.getElementById('kn-category').value,
     phone: document.getElementById('kn-phone').value,
+    address: document.getElementById('kn-address').value,
     businessHours: document.getElementById('kn-businessHours').value,
     parking: document.getElementById('kn-parking').value,
     nearbyLandmarks: document.getElementById('kn-nearbyLandmarks').value,
@@ -3195,7 +3214,7 @@ async function importBaselineFromKnowledge() {
     const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
     set('bl-title', k.storeName);
     set('bl-phone', k.phone);
-    set('bl-address', k.address);
+    set('bl-address', getOfficialAddress(k));
     set('bl-category', k.category);
     set('bl-hours', k.businessHours);
     showToast('ナレッジから取り込みました。確認して保存してください', 'success');
