@@ -578,30 +578,10 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">🔑 MEOキーワード（5個）</div></div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿文・返信文の生成に使われます。上位表示を狙うキーワードを設定してください。</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード1</label>
-            <input id="kn-kw0" type="text" placeholder="例：渋谷 美容室" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード2</label>
-            <input id="kn-kw1" type="text" placeholder="例：カット 安い" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード3</label>
-            <input id="kn-kw2" type="text" placeholder="例：縮毛矯正 得意" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード4</label>
-            <input id="kn-kw3" type="text" placeholder="例：予約なし 当日OK" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">キーワード5</label>
-            <input id="kn-kw4" type="text" placeholder="例：口コミ 4.5以上" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          </div>
-        </div>
+        <div class="card-header"><div class="card-title">🔑 MEOキーワード</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿・返信・順位計測に使われます。「地域名×業種」「地域名×業種×ニーズ/メニュー」で具体的に。<b>何個でも追加できます</b>（10〜15個推奨）。</p>
+        <div id="kn-kwList" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addKeywordRow()">＋ キーワードを追加</button>
       </div>
 
       <div class="card">
@@ -2824,6 +2804,7 @@ async function loadKnowledge() {
     document.getElementById('kn-storeName').value = d.storeName || '';
     document.getElementById('kn-category').value = d.category || '';
     document.getElementById('kn-phone').value = d.phone || '';
+    renderKeywords(d.keywords);
     document.getElementById('kn-postalCode').value = d.postalCode || '';
     document.getElementById('kn-address').value = d.address || '';
     document.getElementById('kn-businessHours').value = d.businessHours || '';
@@ -2833,12 +2814,30 @@ async function loadKnowledge() {
     document.getElementById('kn-services').value = d.services || '';
     document.getElementById('kn-targetCustomer').value = d.targetCustomer || '';
     document.getElementById('kn-description').value = d.description || '';
-    (d.keywords || ['','','','','']).forEach((kw, i) => {
-      const el = document.getElementById(`kn-kw${i}`);
-      if (el) el.value = kw;
-    });
   } catch {}
 }
+
+// ─── キーワード（可変リスト） ───
+function _kwRowHtml(kw) {
+  return `<div class="kn-kwrow" style="display:flex;gap:8px;align-items:center">
+    <input type="text" class="kn-kw" value="${String(kw || '').replace(/"/g, '&quot;')}" placeholder="例：相模原 美容室 ／ 相模原 縮毛矯正 得意" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+    <button type="button" class="link-btn" style="color:var(--red);font-size:18px;line-height:1" title="削除" onclick="this.closest('.kn-kwrow').remove()">×</button>
+  </div>`;
+}
+function renderKeywords(list) {
+  const box = document.getElementById('kn-kwList');
+  if (!box) return;
+  const kws = (list && list.length) ? list : ['', '', '', '', ''];
+  box.innerHTML = kws.map(_kwRowHtml).join('');
+}
+function addKeywordRow() {
+  const box = document.getElementById('kn-kwList');
+  if (box) box.insertAdjacentHTML('beforeend', _kwRowHtml(''));
+}
+function getKnKeywords() {
+  return [...document.querySelectorAll('#kn-kwList .kn-kw')].map(i => i.value.trim()).filter(Boolean);
+}
+function setKnKeywords(arr) { renderKeywords((arr && arr.length) ? arr : ['', '', '', '', '']); }
 
 // URLから店舗情報を自動取得してフォームに反映
 async function autofillFromUrl() {
@@ -2871,7 +2870,8 @@ async function autofillFromUrl() {
     set('kn-targetCustomer', f.targetCustomer);
     if (f.keywords) {
       const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
-      kws.slice(0, 5).forEach((kw, i) => { const el = document.getElementById('kn-kw' + i); if (el && !el.value) el.value = kw; });
+      const merged = [...new Set([...getKnKeywords(), ...kws])];
+      setKnKeywords(merged);
     }
     status.textContent = '✅ 反映しました。内容を確認して「ナレッジを保存」を押してください。';
     showToast('自動取得しました', 'success');
@@ -2890,7 +2890,7 @@ async function meoEnrich() {
     services: document.getElementById('kn-services').value,
     targetCustomer: document.getElementById('kn-targetCustomer').value,
     description: document.getElementById('kn-description').value,
-    keywords: [0,1,2,3,4].map(i => document.getElementById('kn-kw' + i)?.value || '').filter(Boolean),
+    keywords: getKnKeywords(),
   };
   if (!current.storeName && !current.category && !current.strengths) {
     return showToast('先に基本情報を入力（またはURL自動取得）してください', 'error');
@@ -2915,7 +2915,7 @@ async function meoEnrich() {
     set('kn-nearbyLandmarks', f.nearbyLandmarks);
     if (f.keywords) {
       const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
-      kws.slice(0, 5).forEach((kw, i) => { const el = document.getElementById('kn-kw' + i); if (el) el.value = kw; });
+      setKnKeywords(kws);
     }
     tipsBox.textContent = f.tips || '強化しました。内容を確認して保存してください。';
     showToast('MEO強化しました。確認して保存してください', 'success');
@@ -2924,7 +2924,7 @@ async function meoEnrich() {
 
 async function saveKnowledge() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const keywords = [0,1,2,3,4].map(i => document.getElementById(`kn-kw${i}`)?.value || '');
+  const keywords = getKnKeywords();
   const body = {
     storeName: document.getElementById('kn-storeName').value,
     category: document.getElementById('kn-category').value,
