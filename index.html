@@ -581,7 +581,17 @@ body {
         <div class="card-header"><div class="card-title">🔑 MEOキーワード</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿・返信・順位計測に使われます。「地域名×業種」「地域名×業種×ニーズ/メニュー」で具体的に。<b>何個でも追加できます</b>（10〜15個推奨）。</p>
         <div id="kn-kwList" style="display:flex;flex-direction:column;gap:8px"></div>
-        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addKeywordRow()">＋ キーワードを追加</button>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="addKeywordRow()">＋ キーワードを追加</button>
+          <button class="btn btn-primary btn-sm" onclick="suggestKeywords()">✨ おすすめキーワード10個を提案</button>
+        </div>
+        <div id="kwSuggestBox" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700">✨ おすすめキーワード（狙い目順）</div>
+            <button class="btn btn-success btn-sm" onclick="addAllSuggestedKeywords()">全部追加</button>
+          </div>
+          <div id="kwSuggestList"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -2836,6 +2846,48 @@ function addKeywordRow() {
 }
 function getKnKeywords() {
   return [...document.querySelectorAll('#kn-kwList .kn-kw')].map(i => i.value.trim()).filter(Boolean);
+}
+function addKeyword(kw) {
+  if (!kw) return;
+  const existing = getKnKeywords();
+  if (existing.includes(kw)) return showToast('追加済みです', 'error');
+  const box = document.getElementById('kn-kwList');
+  box.insertAdjacentHTML('beforeend', _kwRowHtml(kw));
+  showToast('キーワードを追加しました', 'success');
+}
+
+let _suggestedKeywords = [];
+async function suggestKeywords() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('kwSuggestBox');
+  const list = document.getElementById('kwSuggestList');
+  box.style.display = 'block';
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">業種・地域から狙い目を分析中…</div>';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'keyword_suggest' }),
+    });
+    const d = await res.json();
+    if (d.error) { list.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
+    const rows = (d.content || '').split('\n').map(l => l.replace(/^[\d０-９.\-・\s]+/, '').trim()).filter(Boolean);
+    _suggestedKeywords = [];
+    list.innerHTML = rows.map(r => {
+      const [kw, reason] = r.split(/[｜|]/).map(s => (s || '').trim());
+      if (!kw) return '';
+      _suggestedKeywords.push(kw);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1"><div style="font-size:13px;font-weight:600">${escapeHtml(kw)}</div>${reason ? `<div style="font-size:11px;color:var(--text-sub)">${escapeHtml(reason)}</div>` : ''}</div>
+        <button class="btn btn-outline btn-sm" onclick="addKeyword('${kw.replace(/'/g, "&#39;")}')">＋追加</button>
+      </div>`;
+    }).join('');
+  } catch (e) { list.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">提案に失敗しました</div>'; }
+}
+function addAllSuggestedKeywords() {
+  const existing = getKnKeywords();
+  let added = 0;
+  _suggestedKeywords.forEach(kw => { if (kw && !existing.includes(kw)) { document.getElementById('kn-kwList').insertAdjacentHTML('beforeend', _kwRowHtml(kw)); existing.push(kw); added++; } });
+  showToast(`${added}個のキーワードを追加しました`, 'success');
 }
 function setKnKeywords(arr) { renderKeywords((arr && arr.length) ? arr : ['', '', '', '', '']); }
 
