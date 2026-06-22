@@ -563,8 +563,12 @@ body {
             <input id="kn-address" type="text" placeholder="例：神奈川県相模原市南区南台5-21-17 セレス南台203号" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
           <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業日・定休日</label>
+            <input id="kn-businessDays" type="text" placeholder="例：月〜土（日曜・祝日定休）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業時間</label>
-            <input id="kn-businessHours" type="text" placeholder="例：10:00〜20:00（火曜定休）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <input id="kn-businessHours" type="text" placeholder="例：10:00〜20:00（ランチ11:00〜14:00）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">駐車場</label>
@@ -2817,6 +2821,7 @@ async function loadKnowledge() {
     renderKeywords(d.keywords);
     document.getElementById('kn-postalCode').value = d.postalCode || '';
     document.getElementById('kn-address').value = d.address || '';
+    document.getElementById('kn-businessDays').value = d.businessDays || '';
     document.getElementById('kn-businessHours').value = d.businessHours || '';
     document.getElementById('kn-parking').value = d.parking || '';
     document.getElementById('kn-nearbyLandmarks').value = d.nearbyLandmarks || '';
@@ -2913,6 +2918,7 @@ async function autofillFromUrl() {
     set('kn-phone', f.phone);
     set('kn-postalCode', f.postalCode);
     set('kn-address', f.address);
+    set('kn-businessDays', f.businessDays);
     set('kn-businessHours', f.businessHours);
     set('kn-parking', f.parking);
     set('kn-nearbyLandmarks', f.nearbyLandmarks);
@@ -2983,6 +2989,7 @@ async function saveKnowledge() {
     phone: document.getElementById('kn-phone').value,
     postalCode: document.getElementById('kn-postalCode').value,
     address: document.getElementById('kn-address').value,
+    businessDays: document.getElementById('kn-businessDays').value,
     businessHours: document.getElementById('kn-businessHours').value,
     parking: document.getElementById('kn-parking').value,
     nearbyLandmarks: document.getElementById('kn-nearbyLandmarks').value,

@@ -45,8 +45,9 @@ ${pageText}
 
 【ルール】
 ■事実情報（捏造厳禁・ページに無ければ空文字 ""）
-- storeName / postalCode / phone / businessHours / address / parking はページに書かれた事実のみ。推測しない。
+- storeName / postalCode / phone / businessDays / businessHours / address / parking はページに書かれた事実のみ。推測しない。
 - postalCode は郵便番号（例 252-0314）。address は郵便番号を除いた住所。
+- businessDays は営業日・定休日（例「月〜土、日曜定休」）。businessHours は時間帯（例「10:00〜20:00」）。
 
 ■MEO最適化して記載する項目（事実をもとに、検索で見つかりやすい書き方にする）
 - category: 検索で使われる業種名（例「美容室」「整骨院」「焼き鳥居酒屋」）
@@ -62,7 +63,7 @@ ${pageText}
 - JSON以外（説明・前置き・コードブロック記号）は一切出力しない
 
 【出力JSON】
-{"storeName":"","category":"","postalCode":"","address":"","phone":"","businessHours":"","parking":"","nearbyLandmarks":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
+{"storeName":"","category":"","postalCode":"","address":"","phone":"","businessDays":"","businessHours":"","parking":"","nearbyLandmarks":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
