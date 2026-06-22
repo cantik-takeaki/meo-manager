@@ -554,9 +554,13 @@ body {
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">電話番号</label>
             <input id="kn-phone" type="text" placeholder="03-0000-0000" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">郵便番号</label>
+            <input id="kn-postalCode" type="text" placeholder="例：252-0314" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
           <div style="grid-column:1 / -1">
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">正式住所</label>
-            <input id="kn-address" type="text" placeholder="例：〒252-0314 神奈川県相模原市南区南台5-21-17" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">正式住所（郵便番号以下の住所）</label>
+            <input id="kn-address" type="text" placeholder="例：神奈川県相模原市南区南台5-21-17 セレス南台203号" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業時間</label>
@@ -1167,10 +1171,15 @@ function fullGbpAddress(addr) {
   const lines = (addr.addressLines || []).join(' ');
   return [addr.postalCode ? '〒' + addr.postalCode : '', addr.administrativeArea, addr.locality, lines].filter(Boolean).join(' ').trim();
 }
-// 正式住所：GBP連携店舗はGBPの正式住所を優先、無ければナレッジの住所
+// 正式住所：GBP連携店舗はGBPの正式住所(郵便番号込み)を優先、無ければナレッジの郵便番号＋住所
 function getOfficialAddress(k) {
   const gbp = fullGbpAddress(currentLocation?.storefrontAddress);
-  return gbp || (k && k.address) || '';
+  if (gbp) return gbp;
+  const addr = (k && k.address) || '';
+  const pc = (k && k.postalCode) ? ('〒' + String(k.postalCode).replace(/^〒/, '').trim()) : '';
+  // 住所に既に郵便番号が含まれていれば二重にしない
+  if (pc && !/〒|\d{3}-?\d{4}/.test(addr)) return [pc, addr].filter(Boolean).join(' ').trim();
+  return addr || pc;
 }
 
 function selectLocation(idx) {
@@ -2815,6 +2824,7 @@ async function loadKnowledge() {
     document.getElementById('kn-storeName').value = d.storeName || '';
     document.getElementById('kn-category').value = d.category || '';
     document.getElementById('kn-phone').value = d.phone || '';
+    document.getElementById('kn-postalCode').value = d.postalCode || '';
     document.getElementById('kn-address').value = d.address || '';
     document.getElementById('kn-businessHours').value = d.businessHours || '';
     document.getElementById('kn-parking').value = d.parking || '';
@@ -2850,6 +2860,7 @@ async function autofillFromUrl() {
     set('kn-storeName', f.storeName);
     set('kn-category', f.category);
     set('kn-phone', f.phone);
+    set('kn-postalCode', f.postalCode);
     set('kn-address', f.address);
     set('kn-businessHours', f.businessHours);
     set('kn-parking', f.parking);
@@ -2918,6 +2929,7 @@ async function saveKnowledge() {
     storeName: document.getElementById('kn-storeName').value,
     category: document.getElementById('kn-category').value,
     phone: document.getElementById('kn-phone').value,
+    postalCode: document.getElementById('kn-postalCode').value,
     address: document.getElementById('kn-address').value,
     businessHours: document.getElementById('kn-businessHours').value,
     parking: document.getElementById('kn-parking').value,
