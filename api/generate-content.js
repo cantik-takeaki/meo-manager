@@ -47,7 +47,7 @@ ${pageText}
 ■事実情報（捏造厳禁・ページに無ければ空文字 ""）
 - storeName / postalCode / phone / businessDays / businessHours / address / parking はページに書かれた事実のみ。推測しない。
 - postalCode は郵便番号（例 252-0314）。address は郵便番号を除いた住所。
-- businessDays は営業日・定休日（例「月〜土、日曜定休」）。businessHours は時間帯（例「10:00〜20:00」）。
+- businessDays は営業日（例「月〜土」）、closedDays は定休日（例「日曜・祝日」）、businessHours は時間帯（例「10:00〜20:00」）。
 
 ■MEO最適化して記載する項目（事実をもとに、検索で見つかりやすい書き方にする）
 - category: 検索で使われる業種名（例「美容室」「整骨院」「焼き鳥居酒屋」）
@@ -63,7 +63,7 @@ ${pageText}
 - JSON以外（説明・前置き・コードブロック記号）は一切出力しない
 
 【出力JSON】
-{"storeName":"","category":"","postalCode":"","address":"","phone":"","businessDays":"","businessHours":"","parking":"","nearbyLandmarks":"","description":"","strengths":"","services":"","targetCustomer":"","keywords":""}`;
+{"storeName":"","category":"","postalCode":"","address":"","phone":"","businessDays":"","closedDays":"","businessHours":"","parking":"","nearbyLandmarks":"","description":"","strengths":"","expertise":"","services":"","serviceArea":"","targetCustomer":"","keywords":""}`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -263,7 +263,9 @@ JSON以外は一切出力しない。`;
     const area = [knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ');
     if (area) infoLines.push(`地域/アクセス: ${area}`);
     if (strengths) infoLines.push(`強み・特徴: ${strengths}`);
+    if (knowledge.expertise) infoLines.push(`専門性・実績: ${knowledge.expertise}`);
     if (services) infoLines.push(`提供サービス・メニュー: ${services}`);
+    if (knowledge.serviceArea) infoLines.push(`対応エリア: ${knowledge.serviceArea}`);
     if (knowledge.targetCustomer) infoLines.push(`客層: ${knowledge.targetCustomer}`);
     if (keywords.length) infoLines.push(`キーワード: ${keywords.join('、')}`);
     const infoBlock = infoLines.length ? infoLines.join('\n') : '（店舗情報が未登録）';

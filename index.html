@@ -563,8 +563,12 @@ body {
             <input id="kn-address" type="text" placeholder="例：神奈川県相模原市南区南台5-21-17 セレス南台203号" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
           <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業日・定休日</label>
-            <input id="kn-businessDays" type="text" placeholder="例：月〜土（日曜・祝日定休）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業日</label>
+            <input id="kn-businessDays" type="text" placeholder="例：月〜土" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">定休日</label>
+            <input id="kn-closedDays" type="text" placeholder="例：日曜・祝日" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">営業時間</label>
@@ -574,9 +578,9 @@ body {
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">駐車場</label>
             <input id="kn-parking" type="text" placeholder="例：店舗前に5台分あり・無料" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">近隣のランドマーク</label>
-            <input id="kn-nearbyLandmarks" type="text" placeholder="例：渋谷駅から徒歩3分" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <div style="grid-column:1 / -1">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">最寄り駅から店舗まで（アクセス）</label>
+            <input id="kn-nearbyLandmarks" type="text" placeholder="例：小田急「小田急相模原」駅 北口から徒歩7分／〇〇銀行の隣" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           </div>
         </div>
       </div>
@@ -599,15 +603,24 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">💪 店舗の強み・サービス</div></div>
+        <div class="card-header"><div class="card-title">💪 店舗の強み・サービス（MEO重視）</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">ここが投稿・診断・口コミ返信の質を決めます。<b>地域名・専門性・具体的なメニュー名や価格</b>を入れ、できるだけ詳しく。「🚀AIでMEO強化」で自動で濃くできます。</p>
         <div style="display:flex;flex-direction:column;gap:12px">
           <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店舗の強み・特徴</label>
-            <textarea id="kn-strengths" placeholder="例：10年以上の経験を持つスタイリストが在籍。カラーが得意で特に白髪染めの仕上がりに自信あり。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.6"></textarea>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店舗の強み・特徴 <span style="color:var(--text-muted)">（専門性・こだわり・他店との違いを具体的に）</span></label>
+            <textarea id="kn-strengths" placeholder="例：国家資格保有のスタッフが在籍。〇〇（地域）で△△施術に対応。創業15年・施術実績多数。痛みの少ない最新機器を導入。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:120px;font-family:inherit;line-height:1.6"></textarea>
           </div>
           <div>
-            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">サービス・メニュー</label>
-            <textarea id="kn-services" placeholder="例：カット3,000円〜、カラー6,000円〜、縮毛矯正12,000円〜、ヘッドスパ2,000円〜" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.6"></textarea>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">差別化ポイント・専門性・実績 <span style="color:var(--text-muted)">（E-E-A-T／AIに引用されやすく）</span></label>
+            <textarea id="kn-expertise" placeholder="例：〇〇学会認定。メディア掲載・受賞歴。△△分野に特化。資格・経歴・第三者評価など。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:70px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">サービス・メニュー <span style="color:var(--text-muted)">（価格・特徴つきで具体的に）</span></label>
+            <textarea id="kn-services" placeholder="例：カット3,000円〜（似合わせ提案つき）／白髪染め6,000円〜（頭皮に優しい薬剤）／縮毛矯正12,000円〜（くせ毛・うねりに）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:120px;font-family:inherit;line-height:1.6"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">対応エリア・周辺地域 <span style="color:var(--text-muted)">（近隣の地名でMEOの守備範囲を広げる）</span></label>
+            <textarea id="kn-serviceArea" placeholder="例：相模原市全域・座間市・大和市からも来店。〇〇駅／△△駅エリア対応。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:60px;font-family:inherit;line-height:1.6"></textarea>
           </div>
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">ターゲット顧客</label>
@@ -2825,11 +2838,14 @@ async function loadKnowledge() {
     document.getElementById('kn-postalCode').value = d.postalCode || '';
     document.getElementById('kn-address').value = d.address || '';
     document.getElementById('kn-businessDays').value = d.businessDays || '';
+    document.getElementById('kn-closedDays').value = d.closedDays || '';
     document.getElementById('kn-businessHours').value = d.businessHours || '';
     document.getElementById('kn-parking').value = d.parking || '';
     document.getElementById('kn-nearbyLandmarks').value = d.nearbyLandmarks || '';
     document.getElementById('kn-strengths').value = d.strengths || '';
+    document.getElementById('kn-expertise').value = d.expertise || '';
     document.getElementById('kn-services').value = d.services || '';
+    document.getElementById('kn-serviceArea').value = d.serviceArea || '';
     document.getElementById('kn-targetCustomer').value = d.targetCustomer || '';
     document.getElementById('kn-description').value = d.description || '';
   } catch {}
@@ -2927,12 +2943,15 @@ async function autofillFromUrl() {
     set('kn-postalCode', f.postalCode);
     set('kn-address', f.address);
     set('kn-businessDays', f.businessDays);
+    set('kn-closedDays', f.closedDays);
     set('kn-businessHours', f.businessHours);
     set('kn-parking', f.parking);
     set('kn-nearbyLandmarks', f.nearbyLandmarks);
     set('kn-description', f.description);
     set('kn-strengths', f.strengths);
+    set('kn-expertise', f.expertise);
     set('kn-services', f.services);
+    set('kn-serviceArea', f.serviceArea);
     set('kn-targetCustomer', f.targetCustomer);
     if (f.keywords) {
       const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
@@ -2998,11 +3017,14 @@ async function saveKnowledge() {
     postalCode: document.getElementById('kn-postalCode').value,
     address: document.getElementById('kn-address').value,
     businessDays: document.getElementById('kn-businessDays').value,
+    closedDays: document.getElementById('kn-closedDays').value,
     businessHours: document.getElementById('kn-businessHours').value,
     parking: document.getElementById('kn-parking').value,
     nearbyLandmarks: document.getElementById('kn-nearbyLandmarks').value,
     strengths: document.getElementById('kn-strengths').value,
+    expertise: document.getElementById('kn-expertise').value,
     services: document.getElementById('kn-services').value,
+    serviceArea: document.getElementById('kn-serviceArea').value,
     targetCustomer: document.getElementById('kn-targetCustomer').value,
     description: document.getElementById('kn-description').value,
     keywords,
