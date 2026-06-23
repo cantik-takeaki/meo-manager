@@ -1104,21 +1104,24 @@ async function loadLocations() {
       gbpLocations: s.gbpLocations || [],
     }));
 
-    // 重複を除いてマージ（同じ店舗がGBP一覧と登録店舗で二重に出るのを防ぐ）
-    // キー: GBPロケーション名（あれば）＞ 正規化した店舗名。優先度: 登録店舗(storeId付き)＞GBP連携＞その他
-    const _normKey = (loc) => {
-      const byLoc = (loc.gbpLocationName || loc.name || '').match(/locations\/[^/]+/)?.[0];
-      if (byLoc) return 'L:' + byLoc;
-      return 'T:' + (loc.title || loc.storeId || '').trim().toLowerCase();
-    };
-    const _score = (l) => (l.storeId ? 2 : 0) + (l.gbpConnected ? 1 : 0);
-    const _seen = new Map();
-    for (const loc of [...adminLocations, ...gbpLocations]) { // 登録店舗を優先
-      const key = _normKey(loc);
-      const cur = _seen.get(key);
-      if (!cur || _score(loc) > _score(cur)) _seen.set(key, loc);
+    // 重複排除：自社Googleにオーナー登録している運用では、同じ店舗が
+    // 「GBP一覧」と「登録店舗」で二重に出る。GBP側を残し、GBPに無い登録店舗だけ追加する。
+    const _norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)|店$/g, '').toLowerCase();
+    const _titleMatch = (a, b) => { a = _norm(a); b = _norm(b); return a && b && (a === b || a.includes(b) || b.includes(a)); };
+    const _locId = (s) => String(s || '').match(/locations\/[^/]+/)?.[0] || '';
+    const locations = [...gbpLocations];
+    for (const a of adminLocations) {
+      const aLoc = _locId(a.gbpLocationName);
+      const dup = gbpLocations.find(g =>
+        (aLoc && _locId(g.name) === aLoc) || _titleMatch(a.title, g.title)
+      );
+      if (dup) {
+        // GBP側に、登録店舗が持つ補助情報（口コミ依頼用storeId等）を控えめに引き継ぐ
+        if (a.storeId && !dup._linkedStoreId) dup._linkedStoreId = a.storeId;
+      } else {
+        locations.push(a); // GBPに存在しない登録店舗のみ表示
+      }
     }
-    const locations = [..._seen.values()];
     window._locations = locations;
 
     document.getElementById('statLocations').textContent = locations.length;
@@ -2875,9 +2878,13 @@ async function suggestKeywords() {
     });
     const d = await res.json();
     if (d.error) { list.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
-    const rows = (d.content || '').split('\n').map(l => l.replace(/^[\d０-９.\-・\s]+/, '').trim()).filter(Boolean);
+    const allRows = (d.content || '').split('\n').map(l => l.replace(/^[\d０-９.\-・\s]+/, '').trim()).filter(Boolean);
+    // 「推奨個数：…」の行を見出しとして取り出す
+    const recLine = allRows.find(l => /推奨個数|おすすめ個数/.test(l));
+    const rows = allRows.filter(l => l !== recLine && /[｜|]/.test(l));
     _suggestedKeywords = [];
-    list.innerHTML = rows.map(r => {
+    const recHtml = recLine ? `<div style="font-size:12px;font-weight:700;color:var(--accent);background:rgba(79,125,243,0.08);padding:8px 10px;border-radius:6px;margin-bottom:10px">💡 ${escapeHtml(recLine)}</div>` : '';
+    list.innerHTML = recHtml + rows.map(r => {
       const [kw, reason] = r.split(/[｜|]/).map(s => (s || '').trim());
       if (!kw) return '';
       _suggestedKeywords.push(kw);
