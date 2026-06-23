@@ -2883,7 +2883,8 @@ async function suggestKeywords() {
     const recLine = allRows.find(l => /推奨個数|おすすめ個数/.test(l));
     const rows = allRows.filter(l => l !== recLine && /[｜|]/.test(l));
     _suggestedKeywords = [];
-    const recHtml = recLine ? `<div style="font-size:12px;font-weight:700;color:var(--accent);background:rgba(79,125,243,0.08);padding:8px 10px;border-radius:6px;margin-bottom:10px">💡 ${escapeHtml(recLine)}</div>` : '';
+    const recText = recLine || '推奨個数：8〜12個（主力5〜7個＋ロングテール3〜5個）が目安。多すぎると分散して効きにくくなります';
+    const recHtml = `<div style="font-size:12px;font-weight:700;color:var(--accent);background:rgba(79,125,243,0.08);padding:8px 10px;border-radius:6px;margin-bottom:10px">💡 ${escapeHtml(recText)}</div>`;
     list.innerHTML = recHtml + rows.map(r => {
       const [kw, reason] = r.split(/[｜|]/).map(s => (s || '').trim());
       if (!kw) return '';
