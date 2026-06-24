@@ -589,10 +589,15 @@ body {
         <div class="card-header"><div class="card-title">🔑 MEOキーワード</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿・返信・順位計測に使われます。「地域名×業種」「地域名×業種×ニーズ/メニュー」で具体的に。<b>何個でも追加できます</b>（10〜15個推奨）。</p>
         <div id="kn-kwList" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-outline btn-sm" onclick="addKeywordRow()">＋ キーワードを追加</button>
           <button class="btn btn-primary btn-sm" onclick="suggestKeywords()">✨ おすすめキーワード10個を提案</button>
         </div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;padding-top:8px;border-top:1px dashed var(--border)">
+          <input id="kn-areaInput" type="text" placeholder="狙いたい周辺地域（任意・例：座間市 大和市 町田）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary btn-sm" onclick="suggestAreaKeywords()">📍 周辺地域のキーワードを生成</button>
+        </div>
+        <div id="kwAreaStatus" style="font-size:11px;color:var(--text-sub);margin-top:6px"></div>
         <div id="kwSuggestBox" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div style="font-size:13px;font-weight:700">✨ おすすめキーワード（狙い目順）</div>
@@ -2912,6 +2917,27 @@ async function suggestKeywords() {
     }).join('');
   } catch (e) { list.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">提案に失敗しました</div>'; }
 }
+// 周辺地域の「地域×業種」キーワードを生成してリストに追加（地域強化）
+async function suggestAreaKeywords() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const status = document.getElementById('kwAreaStatus');
+  status.textContent = '周辺地域を分析してキーワード生成中…';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'area_keywords', areas: document.getElementById('kn-areaInput').value.trim() }),
+    });
+    const d = await res.json();
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    const kws = String(d.content || '').split(/[、,\n]/).map(s => s.replace(/^[\d０-９.\-・\s]+/, '').trim()).filter(Boolean);
+    const existing = getKnKeywords();
+    let added = 0;
+    kws.forEach(kw => { if (kw && !existing.includes(kw)) { document.getElementById('kn-kwList').insertAdjacentHTML('beforeend', _kwRowHtml(kw)); existing.push(kw); added++; } });
+    status.textContent = `✅ 周辺地域のキーワードを${added}個追加しました。確認して「ナレッジを保存」してください。`;
+    showToast(`${added}個追加しました`, 'success');
+  } catch (e) { status.textContent = '⚠️ 生成に失敗しました'; }
+}
+
 function addAllSuggestedKeywords() {
   const existing = getKnKeywords();
   let added = 0;
