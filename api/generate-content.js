@@ -505,6 +505,30 @@ ${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
 - 15〜20個を読点（、）区切りで出力。キーワードのみ（番号・理由・前置き不要）`;
   }
 
+  // AI相談アシスタント（店舗データを踏まえて質問に答える）
+  if (type === 'assistant') {
+    const q = req.body.question || '';
+    const ctx = req.body.context || {};
+    prompt = `あなたは${storeName}専属のMEO（Googleマップ集客）コンサルタントです。以下の店舗情報を踏まえ、質問に具体的に答えてください。
+
+【店舗情報】
+- 業種: ${knowledge.category || '不明'}
+- 地域: ${knowledge.address || ''} ${knowledge.nearbyLandmarks || ''}
+- 強み: ${strengths || '未設定'}
+- サービス: ${services || '未設定'}
+- キーワード: ${keywords.join('、') || '未設定'}
+- 口コミ: ${ctx.reviews || '不明'}
+- 現在の順位状況: ${ctx.rankings || '不明'}
+
+【質問】${q}
+
+【ルール】
+- 上記の実情報に基づいて答える。分からないことは「未計測/未設定」と正直に言う（捏造しない）
+- 「次に何をすべきか」を具体的なアクションで示す。優先順位をつける
+- 効果や順位は断定せず「〜が期待できます」程度
+- 簡潔に（箇条書き中心、長くなりすぎない）`;
+  }
+
   // 口コミ分析（傾向・改善点・活かし方）
   if (type === 'review_analysis') {
     const revs = (req.body.reviews || []).slice(0, 40);

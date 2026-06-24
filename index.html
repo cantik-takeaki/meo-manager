@@ -418,6 +418,20 @@ body {
         <div id="rankDashList"></div>
       </div>
 
+      <div class="card" id="assistantCard" style="display:none;border-color:rgba(56,224,200,0.3)">
+        <div class="card-header"><div class="card-title">💬 AI相談（この店舗の次の一手）</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <input id="askInput" type="text" placeholder="例：来店を増やすには次に何をすべき？" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')askAssistant()">
+          <button class="btn btn-primary btn-sm" onclick="askAssistant()">相談する</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">よく使う質問：
+          <button class="link-btn" onclick="askPreset('来店を増やすために、次に優先してやるべきことを3つ教えて')">次の一手</button>・
+          <button class="link-btn" onclick="askPreset('競合に勝つために自店が強化すべき点は？')">競合対策</button>・
+          <button class="link-btn" onclick="askPreset('どんな投稿をすればMEOに効果的？テーマを5つ')">投稿ネタ</button>
+        </div>
+        <div id="askAnswer" style="font-size:13px;line-height:1.75;white-space:pre-wrap"></div>
+      </div>
+
       <div class="card" id="gbpCheckCard" style="display:none">
         <div class="card-header"><div class="card-title">✅ GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
         <div id="gbpCheckList"></div>
@@ -1319,6 +1333,7 @@ function selectLocation(idx) {
   loadDashboardRankings().then(loadDiagnosis);
   gbpCheck();
   loadActionLog();
+  const ac = document.getElementById('assistantCard'); if (ac) { ac.style.display = 'block'; document.getElementById('askAnswer').textContent = ''; }
 }
 
 // ─── ダッシュボード：キーワード順位 ───
@@ -1444,6 +1459,28 @@ async function analyzeReviews() {
     }).then(r => r.json());
     box.textContent = d.content || d.error || '分析に失敗しました';
   } catch (e) { box.textContent = '分析に失敗しました'; }
+}
+
+// AI相談アシスタント（店舗データを踏まえて回答）
+function askPreset(q) { document.getElementById('askInput').value = q; askAssistant(); }
+async function askAssistant() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const q = document.getElementById('askInput').value.trim();
+  if (!q) return;
+  const box = document.getElementById('askAnswer');
+  box.textContent = '考え中…';
+  // 文脈：口コミ・順位の概況をDOMから拾う
+  const ctx = {
+    reviews: (document.getElementById('statRating')?.textContent || '') !== '—' ? `平均${document.getElementById('statRating')?.textContent}・未返信${document.getElementById('statPending')?.textContent}件` : '未取得',
+    rankings: (_dashRankings || []).map(r => `${r.keyword}:${r.rank ? r.rank + '位' : '圏外'}`).join('、') || '未計測',
+  };
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'assistant', question: q, context: ctx }),
+    }).then(r => r.json());
+    box.textContent = d.content || d.error || '回答できませんでした';
+  } catch (e) { box.textContent = '回答できませんでした'; }
 }
 
 // GBP最適化チェック（連携店舗のGBPデータから自動判定）
