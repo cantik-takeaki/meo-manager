@@ -2841,7 +2841,7 @@ async function autoFetchAllRanks() {
   const kws = (window._rankingKeywords || []).filter(k => k && !k.startsWith('キーワード'));
   await loadSerpUsage();
   const need = kws.length;
-  if ((window._serpRemaining ?? 100) < need) {
+  if ((window._serpRemaining ?? 250) < need) {
     if (!confirm(`このキーワード数（${need}個）は今月の無料枠の残り（${window._serpRemaining}回）を超えます。残り回数分だけ取得しますか？`)) return;
   } else if (!confirm(`${need}個のキーワードを自動取得します（無料枠を${need}回消費）。よろしいですか？`)) return;
   for (let i = 0; i < (window._rankingKeywords || []).length; i++) {

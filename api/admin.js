@@ -92,7 +92,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && action === 'serpapi-usage') {
     const ym = new Date().toISOString().slice(0, 7);
     const used = await kvGet(`serpapi_usage_${ym}`) || 0;
-    return res.json({ month: ym, used, limit: 100, remaining: Math.max(0, 100 - used) });
+    return res.json({ month: ym, used, limit: 250, remaining: Math.max(0, 250 - used) });
   }
 
   // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
     const used = await kvGet(usedKey) || 0;
-    if (used >= 100) return res.status(429).json({ error: '今月の無料枠（100回）に達しました。来月リセットされます', overLimit: true, used });
+    if (used >= 250) return res.status(429).json({ error: '今月の無料枠（250回）に達しました。来月リセットされます', overLimit: true, used });
     try {
       const params = new URLSearchParams({
         engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY,
