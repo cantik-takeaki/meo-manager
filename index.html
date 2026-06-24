@@ -567,6 +567,7 @@ body {
           <input id="rankLocation" type="text" placeholder="検索地点（例：Shinjuku,Tokyo,Japan）"
             style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
           <button class="btn btn-outline btn-sm" onclick="autoFetchAllRanks()">⚡ 全キーワード自動取得</button>
+          <span id="serpUsage" style="font-size:11px;color:var(--text-sub)"></span>
         </div>
         <div id="rankingInputFields"></div>
         <button class="btn btn-primary" style="margin-top:12px" onclick="saveRankings()">順位を保存</button>
@@ -2777,6 +2778,7 @@ async function openRankingInput(storeId, storeName) {
   document.getElementById('rankingInputStore').textContent = storeName;
   document.getElementById('rankingInputCard').style.display = 'block';
   document.getElementById('rankingInputCard').scrollIntoView({ behavior: 'smooth' });
+  loadSerpUsage();
 
   // キーワード取得：①過去の順位データ → ②企業ナレッジのキーワード → ③プレースホルダ
   const res = await fetch(`/api/admin?action=rankings&storeId=${storeId}`);
@@ -2822,15 +2824,34 @@ async function fetchOneRank(i) {
   } catch (e) { input.value = old; showToast('通信エラー', 'error'); }
 }
 
-// 全キーワードを順に自動取得（SerpApiのレート配慮で逐次）
+// SerpApi 今月の使用状況を表示
+async function loadSerpUsage() {
+  const el = document.getElementById('serpUsage');
+  if (!el) return;
+  try {
+    const u = await fetch('/api/admin?action=serpapi-usage').then(r => r.json());
+    el.textContent = `今月の自動取得：${u.used}/${u.limit}（残${u.remaining}）`;
+    el.style.color = u.remaining <= 10 ? 'var(--red)' : 'var(--text-sub)';
+    window._serpRemaining = u.remaining;
+  } catch (e) {}
+}
+
+// 全キーワードを順に自動取得（SerpApiのレート配慮で逐次・無料枠を確認）
 async function autoFetchAllRanks() {
-  const kws = window._rankingKeywords || [];
-  for (let i = 0; i < kws.length; i++) {
-    if (kws[i] && !kws[i].startsWith('キーワード')) {
+  const kws = (window._rankingKeywords || []).filter(k => k && !k.startsWith('キーワード'));
+  await loadSerpUsage();
+  const need = kws.length;
+  if ((window._serpRemaining ?? 100) < need) {
+    if (!confirm(`このキーワード数（${need}個）は今月の無料枠の残り（${window._serpRemaining}回）を超えます。残り回数分だけ取得しますか？`)) return;
+  } else if (!confirm(`${need}個のキーワードを自動取得します（無料枠を${need}回消費）。よろしいですか？`)) return;
+  for (let i = 0; i < (window._rankingKeywords || []).length; i++) {
+    const kw = window._rankingKeywords[i];
+    if (kw && !kw.startsWith('キーワード')) {
       await fetchOneRank(i);
       await new Promise(r => setTimeout(r, 1200));
     }
   }
+  await loadSerpUsage();
   showToast('全キーワードの自動取得が完了しました', 'success');
 }
 

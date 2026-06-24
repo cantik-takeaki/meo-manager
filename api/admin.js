@@ -88,12 +88,24 @@ export default async function handler(req, res) {
   }
 
   // ── SerpApiで順位を自動取得 ──
+  // SerpApi 今月の使用回数（無料枠100/月の管理）
+  if (req.method === 'GET' && action === 'serpapi-usage') {
+    const ym = new Date().toISOString().slice(0, 7);
+    const used = await kvGet(`serpapi_usage_${ym}`) || 0;
+    return res.json({ month: ym, used, limit: 100, remaining: Math.max(0, 100 - used) });
+  }
+
   // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)
   if (req.method === 'GET' && action === 'fetch-rank') {
     const SERPAPI_KEY = process.env.SERPAPI_KEY;
     if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
     const { keyword, location, store } = req.query;
     if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
+    // 無料枠100/月の上限ガード
+    const ym = new Date().toISOString().slice(0, 7);
+    const usedKey = `serpapi_usage_${ym}`;
+    const used = await kvGet(usedKey) || 0;
+    if (used >= 100) return res.status(429).json({ error: '今月の無料枠（100回）に達しました。来月リセットされます', overLimit: true, used });
     try {
       const params = new URLSearchParams({
         engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY,
@@ -102,6 +114,7 @@ export default async function handler(req, res) {
       const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
       const data = await r.json();
       if (data.error) return res.status(502).json({ error: data.error });
+      await kvSet(usedKey, used + 1); // 使用回数を記録
       const list = data.local_results || [];
       const norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
       const target = norm(store);
