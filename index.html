@@ -418,6 +418,15 @@ body {
         <div id="rankDashList"></div>
       </div>
 
+      <div class="card" id="gbpCheckCard" style="display:none">
+        <div class="card-header"><div class="card-title">✅ GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
+        <div id="gbpCheckList"></div>
+        <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
+          <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
+          <div style="margin-top:4px;line-height:1.9">📷 写真（外観/内観/メニューを月数枚）／🛍 商品・サービス登録（価格つき）／❓ Q&Aの自作／🏷 属性（バリアフリー等）／📝 説明文／📰 投稿（週1）</div>
+        </div>
+      </div>
+
       <div class="card" id="competitorCard">
         <div class="card-header"><div class="card-title">🥊 競合分析</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
@@ -1272,6 +1281,7 @@ function selectLocation(idx) {
   _postImages = [];
   loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
+  gbpCheck();
 }
 
 // ─── ダッシュボード：キーワード順位 ───
@@ -1353,6 +1363,30 @@ async function analyzeReviews() {
     }).then(r => r.json());
     box.textContent = d.content || d.error || '分析に失敗しました';
   } catch (e) { box.textContent = '分析に失敗しました'; }
+}
+
+// GBP最適化チェック（連携店舗のGBPデータから自動判定）
+function gbpCheck() {
+  const card = document.getElementById('gbpCheckCard');
+  if (!card) return;
+  const loc = currentLocation;
+  const isGbp = loc && (loc._type === 'gbp' || loc.gbpConnected || loc.storefrontAddress);
+  if (!isGbp) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const cats = loc.categories || {};
+  const items = [
+    { label: '店名', ok: !!loc.title },
+    { label: '住所', ok: !!loc.storefrontAddress },
+    { label: 'メインカテゴリ', ok: !!(cats.primaryCategory) },
+    { label: 'サブカテゴリ', ok: !!(cats.additionalCategories && cats.additionalCategories.length) },
+    { label: '営業時間', ok: !!(loc.regularHours && (loc.regularHours.periods || []).length) },
+    { label: '電話番号', ok: !!(loc.phoneNumbers && loc.phoneNumbers.primaryPhone) },
+    { label: 'ウェブサイト', ok: !!loc.websiteUri },
+  ];
+  const done = items.filter(i => i.ok).length;
+  document.getElementById('gbpCheckScore').textContent = `${done}/${items.length} 設定済み`;
+  document.getElementById('gbpCheckList').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px 14px">` +
+    items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`).join('') + '</div>';
 }
 
 // ─── ダッシュボード：競合分析（SerpApiの上位店舗を比較） ───
