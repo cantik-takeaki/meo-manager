@@ -415,6 +415,17 @@ body {
         <div id="rankDashList"></div>
       </div>
 
+      <div class="card" id="competitorCard">
+        <div class="card-header"><div class="card-title">🥊 競合分析</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <input id="compKeyword" type="text" placeholder="キーワード（例：相模原 美容室）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <input id="compLocation" type="text" placeholder="検索地点（例：Sagamihara,Kanagawa,Japan）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary btn-sm" onclick="runCompetitorAnalysis()">分析する</button>
+        </div>
+        <div id="compResult"></div>
+      </div>
+
       <div class="card" id="insightsCard" style="display:none">
         <div class="card-header">
           <div class="card-title">インサイト（直近3ヶ月）</div>
@@ -1274,6 +1285,55 @@ async function loadDashboardRankings() {
     }).join('');
     card.style.display = 'block';
   } catch (e) { if (card) card.style.display = 'none'; }
+}
+
+// ─── ダッシュボード：競合分析（SerpApiの上位店舗を比較） ───
+async function runCompetitorAnalysis() {
+  if (!currentLocation) return showToast('店舗を選択してください', 'error');
+  const kw = document.getElementById('compKeyword').value.trim();
+  const loc = document.getElementById('compLocation').value.trim();
+  if (!kw) return showToast('キーワードを入力してください', 'error');
+  const box = document.getElementById('compResult');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>競合を分析中…</div>';
+  try {
+    const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '' });
+    if (loc) p.set('location', loc);
+    const d = await fetch('/api/admin?' + p.toString()).then(r => r.json());
+    if (d.error) { box.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
+    const top = d.top || [];
+    if (!top.length) { box.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">結果が取得できませんでした</div>'; return; }
+    // サマリー
+    const top3 = top.slice(0, 3);
+    const avgR = (a) => { const v = a.map(x => x.rating).filter(Boolean); return v.length ? (v.reduce((s, n) => s + n, 0) / v.length).toFixed(2) : '—'; };
+    const avgRev = (a) => { const v = a.map(x => x.reviews).filter(Boolean); return v.length ? Math.round(v.reduce((s, n) => s + n, 0) / v.length) : '—'; };
+    const myRank = d.found ? d.rank : null;
+    const summary = `<div style="background:var(--bg-3);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px">
+      <div>自店の順位：<b style="color:${myRank && myRank <= 3 ? 'var(--green)' : myRank && myRank <= 10 ? 'var(--gold)' : 'var(--red)'}">${myRank ? myRank + '位' : '圏外（20位以下）'}</b>${d.matched ? `（${escapeHtml(d.matched)}）` : ''}</div>
+      <div style="color:var(--text-sub);margin-top:4px">上位3店の平均：★${avgR(top3)} ／ 口コミ${avgRev(top3)}件</div>
+    </div>`;
+    box.innerHTML = summary + top.map(t => {
+      const mine = d.matched && t.title === d.matched;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;${mine ? 'background:rgba(56,224,200,0.12);border-radius:6px;padding-left:8px' : ''}">
+        <span style="width:28px;font-weight:700;color:var(--text-sub)">${t.position}</span>
+        <span style="flex:1">${escapeHtml(t.title || '')}${mine ? ' 👈自店' : ''}</span>
+        <span style="font-size:12px;color:var(--gold)">★${t.rating || '—'}</span>
+        <span style="font-size:12px;color:var(--text-sub)">口コミ${t.reviews || '—'}</span>
+      </div>`;
+    }).join('') + `<div id="compAdvice" style="margin-top:12px;font-size:13px;line-height:1.7;white-space:pre-wrap"></div>`;
+    // AI助言
+    const adv = document.getElementById('compAdvice');
+    adv.textContent = '勝ち筋を分析中…';
+    try {
+      const ad = await fetch('/api/generate-content', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locationId: currentLocationId, type: 'competitor_advice',
+          competitor: { keyword: kw, myRank, top: top3.map(t => ({ title: t.title, rating: t.rating, reviews: t.reviews })) },
+        }),
+      }).then(r => r.json());
+      adv.textContent = ad.content || '';
+    } catch (e) { adv.textContent = ''; }
+  } catch (e) { box.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">分析に失敗しました</div>'; }
 }
 
 // ─── ダッシュボード：MEO診断（スコアは機械算出・助言はAI） ───

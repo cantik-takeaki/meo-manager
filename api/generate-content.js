@@ -505,6 +505,25 @@ ${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
 - 15〜20個を読点（、）区切りで出力。キーワードのみ（番号・理由・前置き不要）`;
   }
 
+  // 競合分析の勝ち筋助言
+  if (type === 'competitor_advice') {
+    const c = req.body.competitor || {};
+    const topText = (c.top || []).map((t, i) => `${i + 1}位 ${t.title}（★${t.rating || '—'}・口コミ${t.reviews || '—'}件）`).join('\n');
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。
+以下は「${c.keyword}」での上位競合と自店の状況です。自店がこの競合を抜いて上位表示されるための具体策を助言してください。
+
+【自店】${storeName}（現在 ${c.myRank ? c.myRank + '位' : '圏外'}）
+強み: ${strengths || '未設定'}
+【上位競合】
+${topText || 'データなし'}
+
+【出力ルール】
+- 「■競合との差（何が足りないか）」「■今すぐやるべき具体策」の2見出しで、各2〜4個の箇条書き（・始まり）
+- 口コミ数・評価の差、GBP充実度、投稿頻度など、上位との具体的な差に触れる
+- 効果や順位を断定・捏造しない（「〜が期待できます」程度）
+- 前置き不要。2見出しの箇条書きのみ`;
+  }
+
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
