@@ -107,13 +107,18 @@ export default async function handler(req, res) {
     const used = await kvGet(usedKey) || 0;
     if (used >= 250) return res.status(429).json({ error: '今月の無料枠（250回）に達しました。来月リセットされます', overLimit: true, used });
     try {
-      const params = new URLSearchParams({
-        engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY,
-      });
-      if (location) params.set('location', location);
-      const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
-      const data = await r.json();
-      if (data.error) return res.status(502).json({ error: data.error });
+      const callSerp = async (loc) => {
+        const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
+        if (loc) params.set('location', loc);
+        const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+        return r.json();
+      };
+      let data = await callSerp(location);
+      // 地点が不正（Unsupported location）なら地点なしで自動リトライ（KWに地域が入っていれば十分）
+      if (data.error && /location/i.test(data.error) && location) {
+        data = await callSerp('');
+      }
+      if (data.error) return res.status(502).json({ error: data.error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
       await kvSet(usedKey, used + 1); // 使用回数を記録
       const list = data.local_results || [];
       const norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
