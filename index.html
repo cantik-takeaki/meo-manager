@@ -1663,7 +1663,8 @@ function renderMedia() {
     <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
       <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="${m.isVideo ? `pickPhoto(${i})` : `genFromPhoto(${i})`}" title="${m.isVideo ? 'クリックで選択' : 'クリックでこの写真から画像生成'}">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
-      ${m.isVideo ? '' : `<button onclick="genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1">🎨 生成</button>`}
+      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1">🎨 生成</button>`}
+      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();postPhotoToGbp(${i})" title="Googleビジネスプロフィールに写真を追加" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;line-height:1">📍 Google</button>`}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
 }
@@ -1974,6 +1975,27 @@ async function saveGenImage() {
     status.textContent = '✅ ライブラリに保存しました';
     showToast('生成画像をライブラリに保存しました', 'success');
   } catch (e) { status.textContent = '⚠️ 保存失敗: ' + e.message; }
+}
+
+// ライブラリの写真をGoogleビジネスプロフィールに追加（承認の上）
+async function postPhotoToGbp(i) {
+  const m = _mediaList[i];
+  if (!m || m.isVideo) return showToast('写真を選んでください', 'error');
+  if (!currentLocation?.name || !(currentLocation._type === 'gbp' || currentLocation.gbpConnected || currentLocation.storefrontAddress)) {
+    return showToast('GBP連携済みの店舗を選択してください', 'error');
+  }
+  if (!confirm('この写真をGoogleビジネスプロフィールに追加します。よろしいですか？（社外公開アクション）')) return;
+  const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+  showToast('Googleに追加中…', 'success');
+  try {
+    const res = await fetch(`/api/posts?action=gbp-photo&locationName=${encodeURIComponent(currentLocation.name)}${sid}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: m.url }),
+    });
+    const d = await res.json();
+    if (d.success) { showToast('Googleに写真を追加しました', 'success'); logAction('GBPに写真を追加'); }
+    else showToast('追加失敗：' + (d.error || ''), 'error');
+  } catch (e) { showToast('追加に失敗しました', 'error'); }
 }
 
 async function deleteMedia(publicId) {

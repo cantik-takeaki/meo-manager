@@ -449,6 +449,25 @@ export default async function handler(req, res) {
     } catch (e) { /* 補完失敗時はそのまま */ }
   }
 
+  // GBPに写真を追加（ライブラリの公開URLをGoogleビジネスプロフィールのメディアに登録）
+  // ※社外書き込み。フロントで承認ダイアログを通してから呼ぶ設計。
+  if (action === 'gbp-photo' && req.method === 'POST') {
+    const { imageUrl } = req.body || {};
+    if (!imageUrl) return res.status(400).json({ error: '画像URLが必要です' });
+    try {
+      const r = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaFormat: 'PHOTO', sourceUrl: imageUrl, locationAssociation: { category: 'ADDITIONAL' } }),
+      });
+      const data = await r.json();
+      if (data.error) return res.status(r.status).json({ error: data.error.message, pending: true });
+      return res.json({ success: true, name: data.name });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // 投稿一覧
   if (req.method === 'GET') {
     try {
