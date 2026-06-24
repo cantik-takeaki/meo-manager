@@ -460,7 +460,7 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">管理中の店舗</div></div>
+        <div class="card-header"><div class="card-title">🏢 全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
         <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
       </div>
     </div>
@@ -1199,20 +1199,47 @@ async function loadLocations() {
     }
 
     document.getElementById('locationList').innerHTML = locations.length
-      ? locations.map(loc => `
-          <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      ? locations.map((loc, i) => `
+          <div onclick="selectLocation(${i})" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
             <div class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></div>
-            <div style="flex:1">
+            <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:14px">${loc.title || '—'}</div>
               <div style="font-size:12px;color:var(--text-sub)">${loc._type === 'manual' ? 'クライアント店舗' : formatAddress(loc.storefrontAddress)}</div>
+              <div style="margin-top:5px;display:flex;align-items:center;gap:6px">
+                <div style="flex:1;max-width:160px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div id="rd-bar-${i}" style="height:100%;width:0;background:var(--accent);transition:width .3s"></div></div>
+                <span id="rd-pct-${i}" style="font-size:11px;color:var(--text-sub)">…</span>
+              </div>
             </div>
             <span class="badge ${loc._type === 'manual' ? 'badge-pending' : 'badge-active'}">${loc._type === 'manual' ? '手動登録' : 'GBP連携'}</span>
           </div>
         `).join('')
       : '<div class="empty-state"><p>店舗が見つかりません</p></div>';
+    if (locations.length) loadCrossStoreReadiness(locations);
 
   } catch (e) {
     document.getElementById('storeList').innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--red)">${e.message}</div>`;
+  }
+}
+
+// 全店舗のナレッジ完成度を非同期で計算してバー表示（横断ビュー）
+async function loadCrossStoreReadiness(locations) {
+  const FIELDS = ['storeName', 'category', 'address', 'phone', 'businessHours', 'strengths', 'services', 'targetCustomer'];
+  for (let i = 0; i < locations.length; i++) {
+    const loc = locations[i];
+    const id = loc.storeId || (loc.name || '').replace(/\//g, '_');
+    if (!id) continue;
+    try {
+      const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(id)}`).then(r => r.json());
+      let filled = FIELDS.filter(f => k[f] && String(k[f]).trim()).length;
+      const kwOk = (k.keywords || []).filter(Boolean).length >= 3 ? 1 : 0;
+      const total = FIELDS.length + 1;
+      const pct = Math.round(((filled + kwOk) / total) * 100);
+      const bar = document.getElementById('rd-bar-' + i), pe = document.getElementById('rd-pct-' + i);
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--red)'; }
+      if (pe) pe.textContent = `ナレッジ ${pct}%`;
+    } catch (e) {
+      const pe = document.getElementById('rd-pct-' + i); if (pe) pe.textContent = '—';
+    }
   }
 }
 
