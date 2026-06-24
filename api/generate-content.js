@@ -505,6 +505,23 @@ ${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
 - 15〜20個を読点（、）区切りで出力。キーワードのみ（番号・理由・前置き不要）`;
   }
 
+  // 口コミ分析（傾向・改善点・活かし方）
+  if (type === 'review_analysis') {
+    const revs = (req.body.reviews || []).slice(0, 40);
+    const revText = revs.map(r => `★${r.star}：${r.comment}`).join('\n');
+    prompt = `あなたはMEO・店舗運営の専門家です。以下は${storeName}の口コミ一覧です。全体を分析してください。
+
+【口コミ】
+${revText}
+
+【出力ルール】次の4見出しで、各2〜4個の箇条書き（・始まり）。口コミに実際に書かれた内容だけに基づく（捏造しない）。
+■よく褒められている点
+■不満・改善が必要な点
+■全体の傾向（客層・来店動機など読み取れること）
+■サービス改善・投稿への活かし方（具体的に）
+前置き不要、4見出しの箇条書きのみ出力。`;
+  }
+
   // 競合分析の勝ち筋助言
   if (type === 'competitor_advice') {
     const c = req.body.competitor || {};

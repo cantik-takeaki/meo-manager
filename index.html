@@ -465,6 +465,14 @@ body {
         <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
         <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
       </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.25)">
+        <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
+          <button class="btn btn-primary btn-sm" onclick="analyzeReviews()">分析する</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub)">口コミ全体をAIが分析し、褒められている点・改善点・傾向と、サービス/投稿への活かし方を抽出します。</p>
+        <div id="reviewAnalysis" style="font-size:13px;line-height:1.75;white-space:pre-wrap;margin-top:8px"></div>
+      </div>
       <div id="reviewsList">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -1285,6 +1293,23 @@ async function loadDashboardRankings() {
     }).join('');
     card.style.display = 'block';
   } catch (e) { if (card) card.style.display = 'none'; }
+}
+
+// 口コミ分析（褒められる点・改善点・傾向・活かし方）
+async function analyzeReviews() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('reviewAnalysis');
+  const STAR = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+  const items = (allReviews || []).map(r => ({ star: STAR[r.starRating] || r.starRating || 0, comment: r.comment || '' })).filter(r => r.comment);
+  if (!items.length) return showToast('分析できる口コミがありません', 'error');
+  box.textContent = '口コミを分析中…';
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'review_analysis', reviews: items.slice(0, 40) }),
+    }).then(r => r.json());
+    box.textContent = d.content || d.error || '分析に失敗しました';
+  } catch (e) { box.textContent = '分析に失敗しました'; }
 }
 
 // ─── ダッシュボード：競合分析（SerpApiの上位店舗を比較） ───
