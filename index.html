@@ -598,6 +598,16 @@ body {
           <button class="btn btn-primary btn-sm" onclick="suggestAreaKeywords()">📍 周辺地域のキーワードを生成</button>
         </div>
         <div id="kwAreaStatus" style="font-size:11px;color:var(--text-sub);margin-top:6px"></div>
+
+        <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)">
+          <button class="link-btn" onclick="toggleKwPlanner()">🔢 Google広告 キーワードプランナーの実データを取り込む</button>
+          <div id="kwPlannerBox" style="display:none;margin-top:8px">
+            <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">Google広告 → ツール → キーワードプランナーで「キーワード候補」を表示 → ダウンロードしたCSV、または表をコピーしてここに貼り付け（キーワードと月間平均検索数の列があればOK）。検索ボリューム順に並べて取り込めます。</p>
+            <textarea id="kwPlannerInput" placeholder="例（貼り付け）：&#10;相模原 美容室	1300&#10;座間 美容室	480&#10;相模原 縮毛矯正	210" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;min-height:90px;font-family:inherit"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="importKwPlanner()">📥 取り込む（ボリューム順）</button>
+            <div id="kwPlannerList" style="margin-top:10px"></div>
+          </div>
+        </div>
         <div id="kwSuggestBox" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div style="font-size:13px;font-weight:700">✨ おすすめキーワード（狙い目順）</div>
@@ -2936,6 +2946,44 @@ async function suggestAreaKeywords() {
     status.textContent = `✅ 周辺地域のキーワードを${added}個追加しました。確認して「ナレッジを保存」してください。`;
     showToast(`${added}個追加しました`, 'success');
   } catch (e) { status.textContent = '⚠️ 生成に失敗しました'; }
+}
+
+// Google広告 キーワードプランナーの実データ取り込み（無料・貼り付け）
+function toggleKwPlanner() {
+  const b = document.getElementById('kwPlannerBox');
+  b.style.display = b.style.display === 'none' ? 'block' : 'none';
+}
+function importKwPlanner() {
+  const raw = document.getElementById('kwPlannerInput').value.trim();
+  if (!raw) return showToast('データを貼り付けてください', 'error');
+  // 各行を「キーワード〔タブ/カンマ/連続スペース〕数値」で分解
+  const rows = [];
+  raw.split('\n').forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    const parts = line.split(/\t|,|\s{2,}/).map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    // 数値（検索ボリューム）を探す
+    let vol = null, kwParts = [];
+    parts.forEach(p => {
+      const n = parseInt(String(p).replace(/[,，~〜\-–\s回件]/g, ''), 10);
+      if (vol === null && /^\d/.test(p) && !isNaN(n) && n >= 0 && !/[ぁ-んァ-ヶ一-龠a-zA-Z]/.test(p.replace(/[\d,]/g, ''))) vol = n;
+      else kwParts.push(p);
+    });
+    const kw = kwParts.join(' ').trim();
+    if (kw && !/^(キーワード|keyword|月間|avg|平均)/i.test(kw)) rows.push({ kw, vol: vol || 0 });
+  });
+  if (!rows.length) return showToast('キーワードを読み取れませんでした。形式を確認してください', 'error');
+  rows.sort((a, b) => b.vol - a.vol);
+  _suggestedKeywords = rows.map(r => r.kw);
+  const list = document.getElementById('kwPlannerList');
+  list.innerHTML = `<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px">${rows.length}件を検索ボリューム順に取り込み <button class="btn btn-success btn-sm" style="margin-left:8px" onclick="addAllSuggestedKeywords()">全部追加</button></div>` +
+    rows.map(r => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:13px;font-weight:600">${escapeHtml(r.kw)}</div>
+      <span style="font-size:11px;color:var(--text-sub)">${r.vol ? '月間 ' + r.vol.toLocaleString() : '—'}</span>
+      <button class="btn btn-outline btn-sm" onclick="addKeyword('${r.kw.replace(/'/g, "&#39;")}')">＋追加</button>
+    </div>`).join('');
+  showToast(`${rows.length}件を取り込みました`, 'success');
 }
 
 function addAllSuggestedKeywords() {
