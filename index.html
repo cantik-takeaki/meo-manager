@@ -459,6 +459,15 @@ body {
         <div id="alertsList"></div>
       </div>
 
+      <div class="card" id="actionLogCard" style="display:none">
+        <div class="card-header"><div class="card-title">📋 施策履歴・作業ログ</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <input id="logText" type="text" placeholder="実施した施策を記録（例：GBPに写真3枚追加）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')addActionLog()">
+          <button class="btn btn-outline btn-sm" onclick="addActionLog()">＋ 記録</button>
+        </div>
+        <div id="actionLogList"></div>
+      </div>
+
       <div class="card">
         <div class="card-header"><div class="card-title">🏢 全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
         <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
@@ -1309,6 +1318,7 @@ function selectLocation(idx) {
   loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
   gbpCheck();
+  loadActionLog();
 }
 
 // ─── ダッシュボード：キーワード順位 ───
@@ -1333,6 +1343,49 @@ async function loadDashboardRankings() {
     }).join('');
     card.style.display = 'block';
   } catch (e) { if (card) card.style.display = 'none'; }
+}
+
+// ─── 施策履歴・作業ログ ───
+function _logSid() { return currentLocation?.storeId || (currentLocationId || ''); }
+async function logAction(text) {
+  const sid = _logSid();
+  if (!sid || !text) return;
+  try {
+    await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(sid)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+    });
+  } catch (e) {}
+}
+async function loadActionLog() {
+  const card = document.getElementById('actionLogCard');
+  if (!card) return;
+  if (!currentLocationId) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const sid = _logSid();
+  try {
+    const logs = (await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(sid)}`).then(r => r.json())).logs || [];
+    window._actionLogs = logs;
+    const box = document.getElementById('actionLogList');
+    box.innerHTML = logs.length ? logs.map(l => `<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--text-sub);font-size:12px;white-space:nowrap">${l.date}</span>
+      <span style="flex:1">${escapeHtml(l.text)}</span>
+      <button class="link-btn" style="color:var(--red)" onclick="deleteActionLog('${l.id}')">×</button>
+    </div>`).join('') : '<p style="font-size:12px;color:var(--text-sub)">まだ記録はありません。投稿・返信は自動で記録され、手動でも追加できます。</p>';
+  } catch (e) {}
+}
+async function addActionLog() {
+  const inp = document.getElementById('logText');
+  const text = inp.value.trim();
+  if (!text) return;
+  await logAction(text);
+  inp.value = '';
+  loadActionLog();
+  showToast('記録しました', 'success');
+}
+async function deleteActionLog(id) {
+  const sid = _logSid();
+  await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(sid)}&id=${id}`, { method: 'DELETE' });
+  loadActionLog();
 }
 
 // 月次レポート生成（現在の店舗データから印刷用レポート→PDF保存）
@@ -1368,6 +1421,7 @@ function generateReport() {
   <h2>MEOスコア</h2><div><span class="score">${score}</span> <span style="color:#666">/ 100</span></div>
   <h2>キーワード順位</h2><table><tr><th style="width:auto">キーワード</th><th style="width:80px;text-align:right">順位</th></tr>${ranks}</table>
   <h2>インサイト（直近）</h2>${insHtml}
+  <h2>今月の実施施策</h2>${(window._actionLogs && window._actionLogs.length) ? '<table><tr><th style="width:90px">日付</th><th style="width:auto">内容</th></tr>' + window._actionLogs.slice(0, 30).map(l => `<tr><td>${l.date}</td><td>${escapeHtml(l.text)}</td></tr>`).join('') + '</table>' : '<p style="color:#888">記録がありません</p>'}
   <h2>改善アドバイス・次の施策</h2><div class="adv">${escapeHtml(advice) || '（ダッシュボードで診断を実行すると表示されます）'}</div>
   <div class="foot">本レポートは株式会社cantikのMEO管理ツールで自動生成しました。数値は取得時点のものです。</div>
   <button class="noprint" onclick="window.print()" style="margin-top:20px;padding:10px 20px;background:#0e5fb5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🖨 PDFで保存／印刷</button>
@@ -2320,6 +2374,7 @@ async function submitReply(i, reviewName) {
       showToast('APIの審査完了後に返信できます（デモモード）', 'error');
     } else {
       showToast('返信を投稿しました！', 'success');
+      logAction('口コミに返信');
       loadReviews();
     }
   } catch (e) {
@@ -2490,7 +2545,8 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
         body: JSON.stringify({ summary, topicType: opts.topicType || 'STANDARD', callToActionType: opts.cta || '', callToActionUrl: opts.ctaUrl || '' }),
       });
       const data = await res.json();
-      okMsg.push((data.pending || data.error) ? 'Google：審査完了後に投稿可（デモ）' : 'Google：投稿しました');
+      if (data.pending || data.error) okMsg.push('Google：審査完了後に投稿可（デモ）');
+      else { okMsg.push('Google：投稿しました'); logAction('Googleビジネスプロフィールに投稿'); }
     } catch { okMsg.push('Google：エラー'); }
   }
   if (toInstagram) {
@@ -2515,7 +2571,7 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (data.success) okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + images.length + '枚）' : ''}`);
+        if (data.success) { okMsg.push(`Instagram：投稿しました${data.carousel ? '（カルーセル' + images.length + '枚）' : ''}`); logAction('Instagramに投稿' + (data.carousel ? '（カルーセル）' : '')); }
         else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       }
     } catch { okMsg.push('Instagram：エラー'); }

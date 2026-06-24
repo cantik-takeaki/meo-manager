@@ -71,6 +71,31 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
+  // ── 施策履歴・作業ログ（店舗ごと・KV） ──
+  if (action === 'actionlog') {
+    const sid = storeId || 'default';
+    const key = `actionlog_${sid}`;
+    if (req.method === 'GET') {
+      return res.json({ logs: await kvGet(key) || [] });
+    }
+    if (req.method === 'POST') {
+      const { text, date } = req.body || {};
+      if (!text) return res.status(400).json({ error: 'text必須' });
+      const list = await kvGet(key) || [];
+      list.unshift({ id: 'l' + Date.now().toString(36), text, date: date || new Date().toISOString().split('T')[0], createdAt: new Date().toISOString() });
+      if (list.length > 200) list.length = 200;
+      await kvSet(key, list);
+      return res.json({ success: true, logs: list });
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(l => l.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, logs: list });
+    }
+    return res.status(405).end();
+  }
+
   // ── クライアント別 写真ライブラリ（Cloudinary保管＋KVで一覧管理） ──
   // storeId（クライアント）ごとに写真を蓄積。Instagram用に正方形URLも保持。
   if (action === 'media') {
