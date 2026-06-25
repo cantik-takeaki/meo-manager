@@ -266,9 +266,18 @@ export default async function handler(req, res) {
       if (req.method === 'GET' && sub === 'comments') {
         const { mediaId } = req.query;
         if (!mediaId) return res.status(400).json({ error: 'mediaId必須' });
-        const r = await fetch(`${BASE}/${mediaId}/comments?fields=id,text,username,timestamp,replies{id,text,username,timestamp}&access_token=${IG_TOKEN}`);
-        const data = await r.json();
+        const cf = 'id,text,username,timestamp,like_count';
+        let r = await fetch(`${BASE}/${mediaId}/comments?fields=${cf},replies{${cf}}&access_token=${IG_TOKEN}`);
+        let data = await r.json();
         if (data.error) return res.status(400).json({ error: data.error.message });
+        // commentsエッジが空でも media 側に件数がある場合の保険：comments を展開して再取得
+        if (!(data.data && data.data.length)) {
+          try {
+            const r2 = await fetch(`${BASE}/${mediaId}?fields=comments{${cf}}&access_token=${IG_TOKEN}`);
+            const d2 = await r2.json();
+            if (d2.comments && Array.isArray(d2.comments.data) && d2.comments.data.length) data = d2.comments;
+          } catch (e) { /* フォールバック失敗時は元の空応答のまま */ }
+        }
         return res.json(data);
       }
 

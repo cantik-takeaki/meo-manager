@@ -2221,31 +2221,50 @@ async function sendDm() {
 }
 
 // ─── Instagram コメント ───
+let _igCommentPosts = [];
 async function loadIgPostsForComments() {
   const sel = document.getElementById('igCommentPostSelect');
   sel.innerHTML = '<option value="">読み込み中...</option>';
   try {
     const res = await fetch(`/api/posts?action=instagram&sub=media${_igSid()}`);
     const data = await res.json();
-    const posts = data.data || [];
-    sel.innerHTML = '<option value="">投稿を選択してください</option>' + posts.map(p =>
+    _igCommentPosts = data.data || [];
+    sel.innerHTML = '<option value="">投稿を選択してください</option>' + _igCommentPosts.map(p =>
       `<option value="${p.id}">${(p.caption || '(キャプションなし)').slice(0, 30).replace(/\n/g, ' ')}… (💬${p.comments_count || 0})</option>`
     ).join('');
   } catch (e) { sel.innerHTML = '<option value="">読み込み失敗</option>'; }
 }
 
+// 選択投稿の「画像＋投稿文＋コメント」をまとめて表示
 async function loadPostComments() {
   const mediaId = document.getElementById('igCommentPostSelect').value;
   const box = document.getElementById('igCommentsList');
   if (!mediaId) { box.innerHTML = ''; return; }
-  box.innerHTML = '読み込み中...';
+  const post = _igCommentPosts.find(p => p.id === mediaId) || {};
+  const img = post.thumbnail_url || post.media_url || '';
+  const cnt = post.comments_count || 0;
+  const header = `
+    <div style="display:flex;gap:12px;padding:12px;background:var(--bg-3);border-radius:var(--radius-sm);margin-bottom:12px">
+      ${img ? `<img src="${img}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0">` : ''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;white-space:pre-wrap;max-height:76px;overflow:hidden;line-height:1.6">${escapeHtml(post.caption || '') || '(キャプションなし)'}</div>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:5px">💬 ${cnt}件 ・ ❤️ ${post.like_count || 0}　<a href="${post.permalink || '#'}" target="_blank" style="color:var(--accent)">投稿を開く</a></div>
+      </div>
+    </div>`;
+  box.innerHTML = header + '<div style="font-size:12px;color:var(--text-sub);padding:8px">コメント読み込み中...</div>';
   try {
     const res = await fetch(`/api/posts?action=instagram&sub=comments&mediaId=${mediaId}${_igSid()}`);
     const data = await res.json();
-    if (data.error) { box.innerHTML = `<p style="font-size:12px;color:var(--text-sub)">${data.error}</p>`; return; }
+    if (data.error) { box.innerHTML = header + `<p style="font-size:12px;color:var(--red);padding:8px">${data.error}</p>`; return; }
     const cms = data.data || [];
-    if (!cms.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">コメントはまだありません</p>'; return; }
-    box.innerHTML = cms.map(c => `
+    if (!cms.length) {
+      const note = cnt > 0
+        ? `この投稿には${cnt}件のコメントがありますが、まだInstagram APIに反映されていません。<br>反映まで数分かかることがあります。少し待って更新してください。`
+        : 'コメントはまだありません。';
+      box.innerHTML = header + `<div style="padding:10px;font-size:12px;color:var(--text-sub);line-height:1.7">${note}<br><button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="loadPostComments()">更新</button></div>`;
+      return;
+    }
+    box.innerHTML = header + cms.map(c => `
       <div style="padding:10px;border-bottom:1px solid var(--border)">
         <div style="font-size:13px"><b>@${c.username || 'ユーザー'}</b> ${escapeHtml(c.text || '')}</div>
         <div style="display:flex;gap:6px;margin-top:6px">
@@ -2253,7 +2272,7 @@ async function loadPostComments() {
           <button class="btn btn-success btn-sm" onclick="replyToComment('${c.id}')">返信</button>
         </div>
       </div>`).join('');
-  } catch (e) { box.innerHTML = '読み込み失敗'; }
+  } catch (e) { box.innerHTML = header + '<p style="padding:8px;color:var(--red)">読み込み失敗</p>'; }
 }
 
 async function replyToComment(commentId) {
