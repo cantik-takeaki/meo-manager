@@ -237,7 +237,7 @@ export default async function handler(req, res) {
     }
     // 連携状態の確認（トークン不要・店舗ごと）。UIの「連携済み/未連携」判定に使う。
     if (req.method === 'GET' && req.query.sub === 'conn-status') {
-      return res.json({ connected: !!(igConn?.token), username: igConn?.username || '', userId: igConn?.userId || '' });
+      return res.json({ connected: !!(igConn?.token), username: igConn?.username || '', userId: igConn?.userId || '', permissions: igConn?.permissions || '' });
     }
     if (!IG_TOKEN || !IG_USER) {
       return res.status(500).json({ error: 'IG_ACCESS_TOKEN / IG_USER_ID が未設定です（Vercel環境変数）' });

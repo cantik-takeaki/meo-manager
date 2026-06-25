@@ -50,10 +50,13 @@ async function handleInstagram(req, res, code, igStoreId) {
   const shortData = await shortRes.json();
   let shortToken = shortData.access_token;
   let userId = shortData.user_id;
+  let perms = shortData.permissions;
   if (!shortToken && Array.isArray(shortData.data) && shortData.data[0]) {
     shortToken = shortData.data[0].access_token;
     userId = shortData.data[0].user_id;
+    perms = shortData.data[0].permissions;
   }
+  const permissions = Array.isArray(perms) ? perms.join(',') : (perms || '');
   if (!shortToken) {
     const msg = shortData.error_message || shortData.error?.message || 'exchange_failed';
     return res.redirect('/?error=ig_token_' + encodeURIComponent(String(msg).slice(0, 60)));
@@ -84,6 +87,7 @@ async function handleInstagram(req, res, code, igStoreId) {
       token: longToken,
       userId: String(userId || ''),
       username,
+      permissions, // 実際に付与されたスコープ（診断・UI表示用）
       expires_at: Date.now() + expiresIn * 1000,
       connected_at: new Date().toISOString(),
     });

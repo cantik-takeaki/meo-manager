@@ -1662,21 +1662,23 @@ async function renderIgConnect() {
   const sid = currentLocationId; // 連携・投稿・状態確認で使うキーを統一
   const connectUrl = `/api/auth/login?provider=instagram&store=${encodeURIComponent(sid)}`;
   card.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">Instagram連携状態を確認中…</span>';
-  let connected = false, uname = '';
+  let connected = false, uname = '', perms = '';
   try {
     const d = await fetch(`/api/posts?action=instagram&sub=conn-status&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
-    connected = !!d.connected; uname = d.username || '';
+    connected = !!d.connected; uname = d.username || ''; perms = d.permissions || '';
   } catch (e) { /* 取得失敗時は未連携扱いで表示 */ }
   // 描画中に店舗が切り替わっていたら何もしない（非同期の取り違え防止）
   if (currentLocationId !== sid) return;
   const insCard = document.getElementById('igInsightsCard');
   if (connected) {
+    const permList = perms ? perms.split(',').map(p => p.replace('instagram_business_', '')).join(' / ') : '(取得不可)';
     card.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span class="badge badge-active">Instagram連携済み</span>
         <span style="font-weight:600">@${uname || 'アカウント'} に投稿します</span>
         <a href="${connectUrl}" target="_blank" class="btn btn-outline btn-sm" style="margin-left:auto">再連携</a>
-      </div>`;
+      </div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:8px">付与された権限: <b>${permList}</b></div>`;
     loadIgInsights(); // 連携済みのときだけインサイトを表示
   } else {
     if (insCard) insCard.style.display = 'none';
