@@ -494,12 +494,14 @@ body {
         <div class="page-title">口コミ管理</div>
         <div class="page-sub" id="reviewsSubtitle">店舗を選択してください</div>
       </div>
-      <div class="filter-bar">
+      <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button class="filter-btn active" onclick="filterReviews('all', this)">すべて</button>
         <button class="filter-btn" onclick="filterReviews('unreplied', this)">未返信</button>
         <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
         <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
+        <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
       </div>
+      <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。一括生成はドラフトのみ作成し、投稿は1件ずつ承認のうえ行います。</p>
 
       <div class="card" style="border-color:rgba(79,125,243,0.25)">
         <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
@@ -2587,6 +2589,8 @@ async function generateReply(i) {
         reviewText: review.comment,
         rating,
         reviewerName: review.reviewer?.displayName,
+        reviewDate: review.createTime || '',
+        tone: document.getElementById(`tone-${i}`)?.value || 'polite',
       }),
     });
     const data = await res.json();
@@ -2594,6 +2598,36 @@ async function generateReply(i) {
   } catch (e) {
     if (ta) ta.value = '生成に失敗しました';
   }
+}
+
+// 未返信の口コミ全部に、返信ドラフトをまとめて生成（投稿はしない＝承認制）
+async function generateAllUnrepliedReplies() {
+  const targets = allReviews
+    .map((r, idx) => ({ r, idx }))
+    .filter(x => !x.r.reviewReply && (x.r.comment || '').trim());
+  if (!targets.length) return showToast('未返信（本文あり）の口コミはありません', 'success');
+  if (!confirm(`未返信の口コミ ${targets.length}件 すべてに返信ドラフトを生成します。\n（投稿はされません。各返信は内容を確認して個別に「返信を投稿」してください）`)) return;
+
+  // 未返信フィルターに切り替えて、生成対象を画面に出す
+  currentFilter = 'unreplied';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const ub = document.querySelector('.filter-btn[onclick*="unreplied"]');
+  if (ub) ub.classList.add('active');
+  renderReviews();
+
+  const btn = document.getElementById('bulkReplyBtn');
+  if (btn) { btn.disabled = true; }
+  let done = 0;
+  // getFilteredReviews()のインデックス順＝現在の未返信リスト順に生成
+  const list = getFilteredReviews();
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].reviewReply) continue;
+    if (btn) btn.textContent = `生成中… ${done + 1}/${list.length}`;
+    try { await generateReply(i); } catch (e) { /* 個別失敗はスキップ */ }
+    done++;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '✨ 未返信すべてに返信生成'; }
+  showToast(`${done}件の返信ドラフトを生成しました。内容を確認して投稿してください`, 'success');
 }
 
 async function submitReply(i, reviewName) {
