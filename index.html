@@ -1708,6 +1708,7 @@ async function loadIgInsights() {
   body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
   const sid = _igSid();
   const stat = (label, val) => `<div style="text-align:center;min-width:88px"><div style="font-size:24px;font-weight:700;color:var(--accent)">${val}</div><div style="font-size:12px;color:var(--text-sub)">${label}</div></div>`;
+  const num = v => (v == null ? '—' : Number(v).toLocaleString());
   const sumReach = async (period) => {
     try {
       const d = await fetch(`/api/posts?action=instagram&sub=insights&metric=reach&period=${period}${sid}`).then(r => r.json());
@@ -1716,16 +1717,32 @@ async function loadIgInsights() {
       return (m?.values || []).reduce((a, v) => a + (v.value || 0), 0);
     } catch (e) { return null; }
   };
+  // 集計系メトリクス（profile_views等）は metric_type=total_value で取得
+  const totalVals = async (metrics) => {
+    try {
+      const d = await fetch(`/api/posts?action=instagram&sub=insights&metric=${metrics}&metric_type=total_value&period=days_28${sid}`).then(r => r.json());
+      if (d.error) return {};
+      const map = {};
+      (d.data || []).forEach(m => { map[m.name] = (m.total_value && m.total_value.value != null) ? m.total_value.value : null; });
+      return map;
+    } catch (e) { return {}; }
+  };
   try {
     const acc = await fetch(`/api/posts?action=instagram&sub=account${sid}`).then(r => r.json());
-    const followers = (acc && acc.followers_count != null) ? Number(acc.followers_count).toLocaleString() : '—';
+    const followers = (acc && acc.followers_count != null) ? acc.followers_count : null;
+    const posts = (acc && acc.media_count != null) ? acc.media_count : null;
     const r28 = await sumReach('days_28');
     const r7 = await sumReach('week');
+    const tv = await totalVals('profile_views,accounts_engaged,total_interactions');
     if (currentLocationId == null) return;
-    body.innerHTML = stat('フォロワー', followers)
-      + stat('リーチ（28日）', r28 == null ? '—' : r28.toLocaleString())
-      + stat('リーチ（7日）', r7 == null ? '—' : r7.toLocaleString())
-      + `<div style="flex:1;min-width:150px;font-size:11px;color:var(--text-sub);line-height:1.6">Instagram Graph APIから取得（reach・フォロワー数）。連携アカウントの実数値です。</div>`;
+    body.innerHTML = stat('フォロワー', num(followers))
+      + stat('投稿数', num(posts))
+      + stat('リーチ（28日）', num(r28))
+      + stat('リーチ（7日）', num(r7))
+      + stat('プロフ表示（28日）', num(tv.profile_views))
+      + stat('反応した人（28日）', num(tv.accounts_engaged))
+      + stat('合計の反応（28日）', num(tv.total_interactions))
+      + `<div style="flex:1;min-width:150px;font-size:11px;color:var(--text-sub);line-height:1.6">Instagram Graph APIの実数値（直近28日/7日）。「—」はそのメトリクスが未提供の期間/種別です。</div>`;
   } catch (e) {
     body.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗: ${e.message}</span>`;
   }
@@ -2253,28 +2270,65 @@ async function loadPostComments() {
         <div style="font-size:11px;color:var(--text-sub);margin-top:5px">💬 ${cnt}件 ・ ❤️ ${post.like_count || 0}　<a href="${post.permalink || '#'}" target="_blank" style="color:var(--accent)">投稿を開く</a></div>
       </div>
     </div>`;
+  // 投稿ごとインサイトの枠（コメントの下に表示）
+  const insightsBlock = `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">📊 この投稿のインサイト</div>
+      <div id="igPostInsightsBody" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>
+      </div>
+    </div>`;
   box.innerHTML = header + '<div style="font-size:12px;color:var(--text-sub);padding:8px">コメント読み込み中...</div>';
+  let commentsHtml = '';
   try {
     const res = await fetch(`/api/posts?action=instagram&sub=comments&mediaId=${mediaId}${_igSid()}`);
     const data = await res.json();
-    if (data.error) { box.innerHTML = header + `<p style="font-size:12px;color:var(--red);padding:8px">${data.error}</p>`; return; }
-    const cms = data.data || [];
-    if (!cms.length) {
-      const note = cnt > 0
-        ? `この投稿には${cnt}件のコメントがありますが、まだInstagram APIに反映されていません。<br>反映まで数分かかることがあります。少し待って更新してください。`
-        : 'コメントはまだありません。';
-      box.innerHTML = header + `<div style="padding:10px;font-size:12px;color:var(--text-sub);line-height:1.7">${note}<br><button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="loadPostComments()">更新</button></div>`;
-      return;
+    if (data.error) {
+      commentsHtml = `<p style="font-size:12px;color:var(--red);padding:8px">${data.error}</p>`;
+    } else {
+      const cms = data.data || [];
+      if (!cms.length) {
+        const note = cnt > 0
+          ? `この投稿には${cnt}件のコメントがありますが、まだInstagram APIに反映されていません。<br>反映まで数分かかることがあります。少し待って更新してください。`
+          : 'コメントはまだありません。';
+        commentsHtml = `<div style="padding:10px;font-size:12px;color:var(--text-sub);line-height:1.7">${note}<br><button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="loadPostComments()">更新</button></div>`;
+      } else {
+        commentsHtml = cms.map(c => `
+          <div style="padding:10px;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px"><b>@${c.username || 'ユーザー'}</b> ${escapeHtml(c.text || '')}</div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input id="creply_${c.id}" type="text" placeholder="返信..." style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+              <button class="btn btn-success btn-sm" onclick="replyToComment('${c.id}')">返信</button>
+            </div>
+          </div>`).join('');
+      }
     }
-    box.innerHTML = header + cms.map(c => `
-      <div style="padding:10px;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px"><b>@${c.username || 'ユーザー'}</b> ${escapeHtml(c.text || '')}</div>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <input id="creply_${c.id}" type="text" placeholder="返信..." style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
-          <button class="btn btn-success btn-sm" onclick="replyToComment('${c.id}')">返信</button>
-        </div>
-      </div>`).join('');
-  } catch (e) { box.innerHTML = header + '<p style="padding:8px;color:var(--red)">読み込み失敗</p>'; }
+  } catch (e) { commentsHtml = '<p style="padding:8px;color:var(--red)">読み込み失敗</p>'; }
+  box.innerHTML = header + commentsHtml + insightsBlock;
+  fillPostInsights(mediaId, post);
+}
+
+// 選択投稿のインサイト（リーチ/いいね/コメント/保存/シェア/合計反応）を埋める
+async function fillPostInsights(mediaId, post) {
+  const body = document.getElementById('igPostInsightsBody');
+  if (!body) return;
+  const num = v => (v == null ? '—' : Number(v).toLocaleString());
+  const stat = (label, val) => `<div style="text-align:center;min-width:64px"><div style="font-size:18px;font-weight:700;color:var(--accent)">${val}</div><div style="font-size:11px;color:var(--text-sub)">${label}</div></div>`;
+  try {
+    const d = await fetch(`/api/posts?action=instagram&sub=media-insights&mediaId=${mediaId}${_igSid()}`).then(r => r.json());
+    const map = {};
+    (d.data || []).forEach(m => {
+      const v = (m.values && m.values[0] && m.values[0].value != null) ? m.values[0].value
+        : ((m.total_value && m.total_value.value != null) ? m.total_value.value : null);
+      map[m.name] = v;
+    });
+    body.innerHTML = stat('リーチ', num(map.reach))
+      + stat('いいね', num(post.like_count != null ? post.like_count : map.likes))
+      + stat('コメント', num(post.comments_count != null ? post.comments_count : map.comments))
+      + stat('保存', num(map.saved))
+      + stat('シェア', num(map.shares))
+      + stat('合計の反応', num(map.total_interactions));
+  } catch (e) { body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">インサイト取得不可</span>'; }
 }
 
 async function replyToComment(commentId) {

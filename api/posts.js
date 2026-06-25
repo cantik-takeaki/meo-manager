@@ -281,14 +281,34 @@ export default async function handler(req, res) {
         return res.json(data);
       }
 
-      // インサイト（アカウント単位）
+      // インサイト（アカウント単位）。metric_type=total_value にも対応（profile_views等の集計系）
       if (req.method === 'GET' && sub === 'insights') {
         const metric = req.query.metric || 'reach,profile_views,follower_count';
         const period = req.query.period || 'day';
-        const r = await fetch(`${BASE}/${IG_USER}/insights?metric=${metric}&period=${period}&access_token=${IG_TOKEN}`);
+        const mt = req.query.metric_type ? `&metric_type=${encodeURIComponent(req.query.metric_type)}` : '';
+        const r = await fetch(`${BASE}/${IG_USER}/insights?metric=${encodeURIComponent(metric)}&period=${period}${mt}&access_token=${IG_TOKEN}`);
         const data = await r.json();
         if (data.error) return res.status(400).json({ error: data.error.message, pending: true });
         return res.json(data);
+      }
+
+      // 投稿ごとのインサイト（リーチ/保存/シェア/合計反応など）。
+      // メトリクスはメディア種別で可否が異なるため、リッチ→最小へ段階的にフォールバック。
+      if (req.method === 'GET' && sub === 'media-insights') {
+        const { mediaId } = req.query;
+        if (!mediaId) return res.status(400).json({ error: 'mediaId必須' });
+        const sets = [
+          'reach,saved,shares,total_interactions,likes,comments',
+          'reach,saved,shares,total_interactions',
+          'reach,total_interactions',
+          'reach',
+        ];
+        for (const s of sets) {
+          const r = await fetch(`${BASE}/${mediaId}/insights?metric=${s}&access_token=${IG_TOKEN}`);
+          const d = await r.json();
+          if (!d.error && Array.isArray(d.data)) return res.json(d);
+        }
+        return res.json({ data: [] }); // どのメトリクスも取れない場合は空（UIで件数のみ表示）
       }
 
       // コンテナの処理状況確認（動画/リール用）
