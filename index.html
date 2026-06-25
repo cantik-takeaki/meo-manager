@@ -2591,6 +2591,11 @@ async function generateReply(i) {
         reviewerName: review.reviewer?.displayName,
         reviewDate: review.createTime || '',
         tone: document.getElementById(`tone-${i}`)?.value || 'polite',
+        // このお店が過去にした返信を文体の見本として渡す（雰囲気を合わせる）
+        pastReplies: allReviews
+          .filter(r => r.reviewReply?.comment && r.name !== review.name)
+          .map(r => r.reviewReply.comment)
+          .slice(0, 5),
       }),
     });
     const data = await res.json();

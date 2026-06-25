@@ -21,6 +21,12 @@ export default async function handler(req, res) {
     const t = Date.parse(reviewDate);
     if (!isNaN(t)) reviewAgeDays = Math.floor((Date.now() - t) / 86400000);
   }
+  // このお店が過去にした返信（文体・雰囲気を合わせる見本）
+  const pastReplies = (Array.isArray(req.body.pastReplies) ? req.body.pastReplies : [])
+    .map(s => String(s || '').trim()).filter(Boolean).slice(0, 5);
+  const styleBlock = pastReplies.length
+    ? `\n【このお店が過去にした返信（文体・雰囲気の見本）】\n${pastReplies.map((p, i) => `例${i + 1}：${p}`).join('\n')}\n→ 上の返信例の"語り口・丁寧さの度合い・お礼や謝罪の言い回し・締め方"の雰囲気に合わせる。ただし丸写しはせず、今回の口コミ内容に合わせて書く。過去例が無いつもりで一般化しすぎない。`
+    : '';
   const replyTone = req.body.tone || 'polite';
   const toneGuide = ({
     polite: '丁寧でプロフェッショナルな接客トーン。落ち着いた敬語。',
@@ -238,7 +244,7 @@ JSON以外は一切出力しない。`;
 【キーワード】${keywords.join('、')}
 
 【トーン】${toneGuide}
-【来店時期の扱い】${timeGuide}
+【来店時期の扱い】${timeGuide}${styleBlock}
 
 【良い返信の条件】
 1. 冒頭で、口コミ本文に実際に書かれた「具体的な良かった点」を1つ拾い、その言葉に触れて感謝する（料理名・接客・雰囲気・スタッフの対応など、本文の語をそのまま活かす）。一般論の「ご来店ありがとうございます」だけで終わらせない。
@@ -270,7 +276,7 @@ JSON以外は一切出力しない。`;
 【キーワード】${keywords.join('、')}
 
 【トーン】${toneGuide}
-【来店時期の扱い】${timeGuide}
+【来店時期の扱い】${timeGuide}${styleBlock}
 
 【良い返信の条件】
 1. お客様が「具体的に何に不満を感じたか」を本文から正確に特定し、その点に正面から触れる（はぐらかさない）。
