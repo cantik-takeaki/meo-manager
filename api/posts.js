@@ -266,7 +266,7 @@ export default async function handler(req, res) {
       if (req.method === 'GET' && sub === 'comments') {
         const { mediaId } = req.query;
         if (!mediaId) return res.status(400).json({ error: 'mediaId必須' });
-        const cf = 'id,text,username,timestamp,like_count';
+        const cf = 'id,text,username,timestamp,like_count,hidden';
         let r = await fetch(`${BASE}/${mediaId}/comments?fields=${cf},replies{${cf}}&access_token=${IG_TOKEN}`);
         let data = await r.json();
         if (data.error) return res.status(400).json({ error: data.error.message });
