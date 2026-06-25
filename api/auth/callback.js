@@ -27,10 +27,89 @@ async function fetchGbpLocations(accessToken) {
   return { locations: out, error: out.length ? '' : (lastErr || 'no_locations') };
 }
 
+// ── Instagram Business Login コールバック（state="ig:storeId"） ──
+// 短期トークン → 長期トークン(~60日) に交換し、posts.js が読む ig_conn_{storeId} に保存。
+async function handleInstagram(req, res, code, igStoreId) {
+  const redirectUri = process.env.REDIRECT_URI || 'https://meo-manager-rho.vercel.app/api/auth/callback';
+  const igAppId = process.env.IG_APP_ID || '1664344041536126';
+  const igAppSecret = process.env.IG_APP_SECRET;
+  if (!igAppSecret) return res.redirect('/?error=ig_no_secret');
+
+  // 1. 短期トークン交換
+  const shortRes = await fetch('https://api.instagram.com/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: igAppId,
+      client_secret: igAppSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+      code,
+    }).toString(),
+  });
+  const shortData = await shortRes.json();
+  let shortToken = shortData.access_token;
+  let userId = shortData.user_id;
+  if (!shortToken && Array.isArray(shortData.data) && shortData.data[0]) {
+    shortToken = shortData.data[0].access_token;
+    userId = shortData.data[0].user_id;
+  }
+  if (!shortToken) {
+    const msg = shortData.error_message || shortData.error?.message || 'exchange_failed';
+    return res.redirect('/?error=ig_token_' + encodeURIComponent(String(msg).slice(0, 60)));
+  }
+
+  // 2. 長期トークンへ交換（~60日有効）
+  let longToken = shortToken;
+  let expiresIn = 60 * 24 * 3600;
+  try {
+    const llRes = await fetch(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${igAppSecret}&access_token=${shortToken}`);
+    const llData = await llRes.json();
+    if (llData.access_token) { longToken = llData.access_token; expiresIn = llData.expires_in || expiresIn; }
+  } catch (e) { /* 失敗時は短期トークンのまま保存 */ }
+
+  // 3. ユーザー情報（username）取得。pathに使うidはトークン交換のuser_idを優先。
+  let username = '';
+  try {
+    const meRes = await fetch(`https://graph.instagram.com/me?fields=user_id,username&access_token=${longToken}`);
+    const me = await meRes.json();
+    if (me.username) username = me.username;
+    if (!userId && me.user_id) userId = me.user_id;
+  } catch (e) { /* username取得失敗は無視 */ }
+
+  // 4. 保存（posts.js は ig_conn_{storeId}.token / .userId を読む）
+  let kvErr = '';
+  try {
+    await kvSet(`ig_conn_${igStoreId}`, {
+      token: longToken,
+      userId: String(userId || ''),
+      username,
+      expires_at: Date.now() + expiresIn * 1000,
+      connected_at: new Date().toISOString(),
+    });
+    const list = await kvGet('admin_stores') || [];
+    const idx = list.findIndex(s => s.storeId === igStoreId);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], igConnected: true, igUsername: username };
+      await kvSet('admin_stores', list);
+      await kvSet(`client_${igStoreId}`, list[idx]);
+    }
+  } catch (e) { kvErr = 'kv:' + (e.message || 'fail'); }
+
+  const q = new URLSearchParams({ ig_connected: igStoreId, iguser: username });
+  if (kvErr) q.set('kverr', kvErr);
+  return res.redirect(`/?${q.toString()}`);
+}
+
 export default async function handler(req, res) {
   const { code, error, state } = req.query;
   if (error) return res.redirect('/?error=' + encodeURIComponent(error));
   if (!code) return res.redirect('/?error=no_code&got=' + encodeURIComponent(Object.keys(req.query).join(',') || 'none'));
+
+  // Instagram連携のコールバックは専用処理へ分岐
+  if (state && state.startsWith('ig:')) {
+    return handleInstagram(req, res, code, state.slice(3));
+  }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

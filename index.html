@@ -727,6 +727,9 @@ body {
         </div>
       </div>
 
+      <!-- Instagram連携（Instagram Business Login / OAuth） -->
+      <div class="card" id="igConnectCard"></div>
+
       <!-- 写真ライブラリ -->
       <div class="card">
         <div class="card-header"><div class="card-title">写真ライブラリ</div></div>
@@ -1151,6 +1154,17 @@ async function init() {
     document.getElementById('app').classList.add('visible');
     document.getElementById('userName').textContent = user.name || user.email;
     if (user.picture) document.getElementById('userPic').src = user.picture;
+
+    // Instagram連携の戻り（/?ig_connected=... / ?error=ig_...）を通知
+    const _q = new URLSearchParams(location.search);
+    if (_q.get('ig_connected')) {
+      const u = _q.get('iguser');
+      showToast(`Instagram連携が完了しました${u ? '（@' + u + '）' : ''}`, 'success');
+      history.replaceState({}, '', location.pathname);
+    } else if ((_q.get('error') || '').startsWith('ig_')) {
+      showToast('Instagram連携に失敗: ' + _q.get('error'), 'error');
+      history.replaceState({}, '', location.pathname);
+    }
 
     loadLocations();
   } catch {
@@ -1628,6 +1642,38 @@ async function loadDiagnosis() {
 let _mediaList = [];
 let _igSelected = null;
 
+// Instagram連携カードの描画（連携状態に応じて「連携する/連携済み」を出し分け）
+function renderIgConnect() {
+  const card = document.getElementById('igConnectCard');
+  if (!card) return;
+  if (!currentLocationId) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const connectUrl = `/api/auth/login?provider=instagram&store=${encodeURIComponent(currentLocationId)}`;
+  if (currentLocation?.igConnected) {
+    const uname = currentLocation?.igUsername || '';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="badge badge-active">Instagram連携済み</span>
+        <span style="font-weight:600">@${uname || 'アカウント'} に投稿します</span>
+        <a href="${connectUrl}" target="_blank" class="btn btn-outline btn-sm" style="margin-left:auto">再連携</a>
+      </div>`;
+  } else {
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <span class="badge badge-pending">Instagram未連携</span>
+        <div style="flex:1;min-width:220px;font-size:13px;color:var(--text-sub);line-height:1.7">
+          この店舗のInstagramを連携すると、その店舗のアカウントへ直接 投稿・コメント返信・インサイト取得 ができます。<br>
+          連携には、お店のInstagramが<b>プロアカウント（ビジネス/クリエイター）</b>であることが必要です。<br>
+          ※未連携の間は共通アカウント（@cantik.ink）に投稿します。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="${connectUrl}" class="btn btn-primary btn-sm">Instagramを連携</a>
+          <button class="btn btn-outline btn-sm" onclick="copyConnectUrl('${connectUrl}')">連携URLをコピー</button>
+        </div>
+      </div>`;
+  }
+}
+
 async function loadMedia() {
   const gallery = document.getElementById('mediaGallery');
   const sub = document.getElementById('instagramSubtitle');
@@ -1638,6 +1684,7 @@ async function loadMedia() {
   if (composeCard) composeCard.style.display = 'none';
   const statusEl = document.getElementById('mediaUploadStatus');
   if (statusEl) statusEl.textContent = '';
+  renderIgConnect();
   if (!currentLocationId) {
     _mediaList = [];
     if (gallery) gallery.innerHTML = '<p style="font-size:12px;color:var(--text-sub);grid-column:1/-1">店舗を選択してください</p>';
