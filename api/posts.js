@@ -229,7 +229,11 @@ export default async function handler(req, res) {
     let igConn = null;
     if (storeId) {
       igConn = await kvGet(`ig_conn_${storeId}`);
-      if (igConn?.token && igConn?.userId) { IG_TOKEN = igConn.token; IG_USER = igConn.userId; }
+      // 連携トークンは「自分自身のアカウント」のトークン＝ノードに "me" を使うのが最も確実。
+      // ※Instagram Loginのトークン交換が返す user_id は app-scoped で、
+      //   graph.instagram.com のメディア/会話/インサイトのノードIDには使えないことがある
+      //   （"Object with ID ... does not exist / missing permissions" エラーの原因）。
+      if (igConn?.token) { IG_TOKEN = igConn.token; IG_USER = 'me'; }
     }
     // 連携状態の確認（トークン不要・店舗ごと）。UIの「連携済み/未連携」判定に使う。
     if (req.method === 'GET' && req.query.sub === 'conn-status') {
