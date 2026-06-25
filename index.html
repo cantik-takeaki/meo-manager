@@ -1642,15 +1642,24 @@ async function loadDiagnosis() {
 let _mediaList = [];
 let _igSelected = null;
 
-// Instagram連携カードの描画（連携状態に応じて「連携する/連携済み」を出し分け）
-function renderIgConnect() {
+// Instagram連携カードの描画（連携状態はバックエンドの ig_conn_{storeId} を直接確認）
+// ※GBP連携店も手動店も currentLocationId で一貫して判定する
+async function renderIgConnect() {
   const card = document.getElementById('igConnectCard');
   if (!card) return;
   if (!currentLocationId) { card.style.display = 'none'; return; }
   card.style.display = 'block';
-  const connectUrl = `/api/auth/login?provider=instagram&store=${encodeURIComponent(currentLocationId)}`;
-  if (currentLocation?.igConnected) {
-    const uname = currentLocation?.igUsername || '';
+  const sid = currentLocationId; // 連携・投稿・状態確認で使うキーを統一
+  const connectUrl = `/api/auth/login?provider=instagram&store=${encodeURIComponent(sid)}`;
+  card.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">Instagram連携状態を確認中…</span>';
+  let connected = false, uname = '';
+  try {
+    const d = await fetch(`/api/posts?action=instagram&sub=conn-status&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
+    connected = !!d.connected; uname = d.username || '';
+  } catch (e) { /* 取得失敗時は未連携扱いで表示 */ }
+  // 描画中に店舗が切り替わっていたら何もしない（非同期の取り違え防止）
+  if (currentLocationId !== sid) return;
+  if (connected) {
     card.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span class="badge badge-active">Instagram連携済み</span>
@@ -2091,7 +2100,7 @@ async function publishIgPost() {
   if (!confirm('この内容でInstagramに投稿します。よろしいですか？（社外公開アクション）')) return;
   const aspect = document.getElementById('igAspect').value;
   const imageUrl = aspect === 'portrait' ? _igSelected.portraitUrl : _igSelected.squareUrl;
-  const sid = currentLocation?.storeId ? '&storeId=' + currentLocation.storeId : '';
+  const sid = currentLocationId ? '&storeId=' + encodeURIComponent(currentLocationId) : '';
   showToast('投稿中...');
   try {
     const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
@@ -2107,7 +2116,7 @@ async function publishIgPost() {
 // ─── Instagram DM ───
 let _igBizId = null;
 let _igRecipientId = null;
-function _igSid() { return currentLocation?.storeId ? '&storeId=' + currentLocation.storeId : ''; }
+function _igSid() { return currentLocationId ? '&storeId=' + encodeURIComponent(currentLocationId) : ''; }
 
 async function loadConversations() {
   const list = document.getElementById('igConvList');

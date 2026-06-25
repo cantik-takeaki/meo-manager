@@ -226,9 +226,14 @@ export default async function handler(req, res) {
     // ig_conn_{storeId} に保存されたトークンを優先（審査通過後の本番運用で各店舗へ投稿）。
     let IG_TOKEN = process.env.IG_ACCESS_TOKEN;
     let IG_USER = process.env.IG_USER_ID;
+    let igConn = null;
     if (storeId) {
-      const conn = await kvGet(`ig_conn_${storeId}`);
-      if (conn?.token && conn?.userId) { IG_TOKEN = conn.token; IG_USER = conn.userId; }
+      igConn = await kvGet(`ig_conn_${storeId}`);
+      if (igConn?.token && igConn?.userId) { IG_TOKEN = igConn.token; IG_USER = igConn.userId; }
+    }
+    // 連携状態の確認（トークン不要・店舗ごと）。UIの「連携済み/未連携」判定に使う。
+    if (req.method === 'GET' && req.query.sub === 'conn-status') {
+      return res.json({ connected: !!(igConn?.token), username: igConn?.username || '', userId: igConn?.userId || '' });
     }
     if (!IG_TOKEN || !IG_USER) {
       return res.status(500).json({ error: 'IG_ACCESS_TOKEN / IG_USER_ID が未設定です（Vercel環境変数）' });
