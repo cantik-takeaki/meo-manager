@@ -20,6 +20,63 @@ export default async function handler(req, res) {
 
   const { storeId, action } = req.query;
 
+  // ── Instagram Webhook（DM/コメント受信）──
+  // Metaがここを叩く。GET=検証、POST=イベント受信→KV保存（conversationsはWebhook前提のため）。
+  // ※認証不要（Metaサーバーからの呼び出し）。
+  if (action === 'webhook') {
+    if (req.method === 'GET') {
+      const VERIFY = process.env.IG_WEBHOOK_VERIFY_TOKEN || 'cantik_meo_verify';
+      if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY) {
+        return res.status(200).send(req.query['hub.challenge']);
+      }
+      return res.status(403).end();
+    }
+    if (req.method === 'POST') {
+      try {
+        const entries = (req.body && req.body.entry) || [];
+        for (const entry of entries) {
+          // メッセージ（DM）イベント
+          for (const m of (entry.messaging || [])) {
+            const recipientId = m.recipient && m.recipient.id;
+            const senderId = m.sender && m.sender.id;
+            if (!recipientId || !senderId || !m.message) continue;
+            const ev = {
+              senderId: String(senderId), recipientId: String(recipientId),
+              text: m.message.text || '', mid: m.message.mid || null,
+              ts: m.timestamp || Date.now(), isEcho: !!m.message.is_echo,
+            };
+            const key = `ig_dm_${recipientId}`;
+            const list = await kvGet(key) || [];
+            if (!ev.mid || !list.some(x => x.mid === ev.mid)) list.push(ev);
+            if (list.length > 500) list.splice(0, list.length - 500);
+            await kvSet(key, list);
+            // デモ用フォールバック（宛先ID解決に失敗しても拾えるよう全体にも保持）
+            const all = await kvGet('ig_dm_all') || [];
+            if (!ev.mid || !all.some(x => x.mid === ev.mid)) all.push(ev);
+            if (all.length > 300) all.splice(0, all.length - 300);
+            await kvSet('ig_dm_all', all);
+          }
+          // コメントイベント（field=comments）
+          for (const ch of (entry.changes || [])) {
+            if (ch.field === 'comments' && ch.value) {
+              const v = ch.value;
+              const mediaId = v.media && v.media.id;
+              if (!mediaId) continue;
+              const key = `ig_cm_${mediaId}`;
+              const list = await kvGet(key) || [];
+              const cm = { id: v.id, text: v.text || '', username: (v.from && v.from.username) || '', ts: Date.now() };
+              if (!list.some(x => x.id === cm.id)) list.unshift(cm);
+              if (list.length > 200) list.length = 200;
+              await kvSet(key, list);
+            }
+          }
+        }
+      } catch (e) { /* Webhookは必ず200を返す */ }
+      return res.status(200).send('EVENT_RECEIVED');
+    }
+    return res.status(405).end();
+  }
+
   // ── 予約下書き（KV保存。Google APIに予約機能が無いため自前管理） ──
   // ここはトークン不要（自社KVのみ操作）。storeId をキーに使う。
   if (action === 'drafts') {
@@ -278,6 +335,15 @@ export default async function handler(req, res) {
             if (d2.comments && Array.isArray(d2.comments.data) && d2.comments.data.length) data = d2.comments;
           } catch (e) { /* フォールバック失敗時は元の空応答のまま */ }
         }
+        // Webhookで受信したコメント（API一覧に出ない分）を併合
+        try {
+          const hooked = await kvGet(`ig_cm_${mediaId}`) || [];
+          if (hooked.length) {
+            const existing = new Set((data.data || []).map(c => c.id));
+            const extra = hooked.filter(c => !existing.has(c.id)).map(c => ({ id: c.id, text: c.text, username: c.username, timestamp: new Date(c.ts).toISOString(), _viaWebhook: true }));
+            if (extra.length) data = { ...data, data: [...extra, ...(data.data || [])] };
+          }
+        } catch (e) {}
         return res.json(data);
       }
 
@@ -414,22 +480,55 @@ export default async function handler(req, res) {
         return res.json({ success: true, id: pdata.id, creationId });
       }
 
-      // DM：会話一覧
+      // 自分（連携アカウント）の数値IGSIDを解決（Webhookのrecipient.idと突き合わせる用）
+      const resolveMyId = async () => {
+        if (IG_USER && IG_USER !== 'me') return String(IG_USER);
+        try { const me = await fetch(`${BASE}/me?fields=user_id&access_token=${IG_TOKEN}`).then(r => r.json()); return String(me.user_id || me.id || ''); } catch (e) { return ''; }
+      };
+
+      // DM：会話一覧（Webhook受信をKVから。Graph APIはWebhook前提で空のため）
       if (req.method === 'GET' && sub === 'conversations') {
-        const r = await fetch(`${BASE}/${IG_USER}/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
-        const data = await r.json();
-        if (data.error) return res.status(400).json({ error: data.error.message, pending: true });
-        return res.json(data);
+        const myId = await resolveMyId();
+        let events = (myId && await kvGet(`ig_dm_${myId}`)) || [];
+        if (!events.length) events = await kvGet('ig_dm_all') || []; // 宛先ID解決できなくてもデモ表示
+        const convs = {};
+        for (const e of events) {
+          const other = String(e.senderId) === myId ? e.recipientId : e.senderId;
+          if (!other) continue;
+          if (!convs[other]) convs[other] = { id: String(other), _last: 0, participants: { data: [{ id: String(other), username: '' }] } };
+          if ((e.ts || 0) >= convs[other]._last) { convs[other]._last = e.ts || 0; convs[other].updated_time = new Date(e.ts || Date.now()).toISOString(); }
+        }
+        const list = Object.values(convs).sort((a, b) => b._last - a._last);
+        // Graph側にも会話があれば併合（基本は空）
+        try {
+          const r = await fetch(`${BASE}/${IG_USER}/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
+          const gd = await r.json();
+          if (gd.data && gd.data.length) {
+            for (const c of gd.data) if (!convs[c.id]) list.push(c);
+          }
+        } catch (e) { /* graphが無くてもKVで動く */ }
+        return res.json({ data: list, source: list.length ? 'webhook' : 'empty' });
       }
 
-      // DM：会話内のメッセージ取得
+      // DM：会話内メッセージ（conversationId = 相手のIGSID）
       if (req.method === 'GET' && sub === 'messages') {
         const { conversationId } = req.query;
         if (!conversationId) return res.status(400).json({ error: 'conversationId必須' });
-        const r = await fetch(`${BASE}/${conversationId}?fields=messages{id,created_time,from,to,message}&access_token=${IG_TOKEN}`);
-        const data = await r.json();
-        if (data.error) return res.status(400).json({ error: data.error.message });
-        return res.json(data);
+        const myId = await resolveMyId();
+        let events = (myId && await kvGet(`ig_dm_${myId}`)) || [];
+        if (!events.length) events = await kvGet('ig_dm_all') || [];
+        const thread = events
+          .filter(e => String(e.senderId) === String(conversationId) || String(e.recipientId) === String(conversationId))
+          .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+          .map(e => ({ id: e.mid, created_time: new Date(e.ts || Date.now()).toISOString(), from: { id: String(e.senderId) }, message: e.text }));
+        if (thread.length) return res.json({ messages: { data: thread.slice().reverse() }, myId });
+        // KVに無ければGraphを試す（基本空）
+        try {
+          const r = await fetch(`${BASE}/${conversationId}?fields=messages{id,created_time,from,to,message}&access_token=${IG_TOKEN}`);
+          const data = await r.json();
+          if (!data.error) return res.json({ ...data, myId });
+        } catch (e) {}
+        return res.json({ messages: { data: [] }, myId });
       }
 
       // DM：メッセージ送信（※相手の最終メッセージから24時間以内のみ送信可）
@@ -442,6 +541,18 @@ export default async function handler(req, res) {
         });
         const data = await r.json();
         if (data.error) return res.status(400).json({ error: data.error.message });
+        // 送信した自分の発言もスレッドに残す（Webhookエコー待ちにしない）
+        try {
+          const myId = (IG_USER && IG_USER !== 'me') ? String(IG_USER)
+            : String((await fetch(`${BASE}/me?fields=user_id&access_token=${IG_TOKEN}`).then(x => x.json())).user_id || '');
+          if (myId) {
+            const key = `ig_dm_${myId}`;
+            const list = await kvGet(key) || [];
+            list.push({ senderId: myId, recipientId: String(recipientId), text, mid: data.message_id || null, ts: Date.now(), isEcho: true });
+            if (list.length > 500) list.splice(0, list.length - 500);
+            await kvSet(key, list);
+          }
+        } catch (e) { /* 記録失敗は無視 */ }
         return res.json({ success: true, ...data });
       }
 
