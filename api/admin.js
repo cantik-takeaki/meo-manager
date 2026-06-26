@@ -68,6 +68,30 @@ export default async function handler(req, res) {
     return res.json({ ...DEFAULT_SURVEY, ...(s || {}) });
   }
 
+  // ── リード取得（公開・アンケート完了画面のメール/LINE登録を受け取る） ──
+  // 再来店販促リスト用。お客さんのブラウザから叩くため認証不要。
+  if (action === 'lead-submit' && req.method === 'POST') {
+    const { storeId, email, name, rating } = req.body || {};
+    if (!storeId || !email) return res.status(400).json({ error: 'storeId・email必須' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email))) return res.status(400).json({ error: 'メール形式が不正です' });
+    const key = `leads_${storeId}`;
+    const list = await kvGet(key) || [];
+    // 同じメールは重複登録しない（最新で上書き）
+    const existing = list.findIndex(l => l.email === String(email).toLowerCase());
+    const item = {
+      id: 'ld' + Date.now().toString(36),
+      email: String(email).toLowerCase().slice(0, 120),
+      name: String(name || '').slice(0, 60),
+      rating: parseInt(rating, 10) || null,
+      at: new Date().toISOString(),
+    };
+    if (existing >= 0) list[existing] = { ...list[existing], ...item, id: list[existing].id };
+    else list.unshift(item);
+    if (list.length > 2000) list.length = 2000;
+    await kvSet(key, list);
+    return res.json({ success: true });
+  }
+
   // ── 低評価の店内フィードバック 受け取り（公開・Googleには出さず店舗だけが見る） ──
   if (action === 'feedback-submit' && req.method === 'POST') {
     const { storeId, rating, text, contact } = req.body || {};
@@ -117,6 +141,31 @@ export default async function handler(req, res) {
       if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));
       await kvSet(key, next);
       return res.json({ success: true, survey: next });
+    }
+  }
+
+  // ── リード一覧/削除/CSV（管理側）──
+  if (action === 'leads') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `leads_${storeId}`;
+    if (req.method === 'GET') {
+      const list = await kvGet(key) || [];
+      if (req.query.format === 'csv') {
+        const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        const rows = [['email', 'name', 'rating', 'date'].join(',')]
+          .concat(list.map(l => [esc(l.email), esc(l.name), esc(l.rating), esc((l.at || '').slice(0, 10))].join(',')));
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="leads_${storeId}.csv"`);
+        return res.status(200).send('﻿' + rows.join('\r\n'));
+      }
+      return res.json({ leads: list });
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(l => l.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, leads: list });
     }
   }
 

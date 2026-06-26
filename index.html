@@ -454,6 +454,16 @@ body {
           <button class="btn btn-primary btn-sm" onclick="openReviewPop()">🖨 口コミ依頼POP・QRを作る</button>
           <button class="btn btn-outline btn-sm" onclick="openSurveyEditor()">✏️ アンケートを編集</button>
           <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
+          <button class="btn btn-outline btn-sm" onclick="loadLeads()">📩 リード一覧<span id="leadBadge"></span></button>
+        </div>
+
+        <!-- リード一覧（折りたたみ） -->
+        <div id="leadsBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:700;font-size:14px">📩 取得リード（メール）</div>
+            <button class="btn btn-outline btn-sm" onclick="downloadLeadsCsv()">CSVダウンロード</button>
+          </div>
+          <div id="leadsList"></div>
         </div>
 
         <!-- アンケート編集（折りたたみ） -->
@@ -1497,11 +1507,17 @@ async function loadKpi() {
   } catch (e) {
     body.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗: ${e.message}</span>`;
   }
-  // 低評価フィードバックの未読バッジ
+  // 低評価フィードバック・リードの件数バッジ
   try {
     const fb = await fetch(`/api/admin?action=feedback&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
     const n = (fb.feedback || []).length;
     const badge = document.getElementById('fbBadge');
+    if (badge) badge.textContent = n ? `（${n}）` : '';
+  } catch (e) {}
+  try {
+    const ld = await fetch(`/api/admin?action=leads&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
+    const n = (ld.leads || []).length;
+    const badge = document.getElementById('leadBadge');
     if (badge) badge.textContent = n ? `（${n}）` : '';
   } catch (e) {}
 }
@@ -1670,6 +1686,42 @@ async function deleteFeedback(id) {
     renderFeedback();
     loadKpi();
   } catch (e) { showToast('削除失敗', 'error'); }
+}
+
+// ── 取得リード（メール）一覧・CSV ──
+function loadLeads() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('leadsBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  if (box.style.display === 'block') renderLeads();
+}
+
+async function renderLeads() {
+  const list = document.getElementById('leadsList');
+  list.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
+  try {
+    const d = await fetch(`/api/admin?action=leads&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const items = d.leads || [];
+    if (!items.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">まだリードはありません。アンケート完了画面でメール登録があると貯まります。</p>'; return; }
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${items.length}件</div>` + items.map(l => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${escapeHtml(l.email)}</div>
+          <div style="font-size:11px;color:var(--text-sub)">${l.rating ? '★' + l.rating + ' ・ ' : ''}${(l.at || '').slice(0, 10)}${l.name ? ' ・ ' + escapeHtml(l.name) : ''}</div></div>
+        <button class="btn btn-outline btn-sm" onclick="deleteLead('${l.id}')">削除</button>
+      </div>`).join('');
+  } catch (e) { list.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗</span>`; }
+}
+
+async function deleteLead(id) {
+  try {
+    await fetch(`/api/admin?action=leads&storeId=${encodeURIComponent(currentLocationId)}&id=${id}`, { method: 'DELETE' });
+    renderLeads();
+  } catch (e) { showToast('削除失敗', 'error'); }
+}
+
+function downloadLeadsCsv() {
+  if (!currentLocationId) return;
+  window.open(`/api/admin?action=leads&storeId=${encodeURIComponent(currentLocationId)}&format=csv`, '_blank');
 }
 
 // ─── ダッシュボード：キーワード順位 ───

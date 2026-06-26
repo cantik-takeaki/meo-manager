@@ -107,6 +107,7 @@
       <button class="btn btn-google" id="openGoogle" style="margin-top:20px">Googleの口コミ投稿を開く</button>
       <button class="btn btn-line hidden" id="lineBtn1">LINEで友だち追加</button>
     </div>
+    <div class="leadbox" data-lead></div>
   </div>
 
   <!-- STEP-DONE: 完了（フィードバック送信後） -->
@@ -117,6 +118,7 @@
       <p style="color:var(--sub);font-size:14px" id="doneMsg"></p>
       <button class="btn btn-line hidden" id="lineBtn2" style="margin-top:16px">LINEで友だち追加</button>
     </div>
+    <div class="leadbox" data-lead></div>
   </div>
 </div>
 
@@ -167,6 +169,40 @@ async function loadSurvey(){
     });
   }
   document.getElementById('lowMsg').textContent = SURVEY.lowMsg || 'いただいたお声は改善に活かします。差し支えなければ、もう少し詳しくお聞かせください。';
+}
+
+// 完了画面のメール登録ブロックを描画（任意・再来店販促リスト用）
+function renderLeadBox(){
+  if (SURVEY && SURVEY.askEmail === false) return; // 設定でオフなら出さない
+  const msg = (SURVEY && SURVEY.leadMsg) || 'お得な情報やクーポンをお送りします。よろしければメールをご登録ください（任意）。';
+  document.querySelectorAll('[data-lead]').forEach(box => {
+    if (box.dataset.rendered) return;
+    box.dataset.rendered = '1';
+    box.innerHTML = `
+      <div style="margin-top:18px;border-top:1px solid #e6edf3;padding-top:16px;text-align:left">
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px">📩 次回使えるお知らせ</div>
+        <p style="font-size:12.5px;color:var(--sub);margin-bottom:10px">${msg}</p>
+        <input class="free" type="email" placeholder="メールアドレス（任意）" data-lead-email>
+        <button class="btn btn-primary" style="margin-top:10px" data-lead-btn>登録する</button>
+        <div class="note" data-lead-done style="display:none;color:#06873a">ご登録ありがとうございます。</div>
+      </div>`;
+    const inp = box.querySelector('[data-lead-email]');
+    const btn = box.querySelector('[data-lead-btn]');
+    btn.onclick = async () => {
+      const email = (inp.value || '').trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ inp.style.borderColor = '#e0563a'; return; }
+      btn.disabled = true; btn.textContent = '登録中…';
+      try {
+        await fetch('/api/admin?action=lead-submit', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ storeId: STORE_ID, email, rating: RATING })
+        });
+      } catch(e){}
+      box.querySelector('[data-lead-email]').style.display = 'none';
+      btn.style.display = 'none';
+      box.querySelector('[data-lead-done]').style.display = 'block';
+    };
+  });
 }
 
 // ── 満足度（星）──
@@ -247,6 +283,7 @@ document.getElementById('lowSubmit').onclick = async () => {
   document.getElementById('doneTitle').textContent = 'お声をありがとうございました';
   document.getElementById('doneMsg').textContent = SURVEY?.completionMsg || 'いただいたご意見は、サービス改善に活かしてまいります。';
   document.getElementById('stepDone').classList.remove('hidden');
+  renderLeadBox();
 };
 
 document.getElementById('consent').onchange = (e) => { document.getElementById('copyBtn').disabled = !e.target.checked; };
@@ -255,6 +292,7 @@ document.getElementById('copyBtn').onclick = async () => {
   try { await navigator.clipboard.writeText(text); } catch(e){}
   document.getElementById('step2').classList.add('hidden');
   document.getElementById('step3').classList.remove('hidden');
+  renderLeadBox();
 };
 document.getElementById('openGoogle').onclick = () => {
   kpiTrack('click');
