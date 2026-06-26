@@ -1836,8 +1836,8 @@ async function deleteActionLog(id) {
   loadActionLog();
 }
 
-// 月次レポート生成（現在の店舗データから印刷用レポート→PDF保存）
-function generateReport() {
+// 月次レポート生成（口コミKPI・満足度・順位推移・AI総合所見を含む）→ PDF保存
+async function generateReport() {
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
   const txt = (id) => (document.getElementById(id)?.textContent || '—').trim();
   const store = currentLocation.title || '';
@@ -1845,9 +1845,49 @@ function generateReport() {
   const ym = `${now.getFullYear()}年${now.getMonth() + 1}月`;
   const score = txt('meoScoreNum');
   const advice = (document.getElementById('meoAdvice')?.textContent || '').trim();
-  const ranks = (_dashRankings || []).map(r => `<tr><td>${escapeHtml(r.keyword)}</td><td style="text-align:right;font-weight:700">${r.rank ? r.rank + '位' : '圏外'}</td></tr>`).join('') || '<tr><td colspan="2" style="color:#888">順位データなし</td></tr>';
+  showToast('レポートを作成中…（AI所見を生成）', 'success');
+
+  // 順位（前回比つき）
+  const ranks = (_dashRankings || []).map(r => {
+    const badge = r.delta == null ? '' : r.delta > 0 ? `<span style="color:#10b981">▲${r.delta}</span>` : r.delta < 0 ? `<span style="color:#ef4444">▼${-r.delta}</span>` : '→';
+    return `<tr><td>${escapeHtml(r.keyword)}</td><td style="text-align:center">${badge}</td><td style="text-align:right;font-weight:700">${r.rank ? r.rank + '位' : '圏外'}</td></tr>`;
+  }).join('') || '<tr><td colspan="3" style="color:#888">順位データなし</td></tr>';
+
+  // インサイト
   const insOn = document.getElementById('insightsCard')?.style.display !== 'none';
   const insHtml = insOn ? `<table class="t"><tr><th>表示回数</th><td>${txt('insImpressions')}</td><th>電話</th><td>${txt('insCalls')}</td></tr><tr><th>マップ表示</th><td>${txt('insMaps')}</td><th>ルート検索</th><td>${txt('insDir')}</td></tr><tr><th>検索表示</th><td>${txt('insSearch')}</td><th>サイト訪問</th><td>${txt('insWeb')}</td></tr></table>` : '<p style="color:#888">インサイト未取得（GBP連携で取得できます）</p>';
+
+  // 口コミ獲得KPI＋満足度
+  let kpi = null, kpiHtml = '<p style="color:#888">口コミ獲得の計測データがまだありません。</p>';
+  try {
+    kpi = await fetch(`/api/admin?action=kpi&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const c = kpi.current || {};
+    const cvr = c.scan > 0 ? Math.round((c.click / c.scan) * 100) : null;
+    kpiHtml = `<table><tr><th style="width:auto">QRスキャン</th><th>評価回答</th><th>AI生成</th><th>Googleクリック</th><th>低評価の声</th><th>平均満足度</th><th>遷移率</th></tr>
+      <tr style="text-align:center"><td>${c.scan || 0}</td><td>${c.rate || 0}</td><td>${c.ai || 0}</td><td style="font-weight:700">${c.click || 0}</td><td>${c.lowfb || 0}</td><td>${kpi.avgSatisfaction != null ? '★' + kpi.avgSatisfaction : '—'}</td><td>${cvr != null ? cvr + '%' : '—'}</td></tr></table>`;
+  } catch (e) {}
+
+  // AI総合所見（店舗データを束ねて生成・失敗しても続行）
+  let summary = '';
+  try {
+    const ctx = {
+      score,
+      rankings: (_dashRankings || []).map(r => `${r.keyword}:${r.rank ? r.rank + '位' : '圏外'}${r.delta ? `(前回比${r.delta > 0 ? '+' + r.delta : r.delta})` : ''}`).join('、') || '未計測',
+      reviews: `平均${txt('statRating')}・未返信${txt('statPending')}件`,
+      review_kpi: kpi ? `スキャン${kpi.current?.scan || 0}・評価回答${kpi.current?.rate || 0}・Googleクリック${kpi.current?.click || 0}・平均満足度${kpi.avgSatisfaction ?? '—'}・低評価の声${kpi.current?.lowfb || 0}` : '未計測',
+    };
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId: currentLocationId, type: 'assistant',
+        question: '今月のMEO運用レポートの「総合所見」を店長向けに書いてください。①今月良かった点 ②課題 ③来月優先してやること、を各2〜3行で。データに基づき、誇張や断定はしない。見出しは付けてよい。',
+        context: ctx,
+      }),
+    }).then(r => r.json());
+    summary = d.content || '';
+  } catch (e) {}
+  const summaryHtml = summary ? `<div class="adv">${escapeHtml(summary)}</div>` : '<p style="color:#888">（AI所見を生成できませんでした）</p>';
+
   const w = window.open('', '_blank');
   if (!w) return showToast('ポップアップを許可してください', 'error');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>MEOレポート ${escapeHtml(store)} ${ym}</title>
@@ -1859,16 +1899,18 @@ function generateReport() {
     .score{font-size:40px;font-weight:900;color:#0e5fb5}
     table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
     td,th{border:1px solid #ddd;padding:7px 10px;text-align:left}
-    th{background:#f3f6fb;width:90px;white-space:nowrap}
+    th{background:#f3f6fb;white-space:nowrap}
     .t th{width:90px}
     .adv{white-space:pre-wrap;font-size:13px;background:#f7f9fc;padding:12px;border-radius:6px}
     .foot{margin-top:30px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:10px}
     @media print{.noprint{display:none}body{padding:10px}}
   </style></head><body>
   <div class="head"><h1>MEO運用レポート</h1><div style="text-align:right"><div style="font-weight:700">${escapeHtml(store)}</div><div style="color:#666">${ym}</div></div></div>
+  <h2>総合所見（AI）</h2>${summaryHtml}
   <h2>MEOスコア</h2><div><span class="score">${score}</span> <span style="color:#666">/ 100</span></div>
-  <h2>キーワード順位</h2><table><tr><th style="width:auto">キーワード</th><th style="width:80px;text-align:right">順位</th></tr>${ranks}</table>
-  <h2>インサイト（直近）</h2>${insHtml}
+  <h2>キーワード順位（前回比つき）</h2><table><tr><th style="width:auto">キーワード</th><th style="width:60px;text-align:center">前回比</th><th style="width:70px;text-align:right">順位</th></tr>${ranks}</table>
+  <h2>口コミ獲得KPI・満足度</h2>${kpiHtml}
+  <h2>GBPインサイト（直近）</h2>${insHtml}
   <h2>今月の実施施策</h2>${(window._actionLogs && window._actionLogs.length) ? '<table><tr><th style="width:90px">日付</th><th style="width:auto">内容</th></tr>' + window._actionLogs.slice(0, 30).map(l => `<tr><td>${l.date}</td><td>${escapeHtml(l.text)}</td></tr>`).join('') + '</table>' : '<p style="color:#888">記録がありません</p>'}
   <h2>改善アドバイス・次の施策</h2><div class="adv">${escapeHtml(advice) || '（ダッシュボードで診断を実行すると表示されます）'}</div>
   <div class="foot">本レポートは株式会社cantikのMEO管理ツールで自動生成しました。数値は取得時点のものです。</div>
