@@ -965,7 +965,7 @@ body {
         </div>
         <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px;line-height:1.7">
           クライアントの正しい店舗情報を登録してください。<br>
-          改ざんが発生した際にここに保存した情報と比較してアラートを出します。
+          「🔍 変更チェック」を押すと、保存した正規情報と<b>現在のGoogleビジネスプロフィールを自動で照合</b>し、店名・電話・住所・カテゴリ・URLの変更を検出してアラート履歴に記録します。
         </p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
           <div>
@@ -4270,7 +4270,8 @@ async function loadProtection() {
       // 保存済み表示
       const infoEl = document.getElementById('baselineInfo');
       infoEl.style.display = 'block';
-      infoEl.textContent = `✅ 最終保存: ${new Date(d.savedAt).toLocaleString('ja-JP')}`;
+      infoEl.textContent = `✅ 最終保存: ${new Date(d.savedAt).toLocaleString('ja-JP')}`
+        + (d.lastCheckedAt ? `　／　最終チェック: ${new Date(d.lastCheckedAt).toLocaleString('ja-JP')}` : '');
     }
     const alerts = d.alerts || [];
     document.getElementById('alertsList').innerHTML = alerts.length
@@ -4322,14 +4323,15 @@ async function saveBaseline() {
 
 async function checkNow() {
   if (!currentLocation || !currentLocationId) return showToast('店舗を選択してください', 'error');
+  const sid = currentLocation.storeId ? '&storeId=' + encodeURIComponent(currentLocation.storeId) : '';
   showToast('チェック中...', 'success');
   try {
-    const res = await fetch(`/api/store-settings?action=verify&locationId=${encodeURIComponent(currentLocationId)}&locationName=${encodeURIComponent(currentLocation.name)}`);
+    const res = await fetch(`/api/store-settings?action=verify&locationId=${encodeURIComponent(currentLocationId)}&locationName=${encodeURIComponent(currentLocation.name)}${sid}`);
     const data = await res.json();
-    if (data.status === 'ok') showToast('✅ 変更なし。正常です', 'success');
-    else if (data.status === 'changed') showToast(`⚠️ ${data.diffs.length}件の変更を検出！`, 'error');
-    else if (data.status === 'no_baseline') showToast('正規情報を先に保存してください', 'error');
-    else showToast('チェック完了（API審査待ち）', 'success');
+    if (data.status === 'ok') showToast('✅ 変更なし。正規情報と一致しています', 'success');
+    else if (data.status === 'changed') showToast(`⚠️ ${data.diffs.length}件の変更を検出しました`, 'error');
+    else if (data.status === 'no_baseline') showToast('先に正規情報を保存してください', 'error');
+    else showToast('チェックできませんでした（GBP連携 or 口コミ/情報APIの承認待ち）', 'error');
     loadProtection();
   } catch { showToast('チェックに失敗しました', 'error'); }
 }
