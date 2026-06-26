@@ -442,16 +442,76 @@ body {
       </div>
 
       <div class="card" id="kpiCard" style="display:none">
-        <div class="card-header"><div class="card-title">📈 口コミ獲得KPI（今月）</div>
+        <div class="card-header"><div class="card-title">📈 口コミ促進（今月）</div>
           <button class="btn btn-outline btn-sm" onclick="loadKpi()">更新</button>
         </div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">口コミ依頼ページ（QR/リンク）経由の獲得導線を計測します。お客さんがページを開く→良かった点を選ぶ→AIで下書き→Googleへ、の各段階の数。</p>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">満足度アンケート→分岐型の獲得導線です。高評価のお客様はGoogleへ、低評価のお客様は店内フィードバックで受け止めます（評価を守りつつ改善の声を集める）。</p>
         <div id="kpiBody" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
           <span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>
         </div>
-        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-primary btn-sm" onclick="openReviewQr()">📱 口コミ依頼QR・リンクを表示</button>
-          <span style="font-size:11px;color:var(--text-sub)">このQRを店頭やレシートに。読み取った人数がスキャン数になります。</span>
+        <div id="kpiFunnel" style="margin-top:14px"></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="openReviewPop()">🖨 口コミ依頼POP・QRを作る</button>
+          <button class="btn btn-outline btn-sm" onclick="openSurveyEditor()">✏️ アンケートを編集</button>
+          <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
+        </div>
+
+        <!-- アンケート編集（折りたたみ） -->
+        <div id="surveyEditor" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px">✏️ アンケート編集</div>
+          <div style="display:grid;gap:10px">
+            <label style="font-size:12px;color:var(--text-sub)">タイトル（ページ見出し）
+              <input id="svTitle" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">導入文
+              <input id="svIntro" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <label style="font-size:12px;color:var(--text-sub)">良かった点の選択肢（カンマ区切り）</label>
+                <button class="btn btn-outline btn-sm" onclick="aiSurveyPoints()">✨ AIで業種別に生成</button>
+              </div>
+              <textarea id="svPoints" rows="2" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical"></textarea>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+              <label style="font-size:12px;color:var(--text-sub)">低評価の分岐
+                <select id="svGate" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                  <option value="branch">満足度で分岐（低評価は店内で受け止め）</option>
+                  <option value="all">全員Googleへ誘導</option>
+                </select>
+              </label>
+              <label style="font-size:12px;color:var(--text-sub)">店内フィードバックにする評価
+                <select id="svThreshold" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                  <option value="4">★3以下を店内へ</option>
+                  <option value="3">★2以下を店内へ</option>
+                  <option value="5">★4以下を店内へ</option>
+                </select>
+              </label>
+            </div>
+            <label style="font-size:12px;color:var(--text-sub)">Google口コミ投稿URL（必須・これがないと投稿画面に進めません）
+              <input id="svGoogle" type="url" placeholder="https://g.page/.../review または https://search.google.com/local/writereview?placeid=..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL（任意・完了画面に表示）
+              <input id="svLine" type="url" placeholder="https://lin.ee/..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの案内文
+              <input id="svLowMsg" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">送信完了メッセージ
+              <input id="svDone" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-success btn-sm" onclick="saveSurvey()">保存する</button>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('surveyEditor').style.display='none'">閉じる</button>
+            </div>
+            <p style="font-size:11px;color:var(--text-sub);line-height:1.6">※「満足度で分岐」は、低評価のお客様をGoogleでなく店内フィードバックへ誘導します。評価を守れますが、Googleは恣意的な口コミ選別（レビューゲーティング）を推奨していません。公平に運用したい場合は「全員Googleへ誘導」を選んでください。</p>
+          </div>
+        </div>
+
+        <!-- 低評価フィードバック一覧（折りたたみ） -->
+        <div id="feedbackBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:8px">💬 低評価フィードバック（店内限定・Google非公開）</div>
+          <div id="feedbackList"></div>
         </div>
       </div>
 
@@ -1378,58 +1438,238 @@ function selectLocation(idx) {
   const ac = document.getElementById('assistantCard'); if (ac) { ac.style.display = 'block'; document.getElementById('askAnswer').textContent = ''; }
 }
 
-// ─── 口コミ獲得KPI ───
+// ─── 口コミ促進KPI ───
+let _surveyCache = null;
 async function loadKpi() {
   const card = document.getElementById('kpiCard');
   const body = document.getElementById('kpiBody');
+  const funnelEl = document.getElementById('kpiFunnel');
   if (!card || !body) return;
   const sid = currentLocationId;
   if (!sid) { card.style.display = 'none'; return; }
   card.style.display = 'block';
+  document.getElementById('surveyEditor').style.display = 'none';
+  document.getElementById('feedbackBox').style.display = 'none';
   body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
-  const stat = (label, val, prev) => {
+  if (funnelEl) funnelEl.innerHTML = '';
+  const stat = (label, val, prev, color) => {
     const diff = (prev != null && val != null) ? val - prev : null;
     const dtxt = diff == null ? '' : (diff > 0 ? `<span style="color:var(--green,#10b981);font-size:11px"> ▲${diff}</span>` : diff < 0 ? `<span style="color:var(--red);font-size:11px"> ▼${-diff}</span>` : '<span style="color:var(--text-sub);font-size:11px"> →</span>');
-    return `<div style="text-align:center;min-width:96px"><div style="font-size:24px;font-weight:700;color:var(--accent)">${val == null ? '—' : Number(val).toLocaleString()}${dtxt}</div><div style="font-size:12px;color:var(--text-sub)">${label}</div></div>`;
+    return `<div style="text-align:center;min-width:84px"><div style="font-size:23px;font-weight:700;color:${color || 'var(--accent)'}">${val == null ? '—' : Number(val).toLocaleString()}${dtxt}</div><div style="font-size:12px;color:var(--text-sub)">${label}</div></div>`;
   };
   try {
     const d = await fetch(`/api/admin?action=kpi&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
     if (currentLocationId !== sid) return;
     const c = d.current || {}, p = d.previous || {};
-    // 転換率: クリック / スキャン
-    const cvr = (c.scan > 0) ? Math.round((c.click / c.scan) * 100) : null;
+    const sat = d.avgSatisfaction, satP = d.avgSatisfactionPrev;
     body.innerHTML =
-        stat('スキャン数', c.scan, p.scan)
-      + stat('アンケート回答', c.survey, p.survey)
-      + stat('AI生成数', c.ai, p.ai)
-      + stat('Googleクリック', c.click, p.click)
-      + `<div style="min-width:120px;text-align:center"><div style="font-size:24px;font-weight:700;color:var(--gold,#f59e0b)">${cvr == null ? '—' : cvr + '%'}</div><div style="font-size:12px;color:var(--text-sub)">遷移率(クリック/スキャン)</div></div>`
-      + `<div style="flex:1;min-width:150px;font-size:11px;color:var(--text-sub);line-height:1.6">▲▼は前月比。数値は口コミ依頼ページ経由の実測です（QR/リンクを配って計測）。</div>`;
+        stat('スキャン', c.scan, p.scan)
+      + stat('評価回答', c.rate, p.rate)
+      + stat('AI生成', c.ai, p.ai)
+      + stat('Googleクリック', c.click, p.click, 'var(--gold,#f59e0b)')
+      + stat('低評価の声', c.lowfb, p.lowfb, 'var(--red)')
+      + (c.line || p.line ? stat('LINE誘導', c.line, p.line, '#06c755') : '')
+      + `<div style="text-align:center;min-width:96px"><div style="font-size:23px;font-weight:700;color:var(--gold,#f59e0b)">${sat == null ? '—' : '★' + sat}</div><div style="font-size:12px;color:var(--text-sub)">平均満足度${satP != null ? `<span style="font-size:10px"> (前月★${satP})</span>` : ''}</div></div>`;
+    // 導線ファネル（スキャン→評価→AI生成→Googleクリック）
+    if (funnelEl) {
+      const steps = [
+        { k: 'スキャン', v: c.scan || 0 },
+        { k: '評価回答', v: c.rate || 0 },
+        { k: 'AI下書き', v: c.ai || 0 },
+        { k: 'Googleへ', v: c.click || 0 },
+      ];
+      const max = Math.max(1, steps[0].v);
+      funnelEl.innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">導線ファネル（今月）</div>`
+        + steps.map((s, i) => {
+          const pct = Math.round((s.v / max) * 100);
+          const fromPrev = i > 0 && steps[i-1].v > 0 ? Math.round((s.v / steps[i-1].v) * 100) : null;
+          return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <div style="width:74px;font-size:12px;color:var(--text-sub);text-align:right">${s.k}</div>
+            <div style="flex:1;background:var(--bg-3);border-radius:6px;height:20px;position:relative;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2,#6aa3ff));min-width:2px"></div>
+              <span style="position:absolute;left:8px;top:0;line-height:20px;font-size:11px;font-weight:700;color:var(--text)">${s.v}</span>
+            </div>
+            <div style="width:54px;font-size:11px;color:var(--text-sub)">${fromPrev != null ? fromPrev + '%' : ''}</div>
+          </div>`;
+        }).join('')
+        + `<p style="font-size:11px;color:var(--text-sub);margin-top:6px">右の％は前段からの転換率。▲▼は前月比。低評価の声＝Googleに出さず店内で受け止めた件数。</p>`;
+    }
   } catch (e) {
     body.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗: ${e.message}</span>`;
   }
+  // 低評価フィードバックの未読バッジ
+  try {
+    const fb = await fetch(`/api/admin?action=feedback&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
+    const n = (fb.feedback || []).length;
+    const badge = document.getElementById('fbBadge');
+    if (badge) badge.textContent = n ? `（${n}）` : '';
+  } catch (e) {}
 }
 
-// 口コミ依頼ページのQR・リンクを表示（既存のreviewUrl_保存値を流用）
-function openReviewQr() {
-  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const g = localStorage.getItem('reviewUrl_' + currentLocationId) || '';
-  const base = location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
+// 店舗の口コミ依頼ページURL（Google URLはアンケート設定 or localStorage）
+function reviewPageUrl() {
+  const g = (_surveyCache && _surveyCache.googleUrl) || localStorage.getItem('reviewUrl_' + currentLocationId) || '';
+  return location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
     + '&name=' + encodeURIComponent(currentLocation?.title || '当店')
     + (g ? '&g=' + encodeURIComponent(g) : '');
-  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(base);
-  const w = window.open('', '_blank', 'width=420,height=620');
+}
+
+// ── 印刷用POP（テンプレ＋用紙サイズ＋QR）──
+async function openReviewPop() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!_surveyCache) { try { _surveyCache = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {} }
+  const url = reviewPageUrl();
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=' + encodeURIComponent(url);
+  const store = currentLocation?.title || '当店';
+  const noGoogle = !((_surveyCache && _surveyCache.googleUrl) || localStorage.getItem('reviewUrl_' + currentLocationId));
+  const w = window.open('', '_blank', 'width=720,height=900');
   if (!w) return showToast('ポップアップを許可してください', 'error');
-  w.document.write(`<!doctype html><meta charset="utf-8"><title>口コミ依頼QR</title>
-    <div style="font-family:sans-serif;text-align:center;padding:24px">
-      <h2 style="font-size:18px">${(currentLocation?.title || '当店')} 口コミ依頼</h2>
-      <img src="${qr}" alt="QR" style="width:240px;height:240px;border:1px solid #eee;border-radius:8px">
-      <p style="font-size:12px;color:#666;word-break:break-all;margin:12px 0">${base}</p>
-      <button onclick="navigator.clipboard.writeText('${base}')" style="padding:8px 16px;border:1px solid #4f7df3;background:#4f7df3;color:#fff;border-radius:6px;cursor:pointer">リンクをコピー</button>
-      <button onclick="window.print()" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;margin-left:6px">印刷</button>
-      ${g ? '' : '<p style="font-size:11px;color:#c0392b;margin-top:14px">※Googleの口コミ投稿URLが未設定です。口コミ管理の「依頼URLをコピー」から先にGoogle投稿URLを登録すると、お客さんがそのまま投稿画面まで進めます。</p>'}
-    </div>`);
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>口コミ依頼POP</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans',sans-serif;background:#eef2f5;color:#1a2330;padding:18px}
+    .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+    select,button{font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-family:inherit}
+    button.pri{background:#007cba;color:#fff;border-color:#007cba;font-weight:700}
+    .pop{background:#fff;margin:0 auto;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.12);text-align:center;padding:34px 26px}
+    .pop.size-tent{width:340px}.pop.size-a5{width:420px}.pop.size-a4{width:520px}
+    .tpl-clean .badge{background:#007cba}.tpl-clean h1{color:#0a2540}
+    .tpl-luxe{background:#0c1424;color:#f3e9d6}.tpl-luxe .badge{background:#c9a86a;color:#1a1207}.tpl-luxe h1{color:#f3e9d6}.tpl-luxe .sub,.tpl-luxe .foot{color:#cbb88f}
+    .tpl-pop .badge{background:#ff7a59}.tpl-pop h1{color:#e8553a}
+    .badge{display:inline-block;color:#fff;font-size:13px;font-weight:700;padding:5px 16px;border-radius:999px;margin-bottom:14px}
+    h1{font-size:26px;line-height:1.4;margin-bottom:6px}
+    .store{font-size:13px;color:#64748b;margin-bottom:18px}
+    .qr{width:230px;height:230px;border-radius:10px;margin:0 auto;display:block}
+    .sub{font-size:13px;color:#475569;margin-top:14px;line-height:1.6}
+    .foot{font-size:12px;color:#94a3b8;margin-top:10px}
+    .warn{color:#c0392b;font-size:12px;margin-top:14px}
+    @media print{ body{background:#fff;padding:0} .bar{display:none} .pop{box-shadow:none;margin:0 auto} }
+  </style></head><body>
+  <div class="bar">
+    <label>テンプレ <select id="tpl" onchange="rp()"><option value="clean">シンプル清潔</option><option value="luxe">高級感</option><option value="pop">やさしいポップ</option></select></label>
+    <label>用紙 <select id="size" onchange="rp()"><option value="tent">卓上POP(90×150)</option><option value="a5">A5縦</option><option value="a4">A4縦</option></select></label>
+    <label>キャッチ <input id="cat" value="30秒でかんたんアンケート" style="font-size:13px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;width:200px" oninput="rp()"></label>
+    <button class="pri" onclick="window.print()">🖨 印刷 / PDF保存</button>
+    <button onclick="navigator.clipboard.writeText('${url}');this.textContent='コピー済'">リンクをコピー</button>
+  </div>
+  <div id="pop"></div>
+  <script>
+    var STORE=${JSON.stringify(store)}, QR=${JSON.stringify(qr)}, NOG=${noGoogle ? 'true' : 'false'};
+    function rp(){
+      var tpl=document.getElementById('tpl').value, size=document.getElementById('size').value, cat=document.getElementById('cat').value;
+      document.getElementById('pop').innerHTML='<div class="pop tpl-'+tpl+' size-'+size+'">'
+        +'<div class="badge">'+cat+'</div>'
+        +'<h1>お客様の声を<br>お聞かせください</h1>'
+        +'<div class="store">'+STORE+'</div>'
+        +'<img class="qr" src="'+QR+'" alt="QR">'
+        +'<div class="sub">スマートフォンのカメラで<br>QRコードを読み取ってください</div>'
+        +'<div class="foot">サービス向上のため、ぜひご意見をお聞かせください。</div>'
+        +(NOG?'<div class="warn">※Google口コミURL未設定。アンケート編集で設定すると投稿画面まで進めます。</div>':'')
+        +'</div>';
+    }
+    rp();
+  <\/script>
+  </body></html>`);
   w.document.close();
+}
+
+// ── アンケート編集 ──
+async function openSurveyEditor() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('surveyEditor');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  if (box.style.display === 'none') return;
+  try {
+    const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    _surveyCache = s;
+    document.getElementById('svTitle').value = s.title || '';
+    document.getElementById('svIntro').value = s.intro || '';
+    document.getElementById('svPoints').value = (s.goodPoints || []).join('、');
+    document.getElementById('svGate').value = s.gateMode || 'branch';
+    document.getElementById('svThreshold').value = String(s.lowThreshold || 4);
+    document.getElementById('svGoogle').value = s.googleUrl || localStorage.getItem('reviewUrl_' + currentLocationId) || '';
+    document.getElementById('svLine').value = s.lineUrl || '';
+    document.getElementById('svLowMsg').value = s.lowMsg || '';
+    document.getElementById('svDone').value = s.completionMsg || '';
+  } catch (e) { showToast('設定の取得に失敗しました', 'error'); }
+}
+
+async function aiSurveyPoints() {
+  if (!currentLocationId) return;
+  showToast('AIで生成中…');
+  try {
+    const r = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'survey_points' }),
+    });
+    const d = await r.json();
+    let arr = [];
+    try { arr = JSON.parse((d.content || '').replace(/```json|```/g, '').trim()); } catch (e) {
+      arr = (d.content || '').split(/[、,\n]/).map(s => s.replace(/^[-・\d.\s"]+|["\s]+$/g, '')).filter(Boolean);
+    }
+    if (arr.length) { document.getElementById('svPoints').value = arr.slice(0, 12).join('、'); showToast('生成しました'); }
+    else showToast('生成できませんでした', 'error');
+  } catch (e) { showToast('生成失敗: ' + e.message, 'error'); }
+}
+
+async function saveSurvey() {
+  if (!currentLocationId) return;
+  const goodPoints = document.getElementById('svPoints').value.split(/[、,\n]/).map(s => s.trim()).filter(Boolean);
+  const body = {
+    title: document.getElementById('svTitle').value.trim(),
+    intro: document.getElementById('svIntro').value.trim(),
+    goodPoints,
+    gateMode: document.getElementById('svGate').value,
+    lowThreshold: parseInt(document.getElementById('svThreshold').value, 10),
+    googleUrl: document.getElementById('svGoogle').value.trim(),
+    lineUrl: document.getElementById('svLine').value.trim(),
+    lowMsg: document.getElementById('svLowMsg').value.trim(),
+    completionMsg: document.getElementById('svDone').value.trim(),
+  };
+  try {
+    const r = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.success) {
+      _surveyCache = d.survey;
+      if (body.googleUrl) localStorage.setItem('reviewUrl_' + currentLocationId, body.googleUrl);
+      showToast('アンケートを保存しました', 'success');
+    } else showToast('保存失敗', 'error');
+  } catch (e) { showToast('保存失敗: ' + e.message, 'error'); }
+}
+
+// ── 低評価フィードバック一覧 ──
+function loadFeedback() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('feedbackBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  if (box.style.display === 'block') renderFeedback();
+}
+
+async function renderFeedback() {
+  const list = document.getElementById('feedbackList');
+  list.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
+  try {
+    const d = await fetch(`/api/admin?action=feedback&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const items = d.feedback || [];
+    if (!items.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">まだフィードバックはありません。</p>'; return; }
+    list.innerHTML = items.map(f => `
+      <div style="padding:10px;border-bottom:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text-sub)">${f.rating ? '★' + f.rating + ' ・ ' : ''}${(f.at || '').slice(0, 10)}${f.contact ? ' ・ 連絡先: ' + escapeHtml(f.contact) : ''}</div>
+        <div style="font-size:13px;margin-top:3px;white-space:pre-wrap">${escapeHtml(f.text || '')}</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="deleteFeedback('${f.id}')">対応済みにする（削除）</button>
+      </div>`).join('');
+  } catch (e) { list.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗</span>`; }
+}
+
+async function deleteFeedback(id) {
+  if (!confirm('このフィードバックを削除しますか？')) return;
+  try {
+    await fetch(`/api/admin?action=feedback&storeId=${encodeURIComponent(currentLocationId)}&id=${id}`, { method: 'DELETE' });
+    renderFeedback();
+    loadKpi();
+  } catch (e) { showToast('削除失敗', 'error'); }
 }
 
 // ─── ダッシュボード：キーワード順位 ───

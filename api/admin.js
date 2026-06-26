@@ -26,37 +26,112 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { action } = req.query;
+  const KPI_ZERO = { scan: 0, rate: 0, survey: 0, ai: 0, click: 0, line: 0, lowfb: 0, rateSum: 0, rateCount: 0 };
 
-  // ── 口コミ獲得KPI 計測（公開エンドポイント・認証不要） ──
-  // review.html（お客さん向けQRページ）から段階ごとにカウントを記録する。
-  // 値: scan(ページ表示) / survey(良かった点選択) / ai(AI生成) / click(Google遷移)
-  // ※ここは管理者cookie不要（お客さんのブラウザから叩くため）。store単位のカウンタのみ。
+  // 既定のアンケート設定（店舗未設定時のフォールバック）
+  const DEFAULT_SURVEY = {
+    title: '本日はありがとうございました',
+    intro: 'よろしければ、ご感想をお聞かせください。30秒で終わります。',
+    completionMsg: '貴重なご意見をいただき、ありがとうございました。',
+    lowMsg: '貴重なご意見をありがとうございます。いただいたお声は改善に活かします。差し支えなければ、もう少し詳しくお聞かせください。',
+    goodPoints: ['スタッフが丁寧', '雰囲気が良い', 'また来たい', '説明が分かりやすい', '清潔感がある', '対応が早い', 'コスパが良い', 'おすすめしたい'],
+    lowThreshold: 4,   // この評価未満は「店内フィードバック」へ分岐（4 = ★1〜3が分岐）
+    gateMode: 'branch', // 'branch'=満足度で分岐 / 'all'=全員Google誘導（コンプライアンス安全）
+    googleUrl: '',
+    lineUrl: '',
+  };
+
+  // ── 口コミ獲得KPI 計測（公開・認証不要） ──
+  // review.html（お客さん向けQRページ）から段階ごとにカウント。store単位のカウンタのみ。
   if (action === 'kpi-track' && req.method === 'POST') {
-    const { storeId, event } = req.body || {};
-    const valid = ['scan', 'survey', 'ai', 'click'];
+    const { storeId, event, value } = req.body || {};
+    const valid = ['scan', 'rate', 'survey', 'ai', 'click', 'line', 'lowfb'];
     if (!storeId || !valid.includes(event)) return res.status(400).json({ error: 'storeId・event必須' });
     const ym = new Date().toISOString().slice(0, 7);
     const key = `kpi_${storeId}_${ym}`;
-    const cur = await kvGet(key) || { scan: 0, survey: 0, ai: 0, click: 0 };
+    const cur = { ...KPI_ZERO, ...(await kvGet(key) || {}) };
     cur[event] = (cur[event] || 0) + 1;
+    // rate（満足度）は平均算出のため合計と件数も貯める
+    if (event === 'rate') {
+      const v = parseInt(value, 10);
+      if (v >= 1 && v <= 5) { cur.rateSum = (cur.rateSum || 0) + v; cur.rateCount = (cur.rateCount || 0) + 1; }
+    }
     await kvSet(key, cur);
+    return res.json({ success: true });
+  }
+
+  // ── アンケート設定 取得（公開・review.htmlがお客さんのブラウザから読む） ──
+  if (action === 'survey-public' && req.method === 'GET') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const s = await kvGet(`survey_${storeId}`);
+    return res.json({ ...DEFAULT_SURVEY, ...(s || {}) });
+  }
+
+  // ── 低評価の店内フィードバック 受け取り（公開・Googleには出さず店舗だけが見る） ──
+  if (action === 'feedback-submit' && req.method === 'POST') {
+    const { storeId, rating, text, contact } = req.body || {};
+    if (!storeId || !text) return res.status(400).json({ error: 'storeId・text必須' });
+    const key = `feedback_${storeId}`;
+    const list = await kvGet(key) || [];
+    list.unshift({
+      id: 'f' + Date.now().toString(36),
+      rating: parseInt(rating, 10) || null,
+      text: String(text).slice(0, 1000),
+      contact: String(contact || '').slice(0, 200),
+      at: new Date().toISOString(),
+    });
+    if (list.length > 300) list.length = 300;
+    await kvSet(key, list);
     return res.json({ success: true });
   }
 
   const { access_token } = parseCookies(req);
   if (!access_token) return res.status(401).json({ error: '管理者ログインが必要です' });
 
-  // ── 口コミ獲得KPI 取得（管理側・当月＋前月）──
+  // ── 口コミ獲得KPI 取得（管理側・当月＋前月＋平均満足度）──
   if (action === 'kpi' && req.method === 'GET') {
     const { storeId } = req.query;
     if (!storeId) return res.status(400).json({ error: 'storeId必須' });
     const now = new Date();
     const ym = now.toISOString().slice(0, 7);
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
-    const zero = { scan: 0, survey: 0, ai: 0, click: 0 };
-    const cur = await kvGet(`kpi_${storeId}_${ym}`) || zero;
-    const last = await kvGet(`kpi_${storeId}_${prev}`) || zero;
-    return res.json({ month: ym, current: cur, previous: last });
+    const cur = { ...KPI_ZERO, ...(await kvGet(`kpi_${storeId}_${ym}`) || {}) };
+    const last = { ...KPI_ZERO, ...(await kvGet(`kpi_${storeId}_${prev}`) || {}) };
+    const avg = (o) => (o.rateCount > 0 ? Math.round((o.rateSum / o.rateCount) * 10) / 10 : null);
+    return res.json({ month: ym, current: cur, previous: last, avgSatisfaction: avg(cur), avgSatisfactionPrev: avg(last) });
+  }
+
+  // ── アンケート設定 取得/保存（管理側）──
+  if (action === 'survey') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `survey_${storeId}`;
+    if (req.method === 'GET') return res.json({ ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) });
+    if (req.method === 'POST') {
+      const cur = { ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) };
+      const b = req.body || {};
+      const next = { ...cur };
+      ['title', 'intro', 'completionMsg', 'lowMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
+      if (Array.isArray(b.goodPoints)) next.goodPoints = b.goodPoints.map(s => String(s).slice(0, 30)).filter(Boolean).slice(0, 16);
+      if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));
+      await kvSet(key, next);
+      return res.json({ success: true, survey: next });
+    }
+  }
+
+  // ── 低評価フィードバック 一覧/削除（管理側）──
+  if (action === 'feedback') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `feedback_${storeId}`;
+    if (req.method === 'GET') return res.json({ feedback: await kvGet(key) || [] });
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(f => f.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, feedback: list });
+    }
   }
 
   // ── 店舗一覧（GBP連携状況付き）──
