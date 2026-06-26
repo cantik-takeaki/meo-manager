@@ -2739,7 +2739,7 @@ async function loadPostComments() {
       const cms = data.data || [];
       if (!cms.length) {
         const note = cnt > 0
-          ? `この投稿には${cnt}件のコメントがありますが、APIに表示されていません。<br>多くの場合、<b>Instagramの自動フィルター（不適切なコメント/Hidden Words）が非表示にしている</b>のが原因です（新規・フォロー外アカウントからのコメントが対象になりやすい）。<br>対処：Instagramアプリで該当投稿のコメント欄から<b>「非表示のコメントを表示」</b>→該当コメントを表示に戻す、または 設定→他の人があなたに interact できる方法→<b>不適切なコメント/Hidden Words をオフ</b>。<br>※投稿直後は数分の反映遅延のこともあります。`
+          ? `この投稿のコメント数は${cnt}件ですが、Instagram APIの一覧には出てきません。<br>これは権限の問題ではなく（インサイト等は正常に動いています）、<b>Instagramが特定のコメントをAPI一覧から除外する仕様</b>によるものです。主な原因：<br>① コメントした人の<b>アカウントが非公開（鍵付き）</b>→ 非公開アカウントのコメントはAPIに出ません<br>② そのコメントが<b>削除された親コメントへの返信</b><br><b>確認方法：</b>公開アカウント（または自店アカウント）からこの投稿に新しくコメントして「更新」→ 表示されれば連携は正常です。`
           : 'コメントはまだありません。';
         commentsHtml = `<div style="padding:10px;font-size:12px;color:var(--text-sub);line-height:1.7">${note}<br><button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="loadPostComments()">更新</button></div>`;
       } else {
