@@ -1724,8 +1724,25 @@ function downloadLeadsCsv() {
   window.open(`/api/admin?action=leads&storeId=${encodeURIComponent(currentLocationId)}&format=csv`, '_blank');
 }
 
-// ─── ダッシュボード：キーワード順位 ───
+// ─── ダッシュボード：キーワード順位（推移グラフ・増減・伸び落ち） ───
 let _dashRankings = [];
+// 順位の推移スパークライン（低いほど上＝良い順位を上に描く）
+function rankSparkline(series) {
+  const pts = series.map((v, i) => ({ i, v })).filter(p => p.v != null && p.v > 0);
+  if (pts.length < 2) return '<span style="font-size:11px;color:var(--text-sub)">—</span>';
+  const W = 120, H = 28, pad = 3;
+  const maxRank = Math.max(10, ...pts.map(p => p.v));
+  const n = series.length - 1 || 1;
+  const x = (i) => pad + (i / n) * (W - pad * 2);
+  const y = (v) => pad + ((v - 1) / (maxRank - 1 || 1)) * (H - pad * 2); // rank1→上
+  const d = pts.map((p, k) => `${k === 0 ? 'M' : 'L'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const last = pts[pts.length - 1];
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="vertical-align:middle">
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(last.i).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="2.5" fill="var(--accent)"/>
+  </svg>`;
+}
+
 async function loadDashboardRankings() {
   const card = document.getElementById('rankDashCard');
   _dashRankings = [];
@@ -1734,15 +1751,43 @@ async function loadDashboardRankings() {
   try {
     const data = await fetch(`/api/admin?action=rankings&storeId=${sid}`).then(r => r.json());
     const keywords = (data.keywords || []).filter(k => k && !k.startsWith('キーワード'));
-    const latest = data.history?.[data.history.length - 1];
+    const history = data.history || [];
+    const latest = history[history.length - 1];
+    const prev = history[history.length - 2];
     if (!keywords.length || !latest) { if (card) card.style.display = 'none'; return; }
-    _dashRankings = keywords.map((kw, i) => ({ keyword: kw, rank: latest.rankings?.[i] || null }));
+    _dashRankings = keywords.map((kw, i) => {
+      const series = history.map(h => h.rankings?.[i] ?? null);
+      const rank = latest.rankings?.[i] ?? null;
+      const prevRank = prev ? (prev.rankings?.[i] ?? null) : null;
+      // delta>0=改善（順位が小さくなった）
+      const delta = (rank != null && prevRank != null) ? prevRank - rank : null;
+      return { keyword: kw, rank, prevRank, delta, series };
+    });
     document.getElementById('rankDashDate').textContent = latest.date || '';
-    document.getElementById('rankDashList').innerHTML = _dashRankings.map(r => {
+
+    // 伸び/落ちハイライト
+    const moved = _dashRankings.filter(r => r.delta != null && r.delta !== 0);
+    let highlight = '';
+    if (moved.length) {
+      const up = moved.filter(r => r.delta > 0).sort((a, b) => b.delta - a.delta)[0];
+      const down = moved.filter(r => r.delta < 0).sort((a, b) => a.delta - b.delta)[0];
+      highlight = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">'
+        + (up ? `<div style="flex:1;min-width:140px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:8px 12px"><div style="font-size:11px;color:var(--text-sub)">📈 最も伸びた</div><div style="font-size:13px;font-weight:700">${escapeHtml(up.keyword)} <span style="color:var(--green)">▲${up.delta}</span></div></div>` : '')
+        + (down ? `<div style="flex:1;min-width:140px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:8px 12px"><div style="font-size:11px;color:var(--text-sub)">📉 要注意</div><div style="font-size:13px;font-weight:700">${escapeHtml(down.keyword)} <span style="color:var(--red)">▼${-down.delta}</span></div></div>` : '')
+        + '</div>';
+    }
+
+    document.getElementById('rankDashList').innerHTML = highlight + _dashRankings.map(r => {
       const color = r.rank && r.rank <= 3 ? 'var(--green)' : r.rank && r.rank <= 10 ? 'var(--gold)' : 'var(--text-sub)';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <span>${escapeHtml(r.keyword)}</span>
-        <b style="color:${color};font-size:15px">${r.rank ? r.rank + '位' : '圏外'}</b></div>`;
+      const badge = r.delta == null ? '' : r.delta > 0
+        ? `<span style="color:var(--green);font-size:12px;font-weight:700">▲${r.delta}</span>`
+        : r.delta < 0 ? `<span style="color:var(--red);font-size:12px;font-weight:700">▼${-r.delta}</span>`
+        : `<span style="color:var(--text-sub);font-size:12px">→</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="flex:1;min-width:0">${escapeHtml(r.keyword)}</span>
+        <span style="flex-shrink:0">${rankSparkline(r.series)}</span>
+        <span style="width:42px;text-align:right;flex-shrink:0">${badge}</span>
+        <b style="color:${color};font-size:15px;width:48px;text-align:right;flex-shrink:0">${r.rank ? r.rank + '位' : '圏外'}</b></div>`;
     }).join('');
     card.style.display = 'block';
   } catch (e) { if (card) card.style.display = 'none'; }
