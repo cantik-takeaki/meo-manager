@@ -441,6 +441,20 @@ body {
         </div>
       </div>
 
+      <div class="card" id="kpiCard" style="display:none">
+        <div class="card-header"><div class="card-title">📈 口コミ獲得KPI（今月）</div>
+          <button class="btn btn-outline btn-sm" onclick="loadKpi()">更新</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">口コミ依頼ページ（QR/リンク）経由の獲得導線を計測します。お客さんがページを開く→良かった点を選ぶ→AIで下書き→Googleへ、の各段階の数。</p>
+        <div id="kpiBody" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="openReviewQr()">📱 口コミ依頼QR・リンクを表示</button>
+          <span style="font-size:11px;color:var(--text-sub)">このQRを店頭やレシートに。読み取った人数がスキャン数になります。</span>
+        </div>
+      </div>
+
       <div class="card" id="competitorCard">
         <div class="card-header"><div class="card-title">🥊 競合分析</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
@@ -1355,12 +1369,67 @@ function selectLocation(idx) {
   loadAio();
   loadInsights();
   loadMedia();
+  loadKpi();
   _postImages = [];
   loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
   gbpCheck();
   loadActionLog();
   const ac = document.getElementById('assistantCard'); if (ac) { ac.style.display = 'block'; document.getElementById('askAnswer').textContent = ''; }
+}
+
+// ─── 口コミ獲得KPI ───
+async function loadKpi() {
+  const card = document.getElementById('kpiCard');
+  const body = document.getElementById('kpiBody');
+  if (!card || !body) return;
+  const sid = currentLocationId;
+  if (!sid) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
+  const stat = (label, val, prev) => {
+    const diff = (prev != null && val != null) ? val - prev : null;
+    const dtxt = diff == null ? '' : (diff > 0 ? `<span style="color:var(--green,#10b981);font-size:11px"> ▲${diff}</span>` : diff < 0 ? `<span style="color:var(--red);font-size:11px"> ▼${-diff}</span>` : '<span style="color:var(--text-sub);font-size:11px"> →</span>');
+    return `<div style="text-align:center;min-width:96px"><div style="font-size:24px;font-weight:700;color:var(--accent)">${val == null ? '—' : Number(val).toLocaleString()}${dtxt}</div><div style="font-size:12px;color:var(--text-sub)">${label}</div></div>`;
+  };
+  try {
+    const d = await fetch(`/api/admin?action=kpi&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
+    if (currentLocationId !== sid) return;
+    const c = d.current || {}, p = d.previous || {};
+    // 転換率: クリック / スキャン
+    const cvr = (c.scan > 0) ? Math.round((c.click / c.scan) * 100) : null;
+    body.innerHTML =
+        stat('スキャン数', c.scan, p.scan)
+      + stat('アンケート回答', c.survey, p.survey)
+      + stat('AI生成数', c.ai, p.ai)
+      + stat('Googleクリック', c.click, p.click)
+      + `<div style="min-width:120px;text-align:center"><div style="font-size:24px;font-weight:700;color:var(--gold,#f59e0b)">${cvr == null ? '—' : cvr + '%'}</div><div style="font-size:12px;color:var(--text-sub)">遷移率(クリック/スキャン)</div></div>`
+      + `<div style="flex:1;min-width:150px;font-size:11px;color:var(--text-sub);line-height:1.6">▲▼は前月比。数値は口コミ依頼ページ経由の実測です（QR/リンクを配って計測）。</div>`;
+  } catch (e) {
+    body.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗: ${e.message}</span>`;
+  }
+}
+
+// 口コミ依頼ページのQR・リンクを表示（既存のreviewUrl_保存値を流用）
+function openReviewQr() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const g = localStorage.getItem('reviewUrl_' + currentLocationId) || '';
+  const base = location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
+    + '&name=' + encodeURIComponent(currentLocation?.title || '当店')
+    + (g ? '&g=' + encodeURIComponent(g) : '');
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(base);
+  const w = window.open('', '_blank', 'width=420,height=620');
+  if (!w) return showToast('ポップアップを許可してください', 'error');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>口コミ依頼QR</title>
+    <div style="font-family:sans-serif;text-align:center;padding:24px">
+      <h2 style="font-size:18px">${(currentLocation?.title || '当店')} 口コミ依頼</h2>
+      <img src="${qr}" alt="QR" style="width:240px;height:240px;border:1px solid #eee;border-radius:8px">
+      <p style="font-size:12px;color:#666;word-break:break-all;margin:12px 0">${base}</p>
+      <button onclick="navigator.clipboard.writeText('${base}')" style="padding:8px 16px;border:1px solid #4f7df3;background:#4f7df3;color:#fff;border-radius:6px;cursor:pointer">リンクをコピー</button>
+      <button onclick="window.print()" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;margin-left:6px">印刷</button>
+      ${g ? '' : '<p style="font-size:11px;color:#c0392b;margin-top:14px">※Googleの口コミ投稿URLが未設定です。口コミ管理の「依頼URLをコピー」から先にGoogle投稿URLを登録すると、お客さんがそのまま投稿画面まで進めます。</p>'}
+    </div>`);
+  w.document.close();
 }
 
 // ─── ダッシュボード：キーワード順位 ───

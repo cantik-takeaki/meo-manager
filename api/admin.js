@@ -25,10 +25,39 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const { action } = req.query;
+
+  // ── 口コミ獲得KPI 計測（公開エンドポイント・認証不要） ──
+  // review.html（お客さん向けQRページ）から段階ごとにカウントを記録する。
+  // 値: scan(ページ表示) / survey(良かった点選択) / ai(AI生成) / click(Google遷移)
+  // ※ここは管理者cookie不要（お客さんのブラウザから叩くため）。store単位のカウンタのみ。
+  if (action === 'kpi-track' && req.method === 'POST') {
+    const { storeId, event } = req.body || {};
+    const valid = ['scan', 'survey', 'ai', 'click'];
+    if (!storeId || !valid.includes(event)) return res.status(400).json({ error: 'storeId・event必須' });
+    const ym = new Date().toISOString().slice(0, 7);
+    const key = `kpi_${storeId}_${ym}`;
+    const cur = await kvGet(key) || { scan: 0, survey: 0, ai: 0, click: 0 };
+    cur[event] = (cur[event] || 0) + 1;
+    await kvSet(key, cur);
+    return res.json({ success: true });
+  }
+
   const { access_token } = parseCookies(req);
   if (!access_token) return res.status(401).json({ error: '管理者ログインが必要です' });
 
-  const { action } = req.query;
+  // ── 口コミ獲得KPI 取得（管理側・当月＋前月）──
+  if (action === 'kpi' && req.method === 'GET') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+    const zero = { scan: 0, survey: 0, ai: 0, click: 0 };
+    const cur = await kvGet(`kpi_${storeId}_${ym}`) || zero;
+    const last = await kvGet(`kpi_${storeId}_${prev}`) || zero;
+    return res.json({ month: ym, current: cur, previous: last });
+  }
 
   // ── 店舗一覧（GBP連携状況付き）──
   if (req.method === 'GET' && !action) {

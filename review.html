@@ -94,6 +94,16 @@ const PLACE_URL = params.get('g') || ''; // Googleの口コミ投稿URL（任意
 
 document.getElementById('storeName').textContent = STORE_NAME;
 
+// 口コミ獲得KPI 計測（お客さんの操作段階ごとにカウント）
+function kpiTrack(ev){
+  if(!STORE_ID) return;
+  try { fetch('/api/admin?action=kpi-track', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ storeId: STORE_ID, event: ev }), keepalive:true
+  }).catch(()=>{}); } catch(e){}
+}
+kpiTrack('scan'); // QR/リンクでこのページが開かれた＝スキャン1
+
 // 良かった点の候補（業種に依存しない汎用）
 const PRESETS = ['スタッフが丁寧','雰囲気が良い','また来たい','説明が分かりやすい','清潔感がある','対応が早い','コスパが良い','おすすめしたい','満足できた','相談しやすい'];
 const selected = new Set();
@@ -112,7 +122,9 @@ function updateGenBtn(){ document.getElementById('genBtn').disabled = words().le
 document.getElementById('genBtn').onclick = generate;
 document.getElementById('regenBtn').onclick = generate;
 
+let _surveyTracked = false;
 async function generate(){
+  if(!_surveyTracked){ kpiTrack('survey'); _surveyTracked = true; } // 良かった点を選んで生成へ進んだ＝アンケート回答1
   document.getElementById('step1').classList.add('hidden');
   document.getElementById('step2').classList.remove('hidden');
   document.getElementById('draftArea').style.display = 'none';
@@ -128,6 +140,7 @@ async function generate(){
     document.getElementById('genLoading').classList.add('hidden');
     document.getElementById('draftArea').style.display = '';
     document.getElementById('draftText').value = data.content || '（生成できませんでした。もう一度お試しください）';
+    if (data.content) kpiTrack('ai'); // AI生成成功＝AI生成1
   } catch(e){
     document.getElementById('genLoading').classList.add('hidden');
     document.getElementById('draftArea').style.display = '';
@@ -147,6 +160,7 @@ document.getElementById('copyBtn').onclick = async () => {
 };
 
 document.getElementById('openGoogle').onclick = () => {
+  kpiTrack('click'); // Googleの口コミ投稿画面へ遷移＝Googleクリック1
   const url = PLACE_URL || `https://search.google.com/local/writereview?placeid=`;
   window.open(url, '_blank');
 };
