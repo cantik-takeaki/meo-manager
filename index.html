@@ -1724,6 +1724,29 @@ function downloadLeadsCsv() {
   window.open(`/api/admin?action=leads&storeId=${encodeURIComponent(currentLocationId)}&format=csv`, '_blank');
 }
 
+// キーワードの検索意図を分類（今すぐ客A / 悩み・目的B / 差別化C）
+// A=今すぐ客: 具体的な地域(丁目/駅/区+町)＋業種で来店直前の検索。B=悩み・目的: 広め地域や課題語。C=差別化: 店名/ブランド指名。
+function kwIntent(kw, brand) {
+  const k = String(kw || '');
+  const b = String(brand || '').replace(/(株式会社|有限会社|店|\s)/g, '');
+  // 店名・ブランドを含む → 差別化(C)
+  if (b && b.length >= 2 && k.replace(/\s/g, '').includes(b.slice(0, Math.min(6, b.length)))) return { code: 'C', label: '差別化', c: '#8b5cf6' };
+  // 具体地域トークン（丁目・駅・区+町名・番地）＋語 → 今すぐ客(A)
+  const specific = /\d丁目|[一-龠]{1,4}駅|区[一-龠]{2,}町|[一-龠]{2,}町\b|\d{1,4}-\d/.test(k);
+  // ニーズ/課題語 → 悩み・目的(B)
+  const need = /(安い|近く|人気|おすすめ|口コミ|評判|営業時間|予約|個室|駐車場|クーポン|ランチ|ディナー|持ち帰り|デリバリー|当日|即日|夜間|土日|24時間|痛くない|効果|料金|相場|比較|どこ|方法|対策)/.test(k);
+  const wordCount = k.trim().split(/\s+/).filter(Boolean).length;
+  if (specific && wordCount >= 2) return { code: 'A', label: '今すぐ客', c: '#10b981' };
+  if (need) return { code: 'B', label: '悩み・目的', c: '#f59e0b' };
+  // 地域＋業種の2語以上は今すぐ客寄り、単語なら悩み目的
+  if (wordCount >= 2) return { code: 'A', label: '今すぐ客', c: '#10b981' };
+  return { code: 'B', label: '悩み・目的', c: '#f59e0b' };
+}
+function kwIntentTag(kw, brand) {
+  const it = kwIntent(kw, brand);
+  return `<span title="検索意図：${it.label}" style="display:inline-block;font-size:10px;font-weight:800;color:#fff;background:${it.c};border-radius:4px;padding:1px 6px;line-height:1.5">${it.code} ${it.label}</span>`;
+}
+
 // ─── ダッシュボード：キーワード順位（推移グラフ・増減・伸び落ち） ───
 let _dashRankings = [];
 // 順位の推移スパークライン（低いほど上＝良い順位を上に描く）
@@ -1784,7 +1807,7 @@ async function loadDashboardRankings() {
         : r.delta < 0 ? `<span style="color:var(--red);font-size:12px;font-weight:700">▼${-r.delta}</span>`
         : `<span style="color:var(--text-sub);font-size:12px">→</span>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <span style="flex:1;min-width:0">${escapeHtml(r.keyword)}</span>
+        <span style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${kwIntentTag(r.keyword, currentLocation?.title)}<span>${escapeHtml(r.keyword)}</span></span>
         <span style="flex-shrink:0">${rankSparkline(r.series)}</span>
         <span style="width:42px;text-align:right;flex-shrink:0">${badge}</span>
         <b style="color:${color};font-size:15px;width:48px;text-align:right;flex-shrink:0">${r.rank ? r.rank + '位' : '圏外'}</b></div>`;
@@ -3924,8 +3947,10 @@ async function loadKnowledge() {
 
 // ─── キーワード（可変リスト） ───
 function _kwRowHtml(kw) {
+  const tag = kw ? kwIntentTag(kw, currentLocation?.title) : '';
   return `<div class="kn-kwrow" style="display:flex;gap:8px;align-items:center">
-    <input type="text" class="kn-kw" value="${String(kw || '').replace(/"/g, '&quot;')}" placeholder="例：相模原 美容室 ／ 相模原 縮毛矯正 得意" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+    <span class="kn-kwtag" style="flex-shrink:0;min-width:78px">${tag}</span>
+    <input type="text" class="kn-kw" value="${String(kw || '').replace(/"/g, '&quot;')}" placeholder="例：相模原 美容室 ／ 相模原 縮毛矯正 得意" oninput="const t=this.closest('.kn-kwrow').querySelector('.kn-kwtag'); t.innerHTML=this.value.trim()?kwIntentTag(this.value.trim(), currentLocation&&currentLocation.title):'';" style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
     <button type="button" class="link-btn" style="color:var(--red);font-size:18px;line-height:1" title="削除" onclick="this.closest('.kn-kwrow').remove()">×</button>
   </div>`;
 }
