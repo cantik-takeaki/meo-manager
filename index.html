@@ -447,7 +447,7 @@ body {
         </div>
       </div>
       <div class="side-user-actions">
-        <button onclick="openChangePw()">パスワード変更</button>
+        <button id="changePwBtn" onclick="openChangePw()" style="display:none">パスワード変更</button>
         <a href="/api/auth/logout">ログアウト</a>
       </div>
     </div>
@@ -1513,6 +1513,9 @@ async function init() {
     if (ini) ini.textContent = (dispName.trim()[0] || 'C').toUpperCase();
     if (user.picture) { const p = document.getElementById('userPic'); p.src = user.picture; p.style.display = 'block'; if (ini) ini.style.display = 'none'; }
     window._authEmail = user.email || '';
+    // パスワード変更ボタンはenv管理でない（サイトで登録した）アカウントのみ表示
+    const cpb = document.getElementById('changePwBtn');
+    if (cpb) cpb.style.display = (user.method === 'password' && !user.envManaged) ? '' : 'none';
     renderGbpConnectState(user);
 
     // Google連携の戻り通知

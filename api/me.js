@@ -21,12 +21,14 @@ const sessionToken = (cred) => crypto.createHash('sha256').update('sess|' + cred
 const codeKey = (email) => 'login_code_' + String(email).toLowerCase();
 
 async function getCred() {
-  // KVに登録があれば最優先（パスワード変更を永続化するため）。無ければ環境変数のブートストラップ資格情報。
-  try { const kv = await kvGet(ADMIN_KEY); if (kv && kv.user && kv.hash) return kv; } catch (e) {}
+  // 環境変数(ADMIN_USER/ADMIN_PASS)を最優先。社長が設定した正規資格情報で必ずログインできるようにする。
+  // （過去のテストで残った古いKVレコードに上書きされてログイン不能になる事故を防ぐ）
   if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
     const salt = 'env';
     return { user: String(process.env.ADMIN_USER).toLowerCase(), salt, hash: hashPw(process.env.ADMIN_PASS, salt), name: process.env.ADMIN_NAME || '管理者', _env: true };
   }
+  // envが無い場合のみKV（サイト内で初回セットアップした場合）。
+  try { const kv = await kvGet(ADMIN_KEY); if (kv && kv.user && kv.hash) return kv; } catch (e) {}
   return null;
 }
 
@@ -81,6 +83,8 @@ export default async function handler(req, res) {
     if (action === 'changepw') {
       if (!cred) return res.status(400).json({ error: '未登録です' });
       if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
+      // env管理アカウントはUIから変更不可（変更してもenvが優先され混乱するため明示的にブロック）
+      if (cred._env) return res.status(400).json({ error: '管理者パスワードは環境変数(ADMIN_PASS)で管理されています。変更するにはVercelの環境変数を更新してください。' });
       if (hashPw(String(pass || ''), cred.salt) !== cred.hash) return res.status(401).json({ error: '現在のパスワードが違います' });
       if (String(newPass || '').length < 6) return res.status(400).json({ error: '新しいパスワードは6文字以上にしてください' });
       const salt = crypto.randomBytes(8).toString('hex');
@@ -132,7 +136,7 @@ export default async function handler(req, res) {
   const cred = await getCred();
   if (cred && c.pw_session && c.pw_session === sessionToken(cred)) {
     const gbp = await getMasterInfo();
-    return res.json({ loggedIn: true, method: 'password', name: cred.name || c.user_name || '管理者', gbpConnected: gbp.connected, gbpEmail: gbp.email });
+    return res.json({ loggedIn: true, method: 'password', name: cred.name || c.user_name || '管理者', envManaged: !!cred._env, gbpConnected: gbp.connected, gbpEmail: gbp.email });
   }
   return res.status(401).json({ loggedIn: false, needsSetup: !cred });
 }
