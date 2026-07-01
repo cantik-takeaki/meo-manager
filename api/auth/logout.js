@@ -7,6 +7,7 @@ export default function handler(req, res) {
     `user_email=; ${clear}`,
     `user_name=; ${clear}`,
     `user_picture=; ${clear}`,
+    `pw_session=; ${clear}`,
   ]);
   res.redirect('/');
 }
