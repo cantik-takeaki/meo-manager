@@ -114,7 +114,7 @@ export default async function handler(req, res) {
 
     // 管理者が選抜した「管理対象」集合（無ければ空＝まだ何も登録していない）
     const managedList = await kvGet('managed_locations') || [];
-    const managedSet = new Set(managedList.map(m => m.locId));
+    const managedMap = new Map(managedList.map(m => [m.locId, m]));
 
     // 各アカウント（≒クライアント企業）の店舗を取得。
     // accountName(表示名)をクライアント名として付与し、GBP内の重複はlocationIDで排除。
@@ -135,13 +135,15 @@ export default async function handler(req, res) {
           const locId = String(l.name || '').match(/locations\/[^/]+/)?.[0] || l.name;
           if (locId && seen.has(locId)) continue; // 同一ロケーションIDの重複を排除
           if (locId) seen.add(locId);
+          const mrec = managedMap.get(locId);
           locations.push({
             ...l,
             accountName: account.name,
             clientName,
             locId,                                   // locations/xxx（管理対象の識別子）
             locationName: `${account.name}/${l.name}`, // 口コミ等v4 API用の完全参照
-            managed: managedSet.has(locId),          // 管理者が管理対象に選抜済みか
+            managed: !!mrec,                         // 管理者が管理対象に選抜済みか
+            company: mrec?.company || '',            // クライアント分け用の会社名（管理対象のみ）
           });
         }
       }

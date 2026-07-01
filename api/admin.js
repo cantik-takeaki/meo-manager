@@ -125,14 +125,17 @@ export default async function handler(req, res) {
       const locId = location && (location.locId || String(location.name || '').match(/locations\/[^/]+/)?.[0]);
       if (!locId) return res.status(400).json({ error: 'locId必須' });
       let list = await kvGet('managed_locations') || [];
+      const prev = list.find(m => m.locId === locId);
       list = list.filter(m => m.locId !== locId);
       if (on) list.push({
         locId,
-        locationName: location.locationName || '',
-        title: location.title || '',
-        clientName: location.clientName || '',
-        address: location.address || '',
-        addedAt: new Date().toISOString(),
+        locationName: location.locationName || (prev && prev.locationName) || '',
+        title: location.title || (prev && prev.title) || '',
+        clientName: location.clientName || (prev && prev.clientName) || '',
+        // 会社名（クライアント分け用）。未指定なら既存値→店舗名の順でフォールバック。
+        company: (location.company !== undefined ? String(location.company) : (prev && prev.company)) || location.title || (prev && prev.title) || '',
+        address: location.address || (prev && prev.address) || '',
+        addedAt: (prev && prev.addedAt) || new Date().toISOString(),
       });
       await kvSet('managed_locations', list);
       return res.json({ success: true, managed: list });

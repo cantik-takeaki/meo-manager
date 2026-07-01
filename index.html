@@ -716,8 +716,9 @@ body {
         <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
         <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
         <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
+        <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()">📤 生成した返信を一括投稿</button>
       </div>
-      <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。一括生成はドラフトのみ作成し、投稿は1件ずつ承認のうえ行います。</p>
+      <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。まず「返信生成」でドラフトを作り、内容を確認してから「一括投稿」でまとめてGoogleに反映できます（1件ずつ投稿も可）。</p>
 
       <div class="card" style="border-color:rgba(79,125,243,0.25)">
         <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
@@ -1582,11 +1583,19 @@ function renderGbpPicker() {
     ${locs.map(l => {
       const addr = fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || l.locId;
       return `
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid ${l.managed ? 'var(--accent)' : 'var(--border)'};border-radius:9px;margin-bottom:8px;background:${l.managed ? 'rgba(46,143,240,0.06)' : 'var(--bg-2)'}">
-        <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid ${l.managed ? 'var(--accent)' : 'var(--border)'};border-radius:9px;margin-bottom:8px;background:${l.managed ? 'rgba(46,143,240,0.06)' : 'var(--bg-2)'};flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
           <div style="font-weight:600;font-size:13px">${escapeHtml(l.title || '—')}${l.managed ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">● 管理中</span>' : ''}</div>
           <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(addr)}</div>
         </div>
+        ${l.managed ? `
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:var(--text-sub)">会社名</label>
+          <input type="text" value="${escapeHtml(l.company || l.title || '')}" placeholder="クライアント会社名"
+            style="width:150px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:7px;font-size:12px;font-family:inherit"
+            onchange="saveManagedCompany('${l.locId}', this.value)"
+            onclick="event.stopPropagation()">
+        </div>` : ''}
         <button class="btn btn-sm ${l.managed ? 'btn-outline' : 'btn-primary'}" style="white-space:nowrap"
           onclick="toggleManaged('${l.locId}', ${!l.managed}, this)">${l.managed ? '管理対象から外す' : '＋ 管理対象に追加'}</button>
       </div>`;
@@ -1594,7 +1603,7 @@ function renderGbpPicker() {
   `).join('');
 }
 
-async function toggleManaged(locId, on, btn) {
+async function toggleManaged(locId, on, btn, company) {
   const loc = (window._allGbp || []).find(l => l.locId === locId);
   if (!loc) return;
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
@@ -1608,6 +1617,7 @@ async function toggleManaged(locId, on, btn) {
           locationName: loc.locationName || '',
           title: loc.title || '',
           clientName: loc.clientName || '',
+          company: company !== undefined ? company : (loc.company || loc.title || ''), // 会社名（未指定は店舗名で初期化）
           address: fullGbpAddress(loc.storefrontAddress) || formatAddress(loc.storefrontAddress) || '',
         },
       }),
@@ -1620,6 +1630,32 @@ async function toggleManaged(locId, on, btn) {
     showToast('通信エラー: ' + e.message, 'error');
     if (btn) btn.disabled = false;
   }
+}
+
+// 管理対象店舗の「会社名」を保存（クライアント分けに反映）
+async function saveManagedCompany(locId, company) {
+  const loc = (window._allGbp || []).find(l => l.locId === locId);
+  if (!loc) return;
+  try {
+    const res = await fetch('/api/admin?action=managed', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        on: true,
+        location: {
+          locId,
+          locationName: loc.locationName || '',
+          title: loc.title || '',
+          clientName: loc.clientName || '',
+          company: String(company || '').trim() || loc.title || '',
+          address: fullGbpAddress(loc.storefrontAddress) || formatAddress(loc.storefrontAddress) || '',
+        },
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '会社名の保存に失敗しました', 'error');
+    showToast('会社名を保存しました', 'success');
+    await loadLocations(); // クライアント分けを再描画
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 async function loadLocations() {
@@ -1673,11 +1709,12 @@ async function loadLocations() {
     });
     window._locations = locations;
 
-    // ── クライアント（GBPアカウント＝企業）＞店舗 でグルーピング ──
+    // ── クライアント（会社名）＞店舗 でグルーピング ──
+    // 管理対象は会社名(company)で分ける。未設定はGBPアカウント名→未分類の順でフォールバック。
     const clientMap = new Map();
     locations.forEach((loc, idx) => {
       loc._idx = idx;
-      const cn = loc.clientName || '未分類';
+      const cn = loc.company || loc.clientName || '未分類';
       if (!clientMap.has(cn)) clientMap.set(cn, []);
       clientMap.get(cn).push(loc);
     });
@@ -3509,11 +3546,11 @@ async function generateReply(i) {
         reviewerName: review.reviewer?.displayName,
         reviewDate: review.createTime || '',
         tone: document.getElementById(`tone-${i}`)?.value || 'polite',
-        // このお店が過去にした返信を文体の見本として渡す（雰囲気を合わせる）
+        // このお店が過去にした返信を文体の見本として渡す（雰囲気・句読点を合わせる）
         pastReplies: allReviews
           .filter(r => r.reviewReply?.comment && r.name !== review.name)
           .map(r => r.reviewReply.comment)
-          .slice(0, 5),
+          .slice(0, 8),
       }),
     });
     const data = await res.json();
@@ -3551,6 +3588,45 @@ async function generateAllUnrepliedReplies() {
   }
   if (btn) { btn.disabled = false; btn.textContent = '✨ 未返信すべてに返信生成'; }
   showToast(`${done}件の返信ドラフトを生成しました。内容を確認して投稿してください`, 'success');
+}
+
+// 生成済み（＝テキストが入っている未返信）の返信を、まとめてGoogleに投稿する
+async function postAllDraftedReplies() {
+  if (!currentLocation || !currentLocation.name) return showToast('先に店舗を選択してください', 'error');
+  const placeholders = ['生成中...', '生成失敗', '生成に失敗しました'];
+  const list = getFilteredReviews();
+  const targets = [];
+  list.forEach((r, i) => {
+    if (r.reviewReply) return;               // すでに返信済みは除外
+    const ta = document.getElementById(`replyText-${i}`);
+    const c = ta?.value?.trim();
+    if (c && !placeholders.includes(c)) targets.push({ name: r.name, comment: c });
+  });
+  if (!targets.length) return showToast('投稿できる返信ドラフトがありません。先に「返信生成」してください', 'error');
+  if (!confirm(`生成済みの返信 ${targets.length}件 をGoogleにまとめて投稿します。\n投稿するとお客様に公開されます。よろしいですか？`)) return;
+
+  const btn = document.getElementById('bulkPostBtn');
+  if (btn) btn.disabled = true;
+  let ok = 0, fail = 0;
+  for (let k = 0; k < targets.length; k++) {
+    const t = targets[k];
+    if (btn) btn.textContent = `投稿中… ${k + 1}/${targets.length}`;
+    try {
+      const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewName: t.name, comment: t.comment }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.pending || data.error) fail++; else ok++;
+    } catch (e) { fail++; }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📤 生成した返信を一括投稿'; }
+  if (ok && !fail) showToast(`${ok}件の返信を投稿しました`, 'success');
+  else if (ok && fail) showToast(`投稿完了：成功 ${ok}件 / 失敗 ${fail}件（審査前の店舗はデモのため失敗になります）`, 'error');
+  else showToast(`投稿できませんでした（${fail}件）。API審査完了後に投稿できます`, 'error');
+  if (ok) logAction('口コミに一括返信');
+  loadReviews();
 }
 
 // ── AI口コミリスク診断（β）──
