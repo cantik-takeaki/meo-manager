@@ -2976,7 +2976,9 @@ function renderReviews() {
             ${r.reviewReply ? '返信を編集' : '返信する'}
           </button>
           <button class="btn btn-outline btn-sm" onclick="generateReply(${i})">✨ AI返信生成</button>
+          <button class="btn btn-outline btn-sm" onclick="diagnoseReview(${i})">🛡️ AIリスク診断</button>
         </div>
+        <div id="risk-${i}" style="display:none;margin-top:10px"></div>
         <div class="reply-editor" id="re-${i}">
           <select class="tone-select" id="tone-${i}">
             <option value="polite">丁寧・プロフェッショナル</option>
@@ -3081,6 +3083,71 @@ async function generateAllUnrepliedReplies() {
   }
   if (btn) { btn.disabled = false; btn.textContent = '✨ 未返信すべてに返信生成'; }
   showToast(`${done}件の返信ドラフトを生成しました。内容を確認して投稿してください`, 'success');
+}
+
+// ── AI口コミリスク診断（β）──
+async function diagnoseReview(i) {
+  const review = getFilteredReviews()[i];
+  const box = document.getElementById(`risk-${i}`);
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">🛡️ Googleポリシーに照らして分析中…</div>';
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'review_risk', reviewText: review.comment || '', rating: starRatingToNum(review.starRating) }),
+    }).then(r => r.json());
+    let j = null;
+    try { j = JSON.parse((d.content || '').replace(/```json|```/g, '').trim()); } catch (e) {}
+    if (!j) { box.innerHTML = '<div style="font-size:12px;color:var(--red);padding:8px">診断できませんでした。もう一度お試しください。</div>'; return; }
+    const score = Math.max(0, Math.min(100, parseInt(j.score, 10) || 0));
+    const risk = j.risk || (score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low');
+    const conf = { high: { c: '#ef4444', bg: 'rgba(239,68,68,0.08)', bd: 'rgba(239,68,68,0.3)', dot: '🔴', label: '削除申請候補' },
+      medium: { c: '#f59e0b', bg: 'rgba(245,158,11,0.08)', bd: 'rgba(245,158,11,0.3)', dot: '🟡', label: '様子見' },
+      low: { c: '#10b981', bg: 'rgba(16,185,129,0.08)', bd: 'rgba(16,185,129,0.3)', dot: '🟢', label: '返信推奨' } }[risk] || {};
+    const reasons = (j.reasons || []).map(x => `<li>${escapeHtml(x)}</li>`).join('');
+    const canReport = risk === 'high' || j.recommend === 'report';
+    box.innerHTML = `
+      <div style="background:${conf.bg};border:1px solid ${conf.bd};border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:800;color:${conf.c}">${conf.dot} ${conf.label}</div>
+          <div style="font-size:12px;color:var(--text-sub)">Googleポリシー違反の可能性</div>
+          <div style="font-size:26px;font-weight:900;color:${conf.c}">${score}%</div>
+        </div>
+        ${reasons ? `<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sub)">理由</div><ul style="margin:4px 0 0 18px;font-size:13px;line-height:1.7">${reasons}</ul></div>` : ''}
+        ${j.comment ? `<div style="font-size:12px;color:var(--text-sub);margin-top:6px">${escapeHtml(j.comment)}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})">✨ AI返信作成</button>
+          ${canReport ? `<button class="btn btn-outline btn-sm" onclick="generateReport(${i}, ${JSON.stringify(j.reasons || []).replace(/"/g, '&quot;')})">📄 Google報告文を作成</button>` : ''}
+        </div>
+        <div id="report-${i}" style="display:none;margin-top:10px"></div>
+        <p style="font-size:11px;color:var(--text-sub);line-height:1.6;margin-top:10px">※これはGoogleポリシーに照らした<b>可能性</b>の分析です。削除を保証するものではなく、Googleの審査結果を保証するものでもありません。実際の削除可否はGoogleが判断します。</p>
+      </div>`;
+  } catch (e) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">診断に失敗しました: ${e.message}</div>`;
+  }
+}
+
+async function generateReport(i, reasons) {
+  const review = getFilteredReviews()[i];
+  const box = document.getElementById(`report-${i}`);
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">報告文を作成中…</div>';
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'review_report', reviewText: review.comment || '', reasons: reasons || [] }),
+    }).then(r => r.json());
+    const txt = d.content || '（生成できませんでした）';
+    box.innerHTML = `
+      <textarea style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px;font-size:13px;min-height:120px;font-family:inherit;line-height:1.7">${escapeHtml(txt)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.value);showToast('報告文をコピーしました','success')">コピー</button>
+        <a href="https://support.google.com/business/workflow/9945796" target="_blank" class="btn btn-outline btn-sm">Googleの報告ページを開く</a>
+      </div>
+      <p style="font-size:11px;color:var(--text-sub);margin-top:6px">コピーしてGoogleの報告フォームに貼り付けてください。報告は店舗オーナーが行います。</p>`;
+  } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">生成失敗: ${e.message}</div>`; }
 }
 
 async function submitReply(i, reviewName) {
