@@ -1,5 +1,6 @@
 // api/locations.js — 店舗一覧取得
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
+import { kvGet } from './_kv.js';
 
 function parseCookies(req) {
   const c = {};
@@ -109,10 +110,15 @@ export default async function handler(req, res) {
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const accountsData = await accountsRes.json();
-    if (!accountsData.accounts?.length) return res.json({ locations: [], accounts: [] });
+    if (!accountsData.accounts?.length) return res.json({ locations: [], accounts: [], managedCount: 0 });
+
+    // 管理者が選抜した「管理対象」集合（無ければ空＝まだ何も登録していない）
+    const managedList = await kvGet('managed_locations') || [];
+    const managedSet = new Set(managedList.map(m => m.locId));
 
     // 各アカウント（≒クライアント企業）の店舗を取得。
     // accountName(表示名)をクライアント名として付与し、GBP内の重複はlocationIDで排除。
+    // ※ここでは「Googleが権限を持つ全店舗」を返し、managedフラグで管理対象を示す（実際に表示するのは管理対象のみ＝フロントで選別）。
     const locations = [];
     const seen = new Set();
     const accounts = [];
@@ -129,11 +135,18 @@ export default async function handler(req, res) {
           const locId = String(l.name || '').match(/locations\/[^/]+/)?.[0] || l.name;
           if (locId && seen.has(locId)) continue; // 同一ロケーションIDの重複を排除
           if (locId) seen.add(locId);
-          locations.push({ ...l, accountName: account.name, clientName });
+          locations.push({
+            ...l,
+            accountName: account.name,
+            clientName,
+            locId,                                   // locations/xxx（管理対象の識別子）
+            locationName: `${account.name}/${l.name}`, // 口コミ等v4 API用の完全参照
+            managed: managedSet.has(locId),          // 管理者が管理対象に選抜済みか
+          });
         }
       }
     }
-    res.json({ locations, accounts });
+    res.json({ locations, accounts, managedCount: managedList.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

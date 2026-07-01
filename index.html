@@ -768,9 +768,22 @@ body {
         <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="copyCredentials()">📋 コピー</button>
       </div>
 
+      <!-- Googleから取得した店舗（オーナー登録済み）→ 管理対象を選抜 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔗 Googleから取得した店舗（オーナー/管理者登録済み）</div>
+          <span id="gbpPickerCount" style="font-size:12px;color:var(--text-sub)"></span>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.7">
+          cantikのGoogleアカウントが<strong>管理権限を持つ店舗</strong>の一覧です。ここで<strong>「管理対象に追加」</strong>したものだけが、サイドバー・ダッシュボードに表示されます（全自動では連動しません）。<br>
+          ※同じ名前でも<strong>住所が違えば別の店舗（別リスティング）</strong>です。必要なものだけ選んでください。
+        </p>
+        <div id="gbpPickerList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+
       <!-- 登録済み店舗一覧 -->
       <div class="card">
-        <div class="card-header"><div class="card-title">登録済み店舗一覧</div></div>
+        <div class="card-header"><div class="card-title">手動登録した店舗</div></div>
         <div id="clientStoreList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
       </div>
 
@@ -1550,6 +1563,65 @@ function showLogin(needsSetup) {
 }
 
 // ─── Locations ───
+// ── Googleから取得した店舗の「管理対象」選抜ピッカー ──
+function renderGbpPicker() {
+  const el = document.getElementById('gbpPickerList');
+  if (!el) return;
+  const all = window._allGbp || [];
+  const cntEl = document.getElementById('gbpPickerCount');
+  if (cntEl) cntEl.textContent = all.length ? `${all.filter(l => l.managed).length} / ${all.length} 件を管理中` : '';
+  if (!all.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-muted)">Googleから取得できる店舗がありません。右上「Googleと連携」で接続してください。</div>';
+    return;
+  }
+  // クライアント（GBPアカウント）ごとにグループ化
+  const groups = {};
+  all.forEach(l => { const k = l.clientName || '未分類'; (groups[k] = groups[k] || []).push(l); });
+  el.innerHTML = Object.entries(groups).map(([cn, locs]) => `
+    <div style="font-weight:700;font-size:13px;margin:12px 0 8px">${escapeHtml(cn)}</div>
+    ${locs.map(l => {
+      const addr = fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || l.locId;
+      return `
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid ${l.managed ? 'var(--accent)' : 'var(--border)'};border-radius:9px;margin-bottom:8px;background:${l.managed ? 'rgba(46,143,240,0.06)' : 'var(--bg-2)'}">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px">${escapeHtml(l.title || '—')}${l.managed ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">● 管理中</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(addr)}</div>
+        </div>
+        <button class="btn btn-sm ${l.managed ? 'btn-outline' : 'btn-primary'}" style="white-space:nowrap"
+          onclick="toggleManaged('${l.locId}', ${!l.managed}, this)">${l.managed ? '管理対象から外す' : '＋ 管理対象に追加'}</button>
+      </div>`;
+    }).join('')}
+  `).join('');
+}
+
+async function toggleManaged(locId, on, btn) {
+  const loc = (window._allGbp || []).find(l => l.locId === locId);
+  if (!loc) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await fetch('/api/admin?action=managed', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        on,
+        location: {
+          locId,
+          locationName: loc.locationName || '',
+          title: loc.title || '',
+          clientName: loc.clientName || '',
+          address: fullGbpAddress(loc.storefrontAddress) || formatAddress(loc.storefrontAddress) || '',
+        },
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) { showToast(d.error || '更新に失敗しました', 'error'); if (btn) btn.disabled = false; return; }
+    showToast(on ? '管理対象に追加しました' : '管理対象から外しました', 'success');
+    await loadLocations(); // 再取得（managedフラグ更新）→ サイドバー・ダッシュボード・ピッカーを再描画
+  } catch (e) {
+    showToast('通信エラー: ' + e.message, 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function loadLocations() {
   try {
     // GBP店舗 + 手動登録店舗を両方取得
@@ -1560,7 +1632,10 @@ async function loadLocations() {
     const gbpData = await gbpRes.json();
     const adminData = await adminRes.json();
 
-    const gbpLocations = (gbpData.locations || []).map(l => ({ ...l, _type: 'gbp' }));
+    // Googleが返す全店舗（オーナー登録済み）。ピッカー用に保持し、実際に表示するのは管理対象(managed)のみ。
+    window._allGbp = (gbpData.locations || []).map(l => ({ ...l, _type: 'gbp' }));
+    renderGbpPicker();
+    const gbpLocations = window._allGbp.filter(l => l.managed); // 管理者が選抜した店舗だけ
     const adminLocations = (adminData.stores || []).map(s => ({
       name: s.gbpLocationName || s.storeId,
       title: s.storeName,
@@ -1613,7 +1688,13 @@ async function loadLocations() {
     // サイドバー：クライアント見出し＋その下に店舗
     const storeList = document.getElementById('storeList');
     if (!locations.length) {
-      storeList.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:var(--text-muted)">店舗なし</div>';
+      const hasGbp = (window._allGbp || []).length > 0;
+      storeList.innerHTML = hasGbp
+        ? `<div style="padding:10px 12px;font-size:12px;color:var(--side-text-sub);line-height:1.7">
+             まだ管理対象の店舗がありません。<br>Googleに${(window._allGbp||[]).length}件あります。
+             <button onclick="showPanel('clients')" style="margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;width:100%">店舗管理で追加する</button>
+           </div>`
+        : '<div style="padding:10px 12px;font-size:12px;color:var(--side-text-sub);line-height:1.7">店舗がありません。右上「Googleと連携」で接続してください。</div>';
     } else {
       storeList.innerHTML = window._clients.map(cl => `
         <div class="sidebar-section" style="margin:12px 0 4px 8px">${escapeHtml(cl.name)}<span style="opacity:.6"> (${cl.stores.length})</span></div>
@@ -3776,7 +3857,7 @@ function switchPanel(name, triggerEl) {
   };
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
-  if (name === 'clients') loadClientStores();
+  if (name === 'clients') { loadClientStores(); renderGbpPicker(); }
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
   if (name === 'instagram') loadMedia();

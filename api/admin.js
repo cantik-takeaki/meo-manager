@@ -111,8 +111,33 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
-  const { access_token } = parseCookies(req);
-  if (!access_token) return res.status(401).json({ error: '管理者ログインが必要です' });
+  // 管理者ログイン確認：Google連携(access_token) または メール＋パスワード(pw_session) のどちらか。
+  const _c = parseCookies(req);
+  const access_token = _c.access_token;
+  if (!access_token && !_c.pw_session) return res.status(401).json({ error: '管理者ログインが必要です' });
+
+  // ── 管理対象ロケーション（オーナー登録済みGBPから管理者が選抜して登録） ──
+  // GETで現在の管理対象一覧、POST{location,on}で追加/除外。これで「全自動表示」をやめ管理者が判断する。
+  if (action === 'managed') {
+    if (req.method === 'GET') return res.json({ managed: await kvGet('managed_locations') || [] });
+    if (req.method === 'POST') {
+      const { location, on } = req.body || {};
+      const locId = location && (location.locId || String(location.name || '').match(/locations\/[^/]+/)?.[0]);
+      if (!locId) return res.status(400).json({ error: 'locId必須' });
+      let list = await kvGet('managed_locations') || [];
+      list = list.filter(m => m.locId !== locId);
+      if (on) list.push({
+        locId,
+        locationName: location.locationName || '',
+        title: location.title || '',
+        clientName: location.clientName || '',
+        address: location.address || '',
+        addedAt: new Date().toISOString(),
+      });
+      await kvSet('managed_locations', list);
+      return res.json({ success: true, managed: list });
+    }
+  }
 
   // ── 口コミ獲得KPI 取得（管理側・当月＋前月＋平均満足度）──
   if (action === 'kpi' && req.method === 'GET') {
