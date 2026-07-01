@@ -1781,7 +1781,7 @@ async function loadLocations() {
             ${loc.title || '店舗'}
           </button>`).join('')}
       `).join('');
-      selectLocation(0);
+      selectLocation(0, true); // 初期表示は店舗を選んでもパネルはダッシュボードのまま
     }
 
     // 店舗管理（本体）：クライアントごとにカード → その中に店舗一覧
@@ -1858,7 +1858,7 @@ function getOfficialAddress(k) {
   return addr || pc;
 }
 
-function selectLocation(idx) {
+function selectLocation(idx, keepPanel) {
   const loc = window._locations?.[idx];
   if (!loc) return;
   currentLocation = loc;
@@ -1886,8 +1886,8 @@ function selectLocation(idx) {
     if (el) el.textContent = title;
   });
 
-  // 企業ナレッジパネルに自動切り替え
-  switchPanel('knowledge');
+  // 手動で店舗を選んだときは企業ナレッジへ。初期表示(keepPanel)はダッシュボードのまま残す。
+  if (!keepPanel) switchPanel('knowledge');
 
   // データを全パネル分ロード
   loadReviews();
