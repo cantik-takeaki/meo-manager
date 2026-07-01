@@ -147,6 +147,13 @@ async function loadSurvey(){
     SURVEY = await r.json();
   } catch(e){ SURVEY = null; }
   SURVEY = SURVEY || {};
+  // 受付停止（qrEnabled=false）: アンケート本体を隠して停止メッセージを表示
+  if (SURVEY.qrEnabled === false) {
+    document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
+    const wrap = document.querySelector('.wrap');
+    if (wrap) wrap.insertAdjacentHTML('beforeend', '<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:40px">🙏</div><h2 style="margin:12px 0;font-size:18px">ただいま口コミの受付を停止しています</h2><p style="color:var(--sub);font-size:14px">ご協力ありがとうございます。またの機会によろしくお願いいたします。</p></div>');
+    return;
+  }
   if (SURVEY.title) document.getElementById('headTitle').textContent = SURVEY.title;
   if (SURVEY.intro) document.getElementById('headIntro').textContent = SURVEY.intro;
   // 良かった点チップ

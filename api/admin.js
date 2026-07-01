@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     goodPoints: ['スタッフが丁寧', '雰囲気が良い', 'また来たい', '説明が分かりやすい', '清潔感がある', '対応が早い', 'コスパが良い', 'おすすめしたい'],
     lowThreshold: 4,   // この評価未満は「店内フィードバック」へ分岐（4 = ★1〜3が分岐）
     gateMode: 'branch', // 'branch'=満足度で分岐 / 'all'=全員Google誘導（コンプライアンス安全）
+    qrEnabled: true,   // 口コミ受付ON/OFF（OFFで顧客ページが停止表示）
     googleUrl: '',
     lineUrl: '',
   };
@@ -137,6 +138,7 @@ export default async function handler(req, res) {
       const b = req.body || {};
       const next = { ...cur };
       ['title', 'intro', 'completionMsg', 'lowMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
+      if (b.qrEnabled !== undefined) next.qrEnabled = !!b.qrEnabled; // boolean（Stringで潰さない）
       if (Array.isArray(b.goodPoints)) next.goodPoints = b.goodPoints.map(s => String(s).slice(0, 30)).filter(Boolean).slice(0, 16);
       if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));
       await kvSet(key, next);

@@ -473,13 +473,35 @@ body {
         <div class="card-header"><div class="card-title">📈 口コミ促進（今月）</div>
           <button class="btn btn-outline btn-sm" onclick="loadKpi()">更新</button>
         </div>
+
+        <!-- ① 口コミ依頼URL / QR（固定・常設） -->
+        <div id="reviewLinkBox" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;background:var(--bg-3);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px">
+          <div style="flex:1;min-width:260px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px">📣 口コミ依頼リンク（この店舗の固定URL）</div>
+            <p style="font-size:11px;color:var(--text-sub);margin-bottom:8px">QR・LINE・POPすべて、この1つの入口です。お客様は満足度アンケート→高評価はGoogleへ、低評価は店内フィードバックへ自動で分かれます。</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <input id="reviewLinkInput" readonly style="flex:1;min-width:200px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+              <button class="btn btn-primary btn-sm" onclick="copyReviewLink()">コピー</button>
+            </div>
+            <div id="reviewGoogleBanner" style="margin-top:8px"></div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-outline btn-sm" onclick="openReviewPop()">🖨 POPを作る</button>
+              <a id="qrDownloadLink" download="口コミ依頼QR.png" class="btn btn-outline btn-sm" href="#">QR画像を保存</a>
+              <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" id="qrEnabledToggle" onchange="toggleQrEnabled(this.checked)"> 口コミ受付を有効にする</label>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <img id="reviewQrImg" alt="口コミ依頼QR" style="width:150px;height:150px;border:1px solid var(--border);border-radius:8px;background:#fff">
+            <div style="font-size:11px;color:var(--text-sub);margin-top:4px">店頭POP・レシートに</div>
+          </div>
+        </div>
+
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">満足度アンケート→分岐型の獲得導線です。高評価のお客様はGoogleへ、低評価のお客様は店内フィードバックで受け止めます（評価を守りつつ改善の声を集める）。</p>
         <div id="kpiBody" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
           <span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>
         </div>
         <div id="kpiFunnel" style="margin-top:14px"></div>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-primary btn-sm" onclick="openReviewPop()">🖨 口コミ依頼POP・QRを作る</button>
           <button class="btn btn-outline btn-sm" onclick="openSurveyEditor()">✏️ アンケートを編集</button>
           <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
           <button class="btn btn-outline btn-sm" onclick="loadLeads()">📩 リード一覧<span id="leadBadge"></span></button>
@@ -1492,6 +1514,7 @@ async function loadKpi() {
   card.style.display = 'block';
   document.getElementById('surveyEditor').style.display = 'none';
   document.getElementById('feedbackBox').style.display = 'none';
+  renderReviewLink(); // ①依頼URL/QR/Googleバナー/受付トグルを描画
   body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
   if (funnelEl) funnelEl.innerHTML = '';
   const stat = (label, val, prev, color) => {
@@ -1556,10 +1579,49 @@ async function loadKpi() {
 
 // 店舗の口コミ依頼ページURL（Google URLはアンケート設定 or localStorage）
 function reviewPageUrl() {
-  const g = (_surveyCache && _surveyCache.googleUrl) || localStorage.getItem('reviewUrl_' + currentLocationId) || '';
+  // 依頼URLは store+name のみ（固定URL）。Google口コミURLは review.html が
+  // survey KV(SURVEY.googleUrl) から解決するため、URLに g= を埋め込まない。
   return location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
-    + '&name=' + encodeURIComponent(currentLocation?.title || '当店')
-    + (g ? '&g=' + encodeURIComponent(g) : '');
+    + '&name=' + encodeURIComponent(currentLocation?.title || '当店');
+}
+
+// ① 口コミ依頼リンク/QRセクションの描画（loadKpiから呼ぶ・survey KVを正とする）
+async function renderReviewLink() {
+  if (!currentLocationId) return;
+  // survey設定を取得（Google URL設定状態・受付ON/OFFの判定に使う）
+  if (!_surveyCache || _surveyCache._forStore !== currentLocationId) {
+    try { const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); _surveyCache = { ...s, _forStore: currentLocationId }; } catch (e) { _surveyCache = _surveyCache || {}; }
+  }
+  const url = reviewPageUrl();
+  const inp = document.getElementById('reviewLinkInput'); if (inp) inp.value = url;
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=' + encodeURIComponent(url);
+  const img = document.getElementById('reviewQrImg'); if (img) img.src = qr;
+  const dl = document.getElementById('qrDownloadLink'); if (dl) dl.href = qr;
+  const tog = document.getElementById('qrEnabledToggle'); if (tog) tog.checked = (_surveyCache?.qrEnabled !== false);
+  // Google口コミURL 状態バナー
+  const banner = document.getElementById('reviewGoogleBanner');
+  if (banner) {
+    if (_surveyCache && _surveyCache.googleUrl) {
+      banner.innerHTML = '<span style="font-size:12px;color:var(--accent-2);font-weight:700">✅ Google口コミURL設定済み</span>';
+    } else {
+      banner.innerHTML = `<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--gold);line-height:1.6">⚠️ Google口コミURL未設定。このままだとお客様が投稿画面まで進めません。<button class="btn btn-outline btn-sm" style="margin-left:6px" onclick="openSurveyEditor();setTimeout(()=>{var e=document.getElementById('svGoogle');if(e){e.scrollIntoView({block:'center'});e.focus();}},200)">アンケート編集で設定</button></div>`;
+    }
+  }
+}
+function copyReviewLink() {
+  const url = reviewPageUrl();
+  navigator.clipboard.writeText(url).then(() => showToast('口コミ依頼URLをコピーしました。LINE・QRで送れます', 'success'))
+    .catch(() => window.prompt('以下のURLをコピーしてお使いください：', url));
+}
+async function toggleQrEnabled(on) {
+  if (!currentLocationId) return;
+  try {
+    await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrEnabled: !!on }),
+    });
+    if (_surveyCache) _surveyCache.qrEnabled = !!on;
+    showToast(on ? '口コミ受付を有効にしました' : '口コミ受付を停止しました（お客様のアンケート画面が停止表示になります）', 'success');
+  } catch (e) { showToast('切替失敗: ' + e.message, 'error'); }
 }
 
 // ── 印刷用POP（テンプレ＋用紙サイズ＋QR）──
@@ -1680,9 +1742,9 @@ async function saveSurvey() {
     });
     const d = await r.json();
     if (d.success) {
-      _surveyCache = d.survey;
-      if (body.googleUrl) localStorage.setItem('reviewUrl_' + currentLocationId, body.googleUrl);
+      _surveyCache = d.survey; // survey KV を唯一の正とする（localStorage併用は不整合の温床のため廃止）
       showToast('アンケートを保存しました', 'success');
+      if (typeof renderReviewLink === 'function') renderReviewLink(); // 依頼リンク欄のGoogle設定状態を即更新
     } else showToast('保存失敗', 'error');
   } catch (e) { showToast('保存失敗: ' + e.message, 'error'); }
 }
@@ -3563,16 +3625,12 @@ function copyConnectUrl(path) {
 
 // 口コミ依頼URLを生成してコピー（お客さん向けreview.htmlへのリンク）
 function copyReviewRequest(storeId, storeName) {
-  // 口コミ依頼URLを即コピー（promptで止めない＝「反応しない」体験の修正）。
-  // Google口コミURLはアンケート編集で設定済みの値を使う。
-  const saved = localStorage.getItem('reviewUrl_' + storeId) || '';
-  const params = new URLSearchParams({ store: storeId, name: storeName || '当店' });
-  if (saved) params.set('g', saved);
-  const url = location.origin + '/review.html?' + params.toString();
+  // 固定の口コミ依頼URLを即コピー。Google口コミURLはreview.htmlがsurvey KVから解決するため
+  // URLには埋め込まない（localStorage非依存・二重管理を廃止）。
+  const url = location.origin + '/review.html?store=' + encodeURIComponent(storeId)
+    + '&name=' + encodeURIComponent(storeName || '当店');
   navigator.clipboard.writeText(url).then(() => {
-    showToast(saved
-      ? '口コミ依頼URLをコピーしました。LINE・QRで送れます'
-      : '口コミ依頼URLをコピー（Google口コミURL未設定→アンケート編集で設定を推奨）', 'success');
+    showToast('口コミ依頼URLをコピーしました。LINE・QRで送れます', 'success');
   }).catch(() => {
     window.prompt('以下のURLをコピーしてお使いください：', url);
   });
