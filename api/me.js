@@ -21,11 +21,13 @@ const sessionToken = (cred) => crypto.createHash('sha256').update('sess|' + cred
 const codeKey = (email) => 'login_code_' + String(email).toLowerCase();
 
 async function getCred() {
+  // KVに登録があれば最優先（パスワード変更を永続化するため）。無ければ環境変数のブートストラップ資格情報。
+  try { const kv = await kvGet(ADMIN_KEY); if (kv && kv.user && kv.hash) return kv; } catch (e) {}
   if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
     const salt = 'env';
-    return { user: process.env.ADMIN_USER, salt, hash: hashPw(process.env.ADMIN_PASS, salt), name: process.env.ADMIN_NAME || '管理者', _env: true };
+    return { user: String(process.env.ADMIN_USER).toLowerCase(), salt, hash: hashPw(process.env.ADMIN_PASS, salt), name: process.env.ADMIN_NAME || '管理者', _env: true };
   }
-  try { return await kvGet(ADMIN_KEY); } catch (e) { return null; }
+  return null;
 }
 
 // メール送信（Resend・無料枠）。未設定なら false を返す（＝2段階スキップ）。
@@ -59,7 +61,7 @@ export default async function handler(req, res) {
   const c = parseCookies(req);
 
   if (req.method === 'POST') {
-    const { action, user, pass, name, code } = req.body || {};
+    const { action, user, pass, newPass, name, code } = req.body || {};
     const cred = await getCred();
 
     // ── 初回登録（管理者未登録のときだけ）──
@@ -73,6 +75,19 @@ export default async function handler(req, res) {
       await kvSet(ADMIN_KEY, rec);
       setSession(res, rec);
       return res.json({ success: true, name: rec.name });
+    }
+
+    // ── パスワード変更（ログイン中のみ）──
+    if (action === 'changepw') {
+      if (!cred) return res.status(400).json({ error: '未登録です' });
+      if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
+      if (hashPw(String(pass || ''), cred.salt) !== cred.hash) return res.status(401).json({ error: '現在のパスワードが違います' });
+      if (String(newPass || '').length < 6) return res.status(400).json({ error: '新しいパスワードは6文字以上にしてください' });
+      const salt = crypto.randomBytes(8).toString('hex');
+      const rec = { user: cred.user, salt, hash: hashPw(String(newPass), salt), name: cred.name || '管理者', createdAt: cred.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+      await kvSet(ADMIN_KEY, rec);
+      setSession(res, rec);
+      return res.json({ success: true });
     }
 
     // ── コード検証（2段階認証の2手目）──

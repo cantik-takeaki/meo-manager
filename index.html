@@ -102,19 +102,18 @@ body {
 .google-btn:hover { box-shadow: 0 4px 20px rgba(255,255,255,0.15); }
 .google-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
-/* ─── App Layout ─── */
-.app { display: none; grid-template-columns: 220px 1fr; grid-template-rows: 56px 1fr; min-height: 100vh; }
+/* ─── App Layout（ぐるっと風：サイドバー全高＋右上トップバー） ─── */
+.app { display: none; grid-template-columns: 232px 1fr; grid-template-rows: 58px 1fr; min-height: 100vh; height: 100vh; }
 .app.visible { display: grid; }
 
-/* ─── Topbar ─── */
+/* ─── Topbar（メイン列の上だけ） ─── */
 .topbar {
-  grid-column: 1 / -1;
+  grid-column: 2; grid-row: 1;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
-  box-shadow: var(--shadow);
   gap: 16px;
   z-index: 5;
 }
@@ -129,23 +128,39 @@ body {
 .logout-btn { background: none; border: 1px solid var(--border); color: var(--text-sub); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
 .logout-btn:hover { border-color: var(--border-active); color: var(--text); }
 
-/* ─── Sidebar（濃色固定・ぐるっと風） ─── */
+/* ─── Sidebar（濃色固定・全高・ぐるっと風） ─── */
 .sidebar {
+  grid-column: 1; grid-row: 1 / -1;
   background: var(--side-bg);
   border-right: none;
-  padding: 16px 12px;
-  overflow-y: auto;
+  display: flex; flex-direction: column;
+  min-height: 0;
 }
-.sidebar-section { font-size: 11px; color: var(--side-text-sub); text-transform: uppercase; letter-spacing: .08em; margin: 16px 0 6px 8px; }
+/* ブランドヘッダー（ロゴ） */
+.side-brand {
+  height: 58px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.side-brand img { height: 26px; width: auto; display: block; }
+/* スクロールするナビ本体 */
+.side-nav { flex: 1 1 auto; overflow-y: auto; padding: 14px 12px; min-height: 0; }
+.side-nav::-webkit-scrollbar { width: 6px; }
+.side-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+.sidebar-section { font-size: 10.5px; color: var(--side-text-sub); text-transform: uppercase; letter-spacing: .09em; margin: 16px 0 6px 10px; font-weight: 700; }
+.sidebar-section:first-child { margin-top: 2px; }
 .nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
   cursor: pointer; color: var(--side-text); font-size: 13px;
   transition: all .15s; border: none; background: none; width: 100%; text-align: left;
+  position: relative;
 }
 .nav-item:hover { background: var(--side-active-bg); color: #fff; }
-.nav-item.active { background: var(--side-active-bg); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
-.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-item.active { background: linear-gradient(90deg, var(--accent), var(--accent-deep)); color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(46,143,240,0.35); }
+.nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--gold); color: #1a1200; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
 
 /* ─── Store List in Sidebar ─── */
 .store-list { margin-top: 4px; }
@@ -156,11 +171,36 @@ body {
   transition: all .15s; border: none; background: none; width: 100%; text-align: left;
 }
 .store-item:hover { background: var(--side-active-bg); color: #fff; }
-.store-item.active { background: rgba(79,125,243,0.22); color: #fff; }
+.store-item.active { background: rgba(46,143,240,0.22); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
 .store-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); flex-shrink: 0; }
 
+/* ─── Sidebar 下部ユーザー枠 ─── */
+.side-user {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding: 12px;
+}
+.side-user-card { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+.side-user-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 14px; overflow: hidden;
+}
+.side-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.side-user-name { font-size: 12.5px; color: #fff; font-weight: 600; line-height: 1.3; word-break: break-all; }
+.side-user-role { font-size: 11px; color: var(--side-text-sub); }
+.side-user-actions { display: flex; gap: 8px; margin-top: 8px; }
+.side-user-actions a, .side-user-actions button {
+  flex: 1; text-align: center; text-decoration: none;
+  font-size: 11.5px; color: var(--side-text); background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 7px 4px;
+  cursor: pointer; transition: all .15s;
+}
+.side-user-actions a:hover, .side-user-actions button:hover { background: rgba(255,255,255,0.13); color: #fff; }
+
 /* ─── Main Content ─── */
-.main { background: var(--bg); overflow-y: auto; }
+.main { grid-column: 2; grid-row: 2; background: var(--bg); overflow-y: auto; min-height: 0; }
 .panel { display: none; padding: 28px; }
 .panel.active { display: block; }
 
@@ -343,61 +383,83 @@ body {
 
 <!-- ─── App ─── -->
 <div class="app" id="app">
-  <!-- Topbar -->
-  <header class="topbar">
-    <img src="/logo.png" alt="ラクラクMEO" style="height:30px;width:auto;display:block">
-    <div class="topbar-user">
-      <img id="userPic" src="" alt="">
-      <span id="userName"></span>
-      <a href="/api/auth/logout" class="logout-btn">ログアウト</a>
-    </div>
-  </header>
-
-  <!-- Sidebar -->
+  <!-- Sidebar（ぐるっと風・全高） -->
   <nav class="sidebar">
-    <div class="sidebar-section">メニュー</div>
-    <button class="nav-item active" onclick="showPanel('dashboard')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      ダッシュボード
-    </button>
-    <button class="nav-item" onclick="showPanel('reviews')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      口コミ管理
-    </button>
-    <button class="nav-item" onclick="showPanel('posts')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-      投稿管理
-    </button>
-    <button class="nav-item" onclick="showPanel('instagram')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
-      Instagram投稿
-    </button>
-    <button class="nav-item" onclick="showPanel('clients')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-      店舗管理
-    </button>
-    <button class="nav-item" onclick="showPanel('knowledge')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-      企業ナレッジ
-    </button>
-    <button class="nav-item" onclick="showPanel('protection')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      改ざん防止
-    </button>
-    <button class="nav-item" onclick="showPanel('citation')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-      サイテーション
-    </button>
-    <button class="nav-item" onclick="showPanel('aio')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v4l3 3"/></svg>
-      AIO/LLMO/GEO対策
-    </button>
+    <div class="side-brand">
+      <img src="/logo.png" alt="ラクラクMEO">
+    </div>
+    <div class="side-nav">
+      <div class="sidebar-section">メイン</div>
+      <button class="nav-item active" onclick="showPanel('dashboard', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        ダッシュボード
+      </button>
+      <button class="nav-item" onclick="showPanel('clients', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+        クライアント・店舗
+      </button>
+      <button class="nav-item" onclick="showPanel('reviews', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
+        口コミ管理
+      </button>
 
-    <div class="sidebar-section">店舗</div>
-    <div class="store-list" id="storeList">
-      <div class="loading" style="padding:12px;font-size:12px;">読み込み中...</div>
+      <div class="sidebar-section">集客・発信</div>
+      <button class="nav-item" onclick="showPanel('posts', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        投稿管理
+      </button>
+      <button class="nav-item" onclick="showPanel('instagram', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+        Instagram投稿
+      </button>
+
+      <div class="sidebar-section">MEO / AIO 対策</div>
+      <button class="nav-item" onclick="showPanel('citation', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        サイテーション
+      </button>
+      <button class="nav-item" onclick="showPanel('aio', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 8v4l3 3"/></svg>
+        AIO / LLMO / GEO対策
+      </button>
+      <button class="nav-item" onclick="showPanel('protection', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        改ざん防止
+      </button>
+      <button class="nav-item" onclick="showPanel('knowledge', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        企業ナレッジ
+      </button>
+
+      <div class="sidebar-section">店舗切替</div>
+      <div class="store-list" id="storeList">
+        <div class="loading" style="padding:12px;font-size:12px;">読み込み中...</div>
+      </div>
+    </div>
+
+    <!-- 下部ユーザー枠 -->
+    <div class="side-user">
+      <div class="side-user-card">
+        <div class="side-user-avatar"><span id="userInitial">C</span><img id="userPic" src="" alt="" style="display:none"></div>
+        <div style="min-width:0">
+          <div class="side-user-name" id="userName">管理者</div>
+          <div class="side-user-role">管理者アカウント</div>
+        </div>
+      </div>
+      <div class="side-user-actions">
+        <button onclick="openChangePw()">パスワード変更</button>
+        <a href="/api/auth/logout">ログアウト</a>
+      </div>
     </div>
   </nav>
+
+  <!-- Topbar（メイン列の上） -->
+  <header class="topbar">
+    <div id="topbarTitle" style="font-weight:700;font-size:16px;color:var(--text)">ダッシュボード</div>
+    <div class="topbar-user">
+      <span id="gbpConnectState"></span>
+    </div>
+  </header>
 
   <!-- Main -->
   <main class="main">
@@ -1302,6 +1364,24 @@ body {
 
 <div class="toast" id="toast"></div>
 
+<!-- パスワード変更モーダル -->
+<div id="pwModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(15,23,42,0.45);align-items:center;justify-content:center">
+  <div style="background:var(--bg-2);border-radius:16px;padding:28px;width:360px;max-width:90%;box-shadow:0 20px 60px rgba(15,23,42,0.25)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">パスワード変更</div>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:18px">現在のパスワードを確認のうえ、新しいパスワードを設定します。</div>
+    <form onsubmit="return submitChangePw(event)" style="text-align:left">
+      <input id="pwCur" type="password" placeholder="現在のパスワード" autocomplete="current-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px 13px;border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:10px">
+      <input id="pwNew" type="password" placeholder="新しいパスワード（6文字以上）" autocomplete="new-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px 13px;border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:10px">
+      <input id="pwNew2" type="password" placeholder="新しいパスワード（確認）" autocomplete="new-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px 13px;border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:10px">
+      <div id="pwChangeError" style="color:var(--red);font-size:12px;min-height:16px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="closeChangePw()">キャンセル</button>
+        <button type="submit" class="btn btn-primary" style="flex:1">変更する</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 let currentLocation = null;
 let currentLocationId = null;
@@ -1373,6 +1453,51 @@ function backToLogin() {
   applyPwMode();
 }
 
+// ─── Google連携状態（トップバー）───
+function renderGbpConnectState(user) {
+  const el = document.getElementById('gbpConnectState');
+  if (!el) return;
+  // Googleログインしている場合、または マスターGoogle接続済みなら「連携済み」
+  const connected = user.method === 'google' || user.gbpConnected;
+  if (connected) {
+    el.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--accent-2);font-weight:700;background:rgba(16,185,129,0.1);padding:4px 10px;border-radius:999px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Google連携済み</span>`;
+  } else {
+    el.innerHTML = `<a href="/api/auth/login" class="btn btn-primary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" opacity=".9"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" opacity=".7"/></svg>
+      Googleと連携</a>`;
+  }
+}
+
+// ─── パスワード変更 ───
+function openChangePw() {
+  document.getElementById('pwChangeError').textContent = '';
+  document.getElementById('pwCur').value = '';
+  document.getElementById('pwNew').value = '';
+  document.getElementById('pwNew2').value = '';
+  document.getElementById('pwModal').style.display = 'flex';
+}
+function closeChangePw() { document.getElementById('pwModal').style.display = 'none'; }
+async function submitChangePw(e) {
+  e.preventDefault();
+  const cur = document.getElementById('pwCur').value;
+  const nw = document.getElementById('pwNew').value;
+  const nw2 = document.getElementById('pwNew2').value;
+  const err = document.getElementById('pwChangeError');
+  err.textContent = '';
+  if (nw.length < 6) { err.textContent = '新しいパスワードは6文字以上にしてください'; return false; }
+  if (nw !== nw2) { err.textContent = '新しいパスワードが一致しません'; return false; }
+  try {
+    const res = await fetch('/api/me', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'changepw', pass: cur, newPass: nw }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok && d.success) { closeChangePw(); showToast('パスワードを変更しました', 'success'); }
+    else { err.textContent = d.error || '変更できませんでした'; }
+  } catch (e2) { err.textContent = '通信エラー: ' + e2.message; }
+  return false;
+}
+
 // ─── Init ───
 async function init() {
   try {
@@ -1382,8 +1507,20 @@ async function init() {
 
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
-    document.getElementById('userName').textContent = user.name || user.email;
-    if (user.picture) document.getElementById('userPic').src = user.picture;
+    const dispName = user.name || user.email || '管理者';
+    document.getElementById('userName').textContent = dispName;
+    const ini = document.getElementById('userInitial');
+    if (ini) ini.textContent = (dispName.trim()[0] || 'C').toUpperCase();
+    if (user.picture) { const p = document.getElementById('userPic'); p.src = user.picture; p.style.display = 'block'; if (ini) ini.style.display = 'none'; }
+    window._authEmail = user.email || '';
+    renderGbpConnectState(user);
+
+    // Google連携の戻り通知
+    const _qg = new URLSearchParams(location.search);
+    if (_qg.get('connected') === 'master' || _qg.get('gbp') === 'ok') {
+      showToast('Googleと連携しました。口コミ・順位・インサイトが使えます', 'success');
+      history.replaceState({}, '', location.pathname);
+    }
 
     // Instagram連携の戻り（/?ig_connected=... / ?error=ig_...）を通知
     const _q = new URLSearchParams(location.search);
@@ -3629,6 +3766,13 @@ function switchPanel(name, triggerEl) {
       if (b.getAttribute('onclick')?.includes(`'${name}'`)) b.classList.add('active');
     });
   }
+  const titles = {
+    dashboard: 'ダッシュボード', clients: 'クライアント・店舗', reviews: '口コミ管理',
+    posts: '投稿管理', instagram: 'Instagram投稿', citation: 'サイテーション',
+    aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
+  };
+  const tb = document.getElementById('topbarTitle');
+  if (tb && titles[name]) tb.textContent = titles[name];
   if (name === 'clients') loadClientStores();
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
@@ -3636,8 +3780,8 @@ function switchPanel(name, triggerEl) {
   if (name === 'posts') loadPostImages();
 }
 
-function showPanel(name) {
-  switchPanel(name, event?.currentTarget);
+function showPanel(name, el) {
+  switchPanel(name, el || event?.currentTarget);
 }
 
 // ─── Toast ───
