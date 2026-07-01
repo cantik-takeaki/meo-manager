@@ -642,6 +642,37 @@ ${rt}
 - 報告文の本文のみ出力（前置き不要）。`;
   }
 
+  // AIインサイト異常検知・傾向分析
+  if (type === 'insight_anomaly') {
+    const m = req.body.metrics || {};
+    const ctx = req.body.context || {};
+    const lines = [];
+    if (m.impressions != null) lines.push(`表示回数（合計）: ${m.impressions}`);
+    if (m.mapsImpressions != null) lines.push(`マップ表示: ${m.mapsImpressions}`);
+    if (m.searchImpressions != null) lines.push(`検索表示: ${m.searchImpressions}`);
+    if (m.calls != null) lines.push(`電話タップ: ${m.calls}`);
+    if (m.directionRequests != null) lines.push(`ルート検索: ${m.directionRequests}`);
+    if (m.websiteClicks != null) lines.push(`サイト訪問: ${m.websiteClicks}`);
+    prompt = `あなたはMEO（Googleマップ集客）のデータアナリストです。${storeName}のGoogleビジネスプロフィールのインサイト指標を分析し、異常や気になる傾向を検知して、改善提案をしてください。
+
+【インサイト指標（直近）】
+${lines.join('\n') || '（データ不足）'}
+${ctx.rankings ? `【順位状況】${ctx.rankings}` : ''}
+${ctx.reviews ? `【口コミ】${ctx.reviews}` : ''}
+
+【分析観点】
+- 表示回数が多いのに電話・ルート検索・サイト訪問（アクション）が極端に少ない＝「見られているが行動につながっていない」異常。
+- 検索表示に対しマップ表示が極端に低い/高いなどの偏り。
+- アクション率（電話＋ルート＋サイト÷表示回数）が低い場合の改善余地。
+- 数字が全て0や欠損なら「データ蓄積待ち」と正直に述べる。
+
+【出力】次の3見出しで、各1〜3個の箇条書き（・始まり）。データに基づき、数字を交えて具体的に。憶測で数字を作らない。
+■気づき・異常（データから読み取れること）
+■考えられる原因
+■改善アクション（今月やること・具体的に）
+前置き不要、3見出しの箇条書きのみ。`;
+  }
+
   // 競合分析の勝ち筋助言
   if (type === 'competitor_advice') {
     const c = req.body.competitor || {};

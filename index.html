@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MEO Manager | cantik</title>
+<title>ラクラクMEO | cantik</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -298,7 +298,7 @@ body {
 <!-- ─── Login ─── -->
 <div class="login-screen" id="loginScreen">
   <div class="login-card">
-    <div class="login-logo">MEO Manager</div>
+    <div class="login-logo">ラクラクMEO</div>
     <p class="login-subtitle">Googleビジネスプロフィールを一元管理</p>
     <a href="/api/auth/login" class="google-btn">
       <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -311,7 +311,7 @@ body {
 <div class="app" id="app">
   <!-- Topbar -->
   <header class="topbar">
-    <div class="topbar-logo">MEO Manager</div>
+    <div class="topbar-logo">ラクラクMEO</div>
     <div class="topbar-user">
       <img id="userPic" src="" alt="">
       <span id="userName"></span>
@@ -549,7 +549,10 @@ body {
       <div class="card" id="insightsCard" style="display:none">
         <div class="card-header">
           <div class="card-title">インサイト（直近3ヶ月）</div>
-          <div class="card-sub" id="insightsStore"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="card-sub" id="insightsStore"></div>
+            <button class="btn btn-primary btn-sm" onclick="analyzeInsightAnomaly()">🔍 AI異常検知・傾向分析</button>
+          </div>
         </div>
         <div class="stats-grid" id="insightsGrid">
           <div class="stat-card"><div class="stat-label">表示回数（合計）</div><div class="stat-value blue" id="insImpressions">—</div></div>
@@ -559,6 +562,7 @@ body {
           <div class="stat-card"><div class="stat-label">ルート検索</div><div class="stat-value green" id="insDir">—</div></div>
           <div class="stat-card"><div class="stat-label">サイト訪問</div><div class="stat-value" id="insWeb">—</div></div>
         </div>
+        <div id="insightAnomaly" style="display:none;margin-top:12px"></div>
         <div id="insightsNote" class="card-sub" style="margin-top:8px"></div>
       </div>
 
@@ -2857,6 +2861,7 @@ async function loadInsights() {
       ['insImpressions','insMaps','insSearch','insCalls','insDir','insWeb'].forEach(id => document.getElementById(id).textContent = '—');
     } else {
       const s = data.summary || {};
+      window._insightMetrics = s; // AI異常検知用に保持
       card.style.display = '';
       document.getElementById('insightsNote').textContent = '';
       const fmt = (n) => (n || 0).toLocaleString();
@@ -2867,9 +2872,31 @@ async function loadInsights() {
       document.getElementById('insDir').textContent = fmt(s.directionRequests);
       document.getElementById('insWeb').textContent = fmt(s.websiteClicks);
     }
+    const anom = document.getElementById('insightAnomaly'); if (anom) { anom.style.display = 'none'; anom.innerHTML = ''; }
   } catch (e) {
     if (card) card.style.display = 'none';
   }
+}
+
+// AIインサイト異常検知・傾向分析
+async function analyzeInsightAnomaly() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('insightAnomaly');
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">📊 指標を分析中…</div>';
+  const m = window._insightMetrics || {};
+  const ctx = {
+    rankings: (_dashRankings || []).map(r => `${r.keyword}:${r.rank ? r.rank + '位' : '圏外'}`).join('、') || '未計測',
+    reviews: (document.getElementById('statRating')?.textContent || '') !== '—' ? `平均${document.getElementById('statRating')?.textContent}・未返信${document.getElementById('statPending')?.textContent}件` : '未取得',
+  };
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'insight_anomaly', metrics: m, context: ctx }),
+    }).then(r => r.json());
+    const txt = d.content || d.error || '分析できませんでした';
+    box.innerHTML = `<div style="background:rgba(79,125,243,0.06);border:1px solid rgba(79,125,243,0.2);border-radius:10px;padding:14px;font-size:13px;line-height:1.8;white-space:pre-wrap">${escapeHtml(txt)}</div>`;
+  } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">分析失敗: ${e.message}</div>`; }
 }
 
 // 低評価アラート描画（loadReviewsの集計から呼ぶ）
