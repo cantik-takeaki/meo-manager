@@ -1569,16 +1569,18 @@ function renderGbpPicker() {
   const el = document.getElementById('gbpPickerList');
   if (!el) return;
   const all = window._allGbp || [];
+  const visible = all.filter(l => !l.hidden);           // 一覧に出す店舗（非表示は除外）
+  const hiddenLocs = all.filter(l => l.hidden);         // 非表示にした店舗
   const cntEl = document.getElementById('gbpPickerCount');
-  if (cntEl) cntEl.textContent = all.length ? `${all.filter(l => l.managed).length} / ${all.length} 件を管理中` : '';
+  if (cntEl) cntEl.textContent = visible.length ? `${visible.filter(l => l.managed).length} / ${visible.length} 件を管理中` : '';
   if (!all.length) {
     el.innerHTML = '<div style="font-size:13px;color:var(--text-muted)">Googleから取得できる店舗がありません。右上「Googleと連携」で接続してください。</div>';
     return;
   }
-  // クライアント（GBPアカウント）ごとにグループ化
+  // クライアント（GBPアカウント）ごとにグループ化（表示分のみ）
   const groups = {};
-  all.forEach(l => { const k = l.clientName || '未分類'; (groups[k] = groups[k] || []).push(l); });
-  el.innerHTML = Object.entries(groups).map(([cn, locs]) => `
+  visible.forEach(l => { const k = l.clientName || '未分類'; (groups[k] = groups[k] || []).push(l); });
+  const listHtml = Object.entries(groups).map(([cn, locs]) => `
     <div style="font-weight:700;font-size:13px;margin:12px 0 8px">${escapeHtml(cn)}</div>
     ${locs.map(l => {
       const addr = fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || l.locId;
@@ -1598,9 +1600,30 @@ function renderGbpPicker() {
         </div>` : ''}
         <button class="btn btn-sm ${l.managed ? 'btn-outline' : 'btn-primary'}" style="white-space:nowrap"
           onclick="toggleManaged('${l.locId}', ${!l.managed}, this)">${l.managed ? '管理対象から外す' : '＋ 管理対象に追加'}</button>
+        ${!l.managed ? `<button class="btn btn-sm" style="white-space:nowrap;background:rgba(239,68,68,0.08);color:var(--red);border:none" title="この店舗を一覧から非表示にします（Google本体は変更されません）" onclick="hideLocation('${l.locId}', true)">× 一覧から削除</button>` : ''}
       </div>`;
     }).join('')}
   `).join('');
+
+  // 非表示にした店舗（戻せる）
+  const hiddenHtml = hiddenLocs.length ? `
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-sub)">🚫 一覧から削除した店舗（${hiddenLocs.length}件）— クリックで表示/復元</summary>
+      <div style="margin-top:8px">
+        ${hiddenLocs.map(l => {
+          const addr = fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || l.locId;
+          return `<div style="display:flex;align-items:center;gap:12px;padding:9px 12px;border:1px dashed var(--border);border-radius:9px;margin-bottom:6px;opacity:.75">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;text-decoration:line-through">${escapeHtml(l.title || '—')}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(addr)}</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="hideLocation('${l.locId}', false)">↩ 一覧に戻す</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </details>` : '';
+
+  el.innerHTML = listHtml + hiddenHtml;
 }
 
 async function toggleManaged(locId, on, btn, company) {
@@ -1630,6 +1653,21 @@ async function toggleManaged(locId, on, btn, company) {
     showToast('通信エラー: ' + e.message, 'error');
     if (btn) btn.disabled = false;
   }
+}
+
+// 店舗を一覧から非表示にする / 戻す（Google本体は変更しない）
+async function hideLocation(locId, on) {
+  if (on && !confirm('この店舗をラクラクMEOの一覧から非表示にします。\n（Googleビジネスプロフィール本体は削除されません。あとで「戻す」で復元できます）')) return;
+  try {
+    const res = await fetch('/api/admin?action=hidden', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locId, on }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '更新に失敗しました', 'error');
+    showToast(on ? '一覧から削除しました' : '一覧に戻しました', 'success');
+    await loadLocations(); // 再取得（hiddenフラグ更新）→ ピッカー・サイドバー再描画
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 // 管理対象店舗の「会社名」を保存（クライアント分けに反映）
@@ -1671,7 +1709,7 @@ async function loadLocations() {
     // Googleが返す全店舗（オーナー登録済み）。ピッカー用に保持し、実際に表示するのは管理対象(managed)のみ。
     window._allGbp = (gbpData.locations || []).map(l => ({ ...l, _type: 'gbp' }));
     renderGbpPicker();
-    const gbpLocations = window._allGbp.filter(l => l.managed); // 管理者が選抜した店舗だけ
+    const gbpLocations = window._allGbp.filter(l => l.managed && !l.hidden); // 管理者が選抜した店舗だけ（非表示は除外）
     const adminLocations = (adminData.stores || []).map(s => ({
       name: s.gbpLocationName || s.storeId,
       title: s.storeName,

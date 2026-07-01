@@ -142,6 +142,22 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 一覧から非表示（重複・無関係なGBPリスティングを隠す。Google本体は一切変更しない） ──
+  // hidden_locations に locId を貯め、ピッカーの既定表示から除外する。戻す(on:false)も可能。
+  if (action === 'hidden') {
+    if (req.method === 'GET') return res.json({ hidden: await kvGet('hidden_locations') || [] });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const id = b.locId || String((b.location || {}).name || '').match(/locations\/[^/]+/)?.[0];
+      if (!id) return res.status(400).json({ error: 'locId必須' });
+      let list = await kvGet('hidden_locations') || [];
+      list = list.filter(x => x !== id);
+      if (b.on) list.push(id);
+      await kvSet('hidden_locations', list);
+      return res.json({ success: true, hidden: list });
+    }
+  }
+
   // ── 口コミ獲得KPI 取得（管理側・当月＋前月＋平均満足度）──
   if (action === 'kpi' && req.method === 'GET') {
     const { storeId } = req.query;

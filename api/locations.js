@@ -115,6 +115,8 @@ export default async function handler(req, res) {
     // 管理者が選抜した「管理対象」集合（無ければ空＝まだ何も登録していない）
     const managedList = await kvGet('managed_locations') || [];
     const managedMap = new Map(managedList.map(m => [m.locId, m]));
+    // 一覧から非表示にした店舗（重複・無関係なリスティング）
+    const hiddenSet = new Set(await kvGet('hidden_locations') || []);
 
     // 各アカウント（≒クライアント企業）の店舗を取得。
     // accountName(表示名)をクライアント名として付与し、GBP内の重複はlocationIDで排除。
@@ -144,6 +146,7 @@ export default async function handler(req, res) {
             locationName: `${account.name}/${l.name}`, // 口コミ等v4 API用の完全参照
             managed: !!mrec,                         // 管理者が管理対象に選抜済みか
             company: mrec?.company || '',            // クライアント分け用の会社名（管理対象のみ）
+            hidden: hiddenSet.has(locId),            // 一覧から非表示にしたか
           });
         }
       }
