@@ -1714,7 +1714,9 @@ async function loadLocations() {
     const clientMap = new Map();
     locations.forEach((loc, idx) => {
       loc._idx = idx;
-      const cn = loc.company || loc.clientName || '未分類';
+      // 会社名(company)優先。未設定なら店舗名で分ける（GBPアカウント名で全部束ねない）。
+      // 同じ会社の複数店は、店舗管理で会社名を揃えれば1クライアントに統合できる。
+      const cn = loc.company || loc.title || loc.clientName || '未分類';
       if (!clientMap.has(cn)) clientMap.set(cn, []);
       clientMap.get(cn).push(loc);
     });
