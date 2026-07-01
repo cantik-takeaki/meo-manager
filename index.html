@@ -318,11 +318,13 @@ body {
     <img src="/logo.png" alt="ラクラクMEO" style="width:260px;max-width:80%;margin:0 auto 6px;display:block">
     <div class="login-logo" style="display:none">ラクラクMEO</div>
     <p class="login-subtitle">はじめてでも、カンタンに始められる！</p>
-    <!-- ID/パスワードでログイン -->
-    <form id="pwLoginForm" onsubmit="return pwLogin(event)" style="text-align:left;margin-bottom:18px">
+    <!-- ID/パスワード（未登録なら「管理者登録」・登録済みなら「ログイン」に切替） -->
+    <div id="pwModeLabel" style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;text-align:left"></div>
+    <form id="pwLoginForm" onsubmit="return pwSubmit(event)" style="text-align:left;margin-bottom:18px">
+      <input id="pwName" type="text" placeholder="表示名（例：株式会社cantik）" style="display:none;width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:10px">
       <input id="pwUser" type="text" placeholder="ID（メールアドレス等）" autocomplete="username" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:10px">
-      <input id="pwPass" type="password" placeholder="パスワード" autocomplete="current-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:10px">
-      <button type="submit" class="btn btn-primary" style="width:100%;padding:13px;font-size:15px;border-radius:10px">ログイン</button>
+      <input id="pwPass" type="password" placeholder="パスワード（6文字以上）" autocomplete="current-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:10px">
+      <button id="pwSubmitBtn" type="submit" class="btn btn-primary" style="width:100%;padding:13px;font-size:15px;border-radius:10px">ログイン</button>
       <div id="pwLoginError" style="color:var(--red);font-size:12px;margin-top:8px;min-height:16px"></div>
     </form>
 
@@ -1305,19 +1307,37 @@ let currentLocationId = null;
 let allReviews = [];
 let currentFilter = 'all';
 
-// ─── ID/PWログイン ───
-async function pwLogin(e) {
+// ─── ID/PW（登録/ログイン両対応）───
+let _pwNeedsSetup = false; // true=まだ管理者未登録＝「登録」モード
+function applyPwMode() {
+  const label = document.getElementById('pwModeLabel');
+  const btn = document.getElementById('pwSubmitBtn');
+  const nameInput = document.getElementById('pwName');
+  if (!label || !btn) return;
+  if (_pwNeedsSetup) {
+    label.textContent = '🎉 はじめに管理者アカウントを登録してください';
+    btn.textContent = '管理者を登録';
+    if (nameInput) nameInput.style.display = 'block';
+  } else {
+    label.textContent = 'IDとパスワードでログイン';
+    btn.textContent = 'ログイン';
+    if (nameInput) nameInput.style.display = 'none';
+  }
+}
+async function pwSubmit(e) {
   e.preventDefault();
   const err = document.getElementById('pwLoginError');
   err.textContent = '';
   const user = document.getElementById('pwUser').value.trim();
   const pass = document.getElementById('pwPass').value;
+  const name = document.getElementById('pwName').value.trim();
   if (!user || !pass) { err.textContent = 'IDとパスワードを入力してください'; return false; }
+  const body = _pwNeedsSetup ? { action: 'signup', user, pass, name } : { user, pass };
   try {
-    const r = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, pass }) });
+    const r = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
     if (d.success) { location.reload(); }
-    else { err.textContent = d.error || 'ログインできませんでした'; }
+    else { err.textContent = d.error || 'できませんでした'; }
   } catch (e2) { err.textContent = '通信エラー: ' + e2.message; }
   return false;
 }
@@ -1326,9 +1346,8 @@ async function pwLogin(e) {
 async function init() {
   try {
     const res = await fetch('/api/me');
-    if (!res.ok) { showLogin(); return; }
-    const user = await res.json();
-    if (!user.loggedIn) { showLogin(); return; }
+    const user = await res.json().catch(() => ({}));
+    if (!res.ok || !user.loggedIn) { showLogin(!!user.needsSetup); return; }
 
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
@@ -1352,7 +1371,9 @@ async function init() {
   }
 }
 
-function showLogin() {
+function showLogin(needsSetup) {
+  _pwNeedsSetup = !!needsSetup;
+  applyPwMode();
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('app').classList.remove('visible');
 }
