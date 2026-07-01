@@ -1,7 +1,7 @@
 // api/me.js — 認証（GET=状態 / POST=ログイン or 初回登録）
 // 2系統: ①Google OAuth(access_token cookie・GBP連携に必要) ②ID/PW(KV保存・pw_session cookie)
 // ID/PWは初回に画面から登録（KVにハッシュ保存）。以後そのID/PWでログイン。
-import { getValidCookieToken } from './_tokens.js';
+import { getValidCookieToken, getMasterInfo } from './_tokens.js';
 import { kvGet, kvSet } from './_kv.js';
 import crypto from 'crypto';
 
@@ -78,7 +78,8 @@ export default async function handler(req, res) {
   // ②ID/PW（pw_session が現在の資格情報から派生したトークンと一致）
   const cred = await getCred();
   if (cred && c.pw_session && c.pw_session === sessionToken(cred)) {
-    return res.json({ loggedIn: true, method: 'password', name: cred.name || c.user_name || '管理者' });
+    const gbp = await getMasterInfo(); // マスターGoogle接続の状態（常時ログイン）
+    return res.json({ loggedIn: true, method: 'password', name: cred.name || c.user_name || '管理者', gbpConnected: gbp.connected, gbpEmail: gbp.email });
   }
   // 未ログイン。needsSetup=true なら「まだ管理者未登録＝初回登録画面を出す」
   return res.status(401).json({ loggedIn: false, needsSetup: !cred });

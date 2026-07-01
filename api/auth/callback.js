@@ -1,5 +1,6 @@
 // api/auth/callback.js — Google OAuthコールバック
 import { kvGet, kvSet } from '../_kv.js';
+import { saveMasterToken } from '../_tokens.js';
 
 // お客さんのGBPアカウント→店舗を取得し、口コミAPI用の locationName を返す
 async function fetchGbpLocations(accessToken) {
@@ -196,6 +197,10 @@ export default async function handler(req, res) {
     if (storeMiss) q.set('storemiss', '1');
     return res.redirect(`/?${q.toString()}`);
   }
+
+  // 管理者がGoogle連携 → マスターGoogle接続としてサーバー側(KV)に永続保存。
+  // これで以後、ID/PWログインでも常にGBP機能が使える（Googleは繋ぎっぱなし）。
+  try { await saveMasterToken(tokens, user); } catch (e) { /* 保存失敗しても続行 */ }
 
   // 通常の管理者ログイン → cookieに保存（30日持続・Secure・トークン期限も保存）
   const MAXAGE = 60 * 60 * 24 * 30; // 30日
