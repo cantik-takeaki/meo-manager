@@ -1351,57 +1351,82 @@ async function loadLocations() {
       gbpLocations: s.gbpLocations || [],
     }));
 
-    // 重複排除：自社Googleにオーナー登録している運用では、同じ店舗が
-    // 「GBP一覧」と「登録店舗」で二重に出る。GBP側を残し、GBPに無い登録店舗だけ追加する。
-    const _norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)|店$/g, '').toLowerCase();
-    const _titleMatch = (a, b) => { a = _norm(a); b = _norm(b); return a && b && (a === b || a.includes(b) || b.includes(a)); };
+    // ── locationIDで厳密に重複排除（GBP自動取得＋手動登録の重複を1つに） ──
     const _locId = (s) => String(s || '').match(/locations\/[^/]+/)?.[0] || '';
-    const locations = [...gbpLocations];
-    for (const a of adminLocations) {
-      const aLoc = _locId(a.gbpLocationName);
-      const dup = gbpLocations.find(g =>
-        (aLoc && _locId(g.name) === aLoc) || _titleMatch(a.title, g.title)
-      );
-      if (dup) {
-        // GBP側に、登録店舗が持つ補助情報（口コミ依頼用storeId等）を控えめに引き継ぐ
-        if (a.storeId && !dup._linkedStoreId) dup._linkedStoreId = a.storeId;
-      } else {
-        locations.push(a); // GBPに存在しない登録店舗のみ表示
+    const byLoc = new Map();      // locationID → 店舗
+    const locations = [];
+    const pushLoc = (loc) => {
+      const id = _locId(loc.name) || _locId(loc.gbpLocationName);
+      if (id) {
+        if (byLoc.has(id)) { // 既出：手動側のstoreId等を補完して統合（重複表示しない）
+          const ex = byLoc.get(id);
+          if (loc.storeId && !ex.storeId) ex.storeId = loc.storeId;
+          if (loc.clientName && !ex.clientName) ex.clientName = loc.clientName;
+          return;
+        }
+        byLoc.set(id, loc);
       }
-    }
+      locations.push(loc);
+    };
+    gbpLocations.forEach(pushLoc);
+    // 手動登録店舗：GBP側に同一locationIDが無いものだけ追加（クライアント名は clientEmail や 手動 で分類）
+    adminLocations.forEach(a => {
+      a.clientName = a.clientName || (a.gbpConnected ? '（GBP連携）' : '手動登録の店舗');
+      pushLoc(a);
+    });
     window._locations = locations;
+
+    // ── クライアント（GBPアカウント＝企業）＞店舗 でグルーピング ──
+    const clientMap = new Map();
+    locations.forEach((loc, idx) => {
+      loc._idx = idx;
+      const cn = loc.clientName || '未分類';
+      if (!clientMap.has(cn)) clientMap.set(cn, []);
+      clientMap.get(cn).push(loc);
+    });
+    window._clients = [...clientMap.entries()].map(([name, stores]) => ({ name, stores }));
 
     document.getElementById('statLocations').textContent = locations.length;
 
+    // サイドバー：クライアント見出し＋その下に店舗
     const storeList = document.getElementById('storeList');
     if (!locations.length) {
       storeList.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:var(--text-muted)">店舗なし</div>';
     } else {
-      storeList.innerHTML = locations.map((loc, i) => `
-        <button class="store-item${i === 0 ? ' active' : ''}" onclick="selectLocation(${i})" id="store-${i}">
-          <span class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></span>
-          ${loc.title || '店舗 ' + (i+1)}
-        </button>
+      storeList.innerHTML = window._clients.map(cl => `
+        <div class="sidebar-section" style="margin:12px 0 4px 8px">${escapeHtml(cl.name)}<span style="opacity:.6"> (${cl.stores.length})</span></div>
+        ${cl.stores.map(loc => `
+          <button class="store-item" onclick="selectLocation(${loc._idx})" id="store-${loc._idx}">
+            <span class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></span>
+            ${loc.title || '店舗'}
+          </button>`).join('')}
       `).join('');
       selectLocation(0);
     }
 
-    document.getElementById('locationList').innerHTML = locations.length
-      ? locations.map((loc, i) => `
-          <div onclick="selectLocation(${i})" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
+    // 店舗管理（本体）：クライアントごとにカード → その中に店舗一覧
+    document.getElementById('locationList').innerHTML = window._clients.map(cl => `
+      <div style="margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;margin-bottom:8px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span>
+          ${escapeHtml(cl.name)}
+          <span style="font-size:12px;color:var(--text-sub);font-weight:400">${cl.stores.length}店舗</span>
+        </div>
+        ${cl.stores.map(loc => `
+          <div onclick="selectLocation(${loc._idx})" style="display:flex;align-items:center;gap:12px;padding:12px;margin-left:14px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;background:var(--bg-2)">
             <div class="store-dot" style="background:${loc._type === 'manual' ? 'var(--gold)' : 'var(--accent-2)'}"></div>
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:14px">${loc.title || '—'}</div>
               <div style="font-size:12px;color:var(--text-sub)">${loc._type === 'manual' ? 'クライアント店舗' : formatAddress(loc.storefrontAddress)}</div>
               <div style="margin-top:5px;display:flex;align-items:center;gap:6px">
-                <div style="flex:1;max-width:160px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div id="rd-bar-${i}" style="height:100%;width:0;background:var(--accent);transition:width .3s"></div></div>
-                <span id="rd-pct-${i}" style="font-size:11px;color:var(--text-sub)">…</span>
+                <div style="flex:1;max-width:160px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div id="rd-bar-${loc._idx}" style="height:100%;width:0;background:var(--accent);transition:width .3s"></div></div>
+                <span id="rd-pct-${loc._idx}" style="font-size:11px;color:var(--text-sub)">…</span>
               </div>
             </div>
             <span class="badge ${loc._type === 'manual' ? 'badge-pending' : 'badge-active'}">${loc._type === 'manual' ? '手動登録' : 'GBP連携'}</span>
-          </div>
-        `).join('')
-      : '<div class="empty-state"><p>店舗が見つかりません</p></div>';
+          </div>`).join('')}
+      </div>
+    `).join('') || '<div class="empty-state"><p>店舗が見つかりません</p></div>';
     if (locations.length) loadCrossStoreReadiness(locations);
 
   } catch (e) {

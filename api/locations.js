@@ -109,21 +109,31 @@ export default async function handler(req, res) {
       { headers: { Authorization: `Bearer ${access_token}` } }
     );
     const accountsData = await accountsRes.json();
-    if (!accountsData.accounts?.length) return res.json({ locations: [] });
+    if (!accountsData.accounts?.length) return res.json({ locations: [], accounts: [] });
 
-    // 各アカウントの店舗を取得
+    // 各アカウント（≒クライアント企業）の店舗を取得。
+    // accountName(表示名)をクライアント名として付与し、GBP内の重複はlocationIDで排除。
     const locations = [];
-    for (const account of accountsData.accounts.slice(0, 5)) {
+    const seen = new Set();
+    const accounts = [];
+    for (const account of accountsData.accounts.slice(0, 10)) {
+      const clientName = account.accountName || '（名称未設定のアカウント）';
+      accounts.push({ id: account.name, name: clientName, type: account.type });
       const locRes = await fetch(
-        `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri,regularHours,phoneNumbers,categories`,
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri,regularHours,phoneNumbers,categories&pageSize=100`,
         { headers: { Authorization: `Bearer ${access_token}` } }
       );
       const locData = await locRes.json();
       if (locData.locations) {
-        locations.push(...locData.locations.map(l => ({ ...l, accountName: account.name })));
+        for (const l of locData.locations) {
+          const locId = String(l.name || '').match(/locations\/[^/]+/)?.[0] || l.name;
+          if (locId && seen.has(locId)) continue; // 同一ロケーションIDの重複を排除
+          if (locId) seen.add(locId);
+          locations.push({ ...l, accountName: account.name, clientName });
+        }
       }
     }
-    res.json({ locations });
+    res.json({ locations, accounts });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
