@@ -822,11 +822,35 @@ body {
         <div class="page-title">口コミ管理</div>
         <div class="page-sub" id="reviewsSubtitle">店舗を選択してください</div>
       </div>
+      <!-- ▼▼ 口コミサマリー（追加・ぐるっと風：総数/平均/返信状況/★分布） ▼▼ -->
+      <div class="card" id="reviewStatsCard" style="display:none">
+        <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+          <div style="text-align:center;min-width:120px">
+            <div style="font-size:40px;font-weight:900;line-height:1.1" id="rsAvg">—</div>
+            <div id="rsStars" style="color:var(--gold);font-size:16px;letter-spacing:2px">—</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:2px"><span id="rsTotal">—</span>件の口コミ</div>
+          </div>
+          <div style="flex:1;min-width:240px">
+            <div id="rsDist"></div>
+          </div>
+          <div style="display:flex;gap:12px;min-width:200px">
+            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">✅ 返信済み</div><div class="k-v" style="color:var(--accent-2)" id="rsReplied">—</div></div>
+            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">⏳ 未返信</div><div class="k-v" style="color:var(--gold)" id="rsUnreplied">—</div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button class="filter-btn active" onclick="filterReviews('all', this)">すべて</button>
         <button class="filter-btn" onclick="filterReviews('unreplied', this)">未返信</button>
         <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
         <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
+        <select id="reviewSort" onchange="renderReviews()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer">
+          <option value="newest">新しい順</option>
+          <option value="oldest">古い順</option>
+          <option value="lowest">評価の低い順</option>
+          <option value="unreplied">未返信を先に</option>
+        </select>
         <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
         <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()">📤 生成した返信を一括投稿</button>
       </div>
@@ -3684,11 +3708,48 @@ async function loadReviews() {
 
     if (!allReviews.length) allReviews = getDemoReviews();
     document.getElementById('statPending').textContent = allReviews.filter(r => !r.reviewReply).length;
+    renderReviewStats();
     renderReviews();
   } catch (e) {
     allReviews = getDemoReviews();
+    renderReviewStats();
     renderReviews();
   }
+}
+
+// 口コミサマリー（総数・平均・★分布・返信状況）を描画。allReviewsからクライアント側で集計（実データ/デモ共通）
+function renderReviewStats() {
+  const card = document.getElementById('reviewStatsCard');
+  if (!card) return;
+  const reviews = allReviews || [];
+  if (!reviews.length) { card.style.display = 'none'; return; }
+  let sum = 0, count = 0, replied = 0;
+  const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  reviews.forEach(r => {
+    const s = starRatingToNum(r.starRating);
+    if (s >= 1 && s <= 5) { sum += s; count++; dist[s]++; }
+    if (r.reviewReply) replied++;
+  });
+  const avg = count ? Math.round((sum / count) * 10) / 10 : 0;
+  card.style.display = '';
+  document.getElementById('rsAvg').textContent = avg.toFixed(1);
+  const full = Math.round(avg);
+  document.getElementById('rsStars').textContent = '★'.repeat(full) + '☆'.repeat(5 - full);
+  document.getElementById('rsTotal').textContent = count;
+  document.getElementById('rsReplied').textContent = replied;
+  document.getElementById('rsUnreplied').textContent = reviews.length - replied;
+  // ★分布 横バー（5→1）
+  const max = Math.max(1, ...Object.values(dist));
+  document.getElementById('rsDist').innerHTML = [5, 4, 3, 2, 1].map(s => {
+    const n = dist[s];
+    const pct = Math.round((n / max) * 100);
+    const color = s >= 4 ? 'var(--accent-2)' : s === 3 ? 'var(--gold)' : 'var(--red)';
+    return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+      <span style="font-size:11px;color:var(--text-sub);width:26px;text-align:right">★${s}</span>
+      <div style="flex:1;height:10px;background:var(--bg-3);border-radius:5px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:5px;min-width:${n ? 3 : 0}px"></div></div>
+      <span style="font-size:11px;color:var(--text-sub);width:28px">${n}件</span>
+    </div>`;
+  }).join('');
 }
 
 function getDemoReviews() {
@@ -3711,10 +3772,7 @@ function starRatingToNum(r) {
 }
 
 function renderReviews() {
-  let reviews = [...allReviews];
-  if (currentFilter === 'unreplied') reviews = reviews.filter(r => !r.reviewReply);
-  if (currentFilter === 'low') reviews = reviews.filter(r => starRatingToNum(r.starRating) <= 2);
-  if (currentFilter === 'high') reviews = reviews.filter(r => starRatingToNum(r.starRating) >= 4);
+  const reviews = getFilteredReviews(); // フィルタ＋並べ替え（AIボタンのインデックスと同一の並び）
 
   const el = document.getElementById('reviewsList');
   if (!reviews.length) {
@@ -3735,7 +3793,7 @@ function renderReviews() {
           <div class="stars">${stars}</div>
         </div>
         <div class="review-text">${r.comment || '（コメントなし）'}</div>
-        ${r.reviewReply ? `<div class="review-reply"><div class="review-reply-label">オーナーの返信</div>${r.reviewReply.comment}</div>` : ''}
+        ${r.reviewReply ? `<div class="review-reply"><div class="review-reply-label">オーナーの返信${r.reviewReply.updateTime ? `<span style="font-weight:400;color:var(--text-muted)">・返信日 ${new Date(r.reviewReply.updateTime).toLocaleDateString('ja-JP')}</span>` : ''}</div>${r.reviewReply.comment}</div>` : ''}
         <div class="review-actions">
           <button class="btn btn-outline btn-sm" onclick="toggleReplyEditor(${i})">
             ${r.reviewReply ? '返信を編集' : '返信する'}
@@ -3764,13 +3822,21 @@ function toggleReplyEditor(i) {
   document.getElementById(`re-${i}`).classList.toggle('open');
 }
 
+// フィルタ＋並べ替えの単一情報源。renderReviewsとgenerateReply等のインデックスはここで必ず一致させる
 function getFilteredReviews() {
-  return allReviews.filter(r => {
+  const list = allReviews.filter(r => {
     if (currentFilter === 'unreplied') return !r.reviewReply;
     if (currentFilter === 'low') return starRatingToNum(r.starRating) <= 2;
     if (currentFilter === 'high') return starRatingToNum(r.starRating) >= 4;
     return true;
   });
+  const sort = document.getElementById('reviewSort')?.value || 'newest';
+  const t = (r) => new Date(r.createTime || 0).getTime();
+  if (sort === 'oldest') list.sort((a, b) => t(a) - t(b));
+  else if (sort === 'lowest') list.sort((a, b) => (starRatingToNum(a.starRating) - starRatingToNum(b.starRating)) || (t(b) - t(a)));
+  else if (sort === 'unreplied') list.sort((a, b) => ((a.reviewReply ? 1 : 0) - (b.reviewReply ? 1 : 0)) || (t(b) - t(a)));
+  else list.sort((a, b) => t(b) - t(a)); // newest（既定）
+  return list;
 }
 
 async function generateReply(i) {
