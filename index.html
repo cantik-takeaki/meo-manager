@@ -266,6 +266,9 @@ body {
 
 /* ─── 店舗編集フォームの入力 ─── */
 .ed-in { display:block; width:100%; margin-top:5px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14px; font-family:inherit; }
+/* 「その他」ドロップダウン項目 */
+.more-item { display:block; width:100%; text-align:left; background:none; border:none; padding:11px 16px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; }
+.more-item:hover { background:var(--bg-3); }
 
 /* ─── カードタイトルのアイコンチップ（ぐるっと風・絵文字の格上げ） ─── */
 .ttl-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 9px; flex-shrink: 0; position: relative; top: -1px; }
@@ -790,7 +793,22 @@ body {
             <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
             <span style="width:10px;height:10px;border-radius:50%;background:var(--accent)"></span>
             <span id="storeDetailName" style="font-size:18px;font-weight:800"></span>
+            <span class="badge badge-active">有効</span>
             <span id="storeDetailCompany" style="font-size:12px;color:var(--text-muted)"></span>
+            <!-- 店舗ページのアクション（ぐるっと相当：店舗分析／一括順位入力／その他） -->
+            <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:relative">
+              <button class="btn btn-primary btn-sm" onclick="document.getElementById('meoDiagCard')?.scrollIntoView({behavior:'smooth'})">📊 店舗分析</button>
+              <button class="btn btn-outline btn-sm" onclick="showBulkRank(window._qrIdx ?? currentLocation?._idx)">📋 一括順位入力</button>
+              <button class="btn btn-outline btn-sm" onclick="toggleStoreMore(event)">⋯ その他 ▾</button>
+              <div id="storeMoreMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:20;min-width:210px;overflow:hidden">
+                <button class="more-item" onclick="_moreGo('qr')">🔳 口コミQR管理</button>
+                <button class="more-item" onclick="_moreGo('pop')">🖨 口コミPOP作成</button>
+                <button class="more-item" onclick="_moreGo('result')">📈 口コミQR成果</button>
+                <button class="more-item" onclick="_moreGo('survey')">📋 アンケート回答履歴</button>
+                <button class="more-item" onclick="_moreGo('editsurvey')">✏️ アンケート編集</button>
+                <button class="more-item" onclick="_moreGo('edit')" style="border-top:1px solid var(--border)">🏢 店舗情報を編集</button>
+              </div>
+            </div>
           </div>
         </div>
       <div class="stats-grid">
@@ -1262,6 +1280,29 @@ body {
           <button class="btn btn-outline" onclick="showStoreQr(window._qrIdx)">キャンセル</button>
           <button class="btn btn-primary" onclick="saveStoreEdit()">更新する</button>
         </div>
+      </div>
+
+      <!-- ▼▼ 一括順位入力ビュー ▼▼ -->
+      <div id="storeBulkRankView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <div style="flex:1"><div class="page-title" style="font-size:20px">一括順位入力</div><div class="page-sub" id="bulkStoreName"></div></div>
+          <button class="btn btn-outline btn-sm" onclick="showBulkRank(window._qrIdx)">↺ クリア</button>
+          <button class="btn btn-primary btn-sm" onclick="saveBulkRank()">💾 保存</button>
+        </div>
+        <div class="card">
+          <label style="font-size:12px;color:var(--text-sub)">計測日 <span style="color:var(--red)">*</span>
+            <input id="bulkDate" type="date" class="ed-in" style="max-width:220px">
+          </label>
+          <div style="font-size:12px;color:var(--text-sub);margin-top:6px"><span id="bulkKwCount">0</span> キーワード</div>
+        </div>
+        <div class="card" style="padding:8px 4px">
+          <div style="overflow-x:auto">
+            <table class="summary-table"><thead><tr><th style="text-align:left;padding-left:16px">キーワード</th><th>前回</th><th>今回順位</th><th>圏外</th><th style="text-align:left">メモ</th></tr></thead>
+            <tbody id="bulkRankBody"></tbody></table>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);line-height:1.8">・Enterで次のキーワードに移動します　・順位を入力しなかったキーワードは保存されません　・同じ日付・同じキーワードで既にデータがある場合は上書き保存されます</p>
       </div>
     </div>
 
@@ -4002,7 +4043,7 @@ function jumpToStore(storeId) {
 
 // ─── 店舗管理の4ビュー切替（一覧 / 詳細 / 追加・管理 / 回答履歴） ───
 function _storeViews(show) {
-  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView'].forEach(id => {
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
   });
 }
@@ -4290,6 +4331,92 @@ async function saveStoreEdit() {
     await loadLocations();
     showStoreQr(window._qrIdx);
   } catch (e) { showToast('保存に失敗しました: ' + e.message, 'error'); }
+}
+
+// ─── 店舗ページ「その他」ドロップダウン ───
+function toggleStoreMore(e) {
+  e?.stopPropagation();
+  const m = document.getElementById('storeMoreMenu');
+  if (!m) return;
+  const open = m.style.display !== 'none';
+  m.style.display = open ? 'none' : 'block';
+  if (!open) setTimeout(() => document.addEventListener('click', _closeStoreMore), 0);
+}
+function _closeStoreMore() { const m = document.getElementById('storeMoreMenu'); if (m) m.style.display = 'none'; document.removeEventListener('click', _closeStoreMore); }
+function _moreGo(what) {
+  _closeStoreMore();
+  const idx = window._qrIdx ?? currentLocation?._idx;
+  if (idx == null) return;
+  if (what === 'qr') showStoreQr(idx);
+  else if (what === 'pop') openReviewPop();
+  else if (what === 'result') showStoreQrResult(idx);
+  else if (what === 'survey') showStoreSurvey(idx);
+  else if (what === 'edit') showStoreEdit(idx);
+  else if (what === 'editsurvey') { document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth' }); try { openSurveyEditor(); } catch (e) {} }
+}
+
+// ─── 一括順位入力 ───
+async function showBulkRank(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  window._qrIdx = idx;
+  currentLocation = loc;
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
+  _storeViews('storeBulkRankView');
+  document.getElementById('bulkStoreName').textContent = loc.title || '';
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('bulkDate').value = today;
+  const body = document.getElementById('bulkRankBody');
+  body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">読み込み中...</td></tr>';
+  // キーワード取得：順位データ→ナレッジ
+  let kws = [], lastRanks = [];
+  try {
+    const rk = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    kws = (rk.keywords || []).filter(Boolean);
+    const hist = rk.history || [];
+    lastRanks = hist.length ? (hist[hist.length - 1].rankings || []) : [];
+  } catch (e) {}
+  if (!kws.length) {
+    try { const k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); kws = (k.keywords || []).filter(Boolean); } catch (e) {}
+  }
+  document.getElementById('bulkKwCount').textContent = kws.length;
+  window._bulkKeywords = kws;
+  if (!kws.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">有効なキーワードが登録されていません。<br>店舗ページの「AIでキーワード候補を作成」または順位入力から登録してください。</td></tr>';
+    return;
+  }
+  body.innerHTML = kws.map((kw, i) => `
+    <tr>
+      <td style="text-align:left;padding-left:16px;font-weight:500">${escapeHtml(kw)}</td>
+      <td style="color:var(--text-sub)">${lastRanks[i] ? lastRanks[i] + '位' : '—'}</td>
+      <td><input id="brank-${i}" type="number" min="1" max="100" placeholder="順位" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('brank-'+(${i}+1))?.focus();}" style="width:80px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;text-align:center;font-size:13px"></td>
+      <td><input id="bout-${i}" type="checkbox" onchange="if(this.checked)document.getElementById('brank-'+${i}).value='';" style="width:16px;height:16px"></td>
+      <td style="text-align:left"><input id="bmemo-${i}" type="text" placeholder="メモ（任意）" style="width:100%;min-width:140px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:13px"></td>
+    </tr>`).join('');
+}
+
+async function saveBulkRank() {
+  if (!currentLocationId) return;
+  const date = document.getElementById('bulkDate').value;
+  if (!date) return showToast('計測日を入力してください', 'error');
+  const kws = window._bulkKeywords || [];
+  const rankings = kws.map((_, i) => {
+    if (document.getElementById('bout-' + i)?.checked) return null; // 圏外
+    const v = parseInt(document.getElementById('brank-' + i)?.value, 10);
+    return Number.isFinite(v) ? v : null;
+  });
+  const entered = rankings.filter(r => r != null).length + kws.filter((_, i) => document.getElementById('bout-' + i)?.checked).length;
+  if (!entered) return showToast('順位または圏外を1件以上入力してください', 'error');
+  try {
+    const res = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords: kws, rankings, date }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '保存に失敗しました', 'error');
+    showToast(`${entered}件の順位を保存しました（${date}）`, 'success');
+    loadDashboardSummary();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───

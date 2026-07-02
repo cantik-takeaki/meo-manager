@@ -525,15 +525,18 @@ export default async function handler(req, res) {
 
   // ── 順位保存 ──
   if (req.method === 'POST' && action === 'rankings') {
-    const { storeId, keywords, rankings } = req.body;
+    const { storeId, keywords, rankings, date } = req.body;
     if (!storeId) return res.status(400).json({ error: 'storeId必須' });
     const existing = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
-    const entry = { date: new Date().toISOString().split('T')[0], rankings, recordedAt: new Date().toISOString() };
+    // 計測日は指定があればそれを使う（一括順位入力）。無ければ本日。
+    const useDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? date : new Date().toISOString().split('T')[0];
+    const entry = { date: useDate, rankings, recordedAt: new Date().toISOString() };
     const idx = existing.history.findIndex(h => h.date === entry.date);
     if (idx >= 0) existing.history[idx] = entry;
     else existing.history.push(entry);
-    if (existing.history.length > 30) existing.history = existing.history.slice(-30);
-    existing.keywords = keywords;
+    existing.history.sort((a, b) => String(a.date).localeCompare(String(b.date))); // 日付昇順（過去日入力に対応）
+    if (existing.history.length > 60) existing.history = existing.history.slice(-60);
+    if (Array.isArray(keywords)) existing.keywords = keywords;
     await kvSet(`rankings_${storeId}`, existing);
     return res.json({ success: true });
   }
