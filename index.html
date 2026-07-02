@@ -878,10 +878,25 @@ body {
               <a id="qrDownloadLink" download="口コミ依頼QR.png" class="btn btn-outline btn-sm" href="#">QR画像を保存</a>
               <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" id="qrEnabledToggle" onchange="toggleQrEnabled(this.checked)"> 口コミ受付を有効にする</label>
             </div>
+
+            <!-- 確認用（プレビュー・集計されない） -->
+            <div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
+              <div style="font-size:12px;font-weight:700;margin-bottom:4px">🔎 確認用リンク（スタッフ確認・集計されません）</div>
+              <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">自分たちで動作チェックする時はこちら。スキャンしてもKPIやリードに記録されません。</p>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <input id="reviewPreviewInput" readonly style="flex:1;min-width:200px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                <button class="btn btn-outline btn-sm" onclick="copyReviewLink(true)">コピー</button>
+                <a id="reviewPreviewOpen" href="#" target="_blank" class="btn btn-outline btn-sm">開く</a>
+                <a id="qrPreviewDownload" download="確認用QR.png" class="btn btn-outline btn-sm" href="#">確認用QRを保存</a>
+              </div>
+            </div>
           </div>
           <div style="text-align:center">
-            <img id="reviewQrImg" alt="口コミ依頼QR" style="width:150px;height:150px;border:1px solid var(--border);border-radius:8px;background:#fff">
-            <div style="font-size:11px;color:var(--text-sub);margin-top:4px">店頭POP・レシートに</div>
+            <img id="reviewQrImg" alt="お客用 口コミ依頼QR" style="width:150px;height:150px;border:1px solid var(--border);border-radius:8px;background:#fff">
+            <div style="font-size:11px;color:var(--accent-2);font-weight:700;margin-top:4px">お客用QR</div>
+            <div style="font-size:11px;color:var(--text-sub)">店頭POP・レシートに</div>
+            <img id="reviewPreviewQrImg" alt="確認用QR" style="width:110px;height:110px;border:1px dashed var(--border);border-radius:8px;background:#fff;margin-top:12px">
+            <div style="font-size:11px;color:var(--text-sub);margin-top:2px">確認用（集計なし）</div>
           </div>
         </div>
 
@@ -1726,7 +1741,7 @@ async function pwSubmit(e) {
       document.getElementById('codeMsg').textContent = `${d.email} に届いた6桁の認証コードを入力してください。`;
       document.getElementById('codeForm').style.display = 'block';
       setTimeout(() => document.getElementById('codeInput').focus(), 100);
-    } else if (d.success) { location.reload(); }
+    } else if (d.success) { try { sessionStorage.setItem('rakuraku_panel', 'dashboard'); } catch (e3) {} location.reload(); }
     else { err.textContent = d.error || 'できませんでした'; }
   } catch (e2) { err.textContent = '通信エラー: ' + e2.message; }
   return false;
@@ -1740,7 +1755,7 @@ async function codeSubmit(e) {
   try {
     const r = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verify', code }) });
     const d = await r.json();
-    if (d.success) { location.reload(); }
+    if (d.success) { try { sessionStorage.setItem('rakuraku_panel', 'dashboard'); } catch (e3) {} location.reload(); }
     else { err.textContent = d.error || '認証できませんでした'; }
   } catch (e2) { err.textContent = '通信エラー: ' + e2.message; }
   return false;
@@ -1837,6 +1852,13 @@ async function init() {
 
     loadLocations();
     loadDashboardSummary(); // 全社サマリー（順位ロールアップ＋KPI合計＋店舗別表）
+
+    // リロード時は直前のページを復元（ログイン直後はdashboardに設定済み）。ダッシュボードは初期表示のまま。
+    try {
+      const saved = sessionStorage.getItem('rakuraku_panel');
+      const valid = ['dashboard', 'clients', 'stores', 'reviews', 'posts', 'instagram', 'citation', 'aio', 'protection', 'knowledge'];
+      if (saved && saved !== 'dashboard' && valid.includes(saved)) switchPanel(saved);
+    } catch (e) {}
   } catch {
     showLogin();
   }
@@ -2303,11 +2325,13 @@ async function loadKpi() {
 }
 
 // 店舗の口コミ依頼ページURL（Google URLはアンケート設定 or localStorage）
-function reviewPageUrl() {
+function reviewPageUrl(preview) {
   // 依頼URLは store+name のみ（固定URL）。Google口コミURLは review.html が
   // survey KV(SURVEY.googleUrl) から解決するため、URLに g= を埋め込まない。
+  // preview=true は確認用（スタッフ確認・集計されない）。
   return location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
-    + '&name=' + encodeURIComponent(currentLocation?.title || '当店');
+    + '&name=' + encodeURIComponent(currentLocation?.title || '当店')
+    + (preview ? '&preview=1' : '');
 }
 
 // ① 口コミ依頼リンク/QRセクションの描画（loadKpiから呼ぶ・survey KVを正とする）
@@ -2322,6 +2346,13 @@ async function renderReviewLink() {
   const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=' + encodeURIComponent(url);
   const img = document.getElementById('reviewQrImg'); if (img) img.src = qr;
   const dl = document.getElementById('qrDownloadLink'); if (dl) dl.href = qr;
+  // 確認用（プレビュー）リンク・QR
+  const purl = reviewPageUrl(true);
+  const pinp = document.getElementById('reviewPreviewInput'); if (pinp) pinp.value = purl;
+  const popen = document.getElementById('reviewPreviewOpen'); if (popen) popen.href = purl;
+  const pqr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=' + encodeURIComponent(purl);
+  const pimg = document.getElementById('reviewPreviewQrImg'); if (pimg) pimg.src = pqr;
+  const pdl = document.getElementById('qrPreviewDownload'); if (pdl) pdl.href = pqr;
   const tog = document.getElementById('qrEnabledToggle'); if (tog) tog.checked = (_surveyCache?.qrEnabled !== false);
   // Google口コミURL 状態バナー
   const banner = document.getElementById('reviewGoogleBanner');
@@ -2333,9 +2364,10 @@ async function renderReviewLink() {
     }
   }
 }
-function copyReviewLink() {
-  const url = reviewPageUrl();
-  navigator.clipboard.writeText(url).then(() => showToast('口コミ依頼URLをコピーしました。LINE・QRで送れます', 'success'))
+function copyReviewLink(preview) {
+  const url = reviewPageUrl(!!preview);
+  const msg = preview ? '確認用URLをコピーしました（集計されません）' : '口コミ依頼URLをコピーしました。LINE・QRで送れます';
+  navigator.clipboard.writeText(url).then(() => showToast(msg, 'success'))
     .catch(() => window.prompt('以下のURLをコピーしてお使いください：', url));
 }
 async function toggleQrEnabled(on) {
@@ -4734,6 +4766,8 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
 
 // ─── Navigation ───
 function switchPanel(name, triggerEl) {
+  // 現在のパネルを記憶（リロードしても同じページを維持するため）
+  try { sessionStorage.setItem('rakuraku_panel', name); } catch (e) {}
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + name)?.classList.add('active');

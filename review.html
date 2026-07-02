@@ -42,6 +42,12 @@
   @keyframes s{ to{ transform:rotate(360deg); } }
   .thanks{ text-align:center; padding:30px 16px; }
   .thanks .big{ font-size:46px; }
+  /* 高品質アイコンバッジ */
+  .icon-badge{ width:72px; height:72px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin:0 auto 4px; box-shadow:0 6px 18px rgba(0,0,0,.10); }
+  .icon-badge svg{ width:36px; height:36px; }
+  .icon-badge.green{ background:linear-gradient(135deg,#22c55e,#06873a); color:#fff; }
+  .icon-badge.blue{ background:linear-gradient(135deg,var(--blue),var(--blue-d)); color:#fff; }
+  .lead-ico{ width:22px; height:22px; vertical-align:middle; margin-right:7px; color:var(--blue); }
 </style>
 </head>
 <body>
@@ -101,7 +107,7 @@
   <!-- STEP3: 完了（高評価コピー後） -->
   <div class="card hidden" id="step3">
     <div class="thanks">
-      <div class="big">🙏</div>
+      <div class="icon-badge green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="4" width="12" height="14" rx="2"/><path d="M16 4V3a1 1 0 00-1-1H5a1 1 0 00-1 1v13a1 1 0 001 1h1"/><path d="M11 12l2 2 3.5-3.5"/></svg></div>
       <h2 style="margin:10px 0">ありがとうございます！</h2>
       <p style="color:var(--sub);font-size:14px">下書きをコピーしました。<br>Googleの投稿画面で貼り付けて投稿してください。</p>
       <button class="btn btn-google" id="openGoogle" style="margin-top:20px">Googleの口コミ投稿を開く</button>
@@ -113,7 +119,7 @@
   <!-- STEP-DONE: 完了（フィードバック送信後） -->
   <div class="card hidden" id="stepDone">
     <div class="thanks">
-      <div class="big">✅</div>
+      <div class="icon-badge green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg></div>
       <h2 style="margin:10px 0" id="doneTitle">ありがとうございました</h2>
       <p style="color:var(--sub);font-size:14px" id="doneMsg"></p>
       <button class="btn btn-line hidden" id="lineBtn2" style="margin-top:16px">LINEで友だち追加</button>
@@ -126,13 +132,21 @@
 const params = new URLSearchParams(location.search);
 const STORE_ID = params.get('store') || '';
 const STORE_NAME = params.get('name') || '当店';
+// 確認用（プレビュー）モード：スタッフ確認用。KPI集計・リード・フィードバックを記録しない。
+const PREVIEW = params.get('preview') === '1';
 let SURVEY = null;
 let RATING = 0;
 
 document.getElementById('storeName').textContent = STORE_NAME;
 
+// 確認用バナー（記録されないことを明示）
+if (PREVIEW) {
+  document.body.insertAdjacentHTML('afterbegin',
+    '<div style="background:#fff7e6;color:#8a6d00;text-align:center;padding:8px 12px;font-size:13px;font-weight:700;border-bottom:1px solid #f0d488">確認用プレビュー（この操作は集計・記録されません）</div>');
+}
+
 function kpiTrack(ev, value){
-  if(!STORE_ID) return;
+  if(!STORE_ID || PREVIEW) return;   // プレビューは集計しない
   try { fetch('/api/admin?action=kpi-track', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ storeId: STORE_ID, event: ev, value }), keepalive:true
@@ -189,7 +203,7 @@ function renderLeadBox(){
     box.dataset.rendered = '1';
     box.innerHTML = `
       <div style="margin-top:18px;border-top:1px solid #e6edf3;padding-top:16px;text-align:left">
-        <div style="font-size:14px;font-weight:700;margin-bottom:6px">📩 次回使えるお知らせ</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px"><svg class="lead-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>次回使えるお知らせ</div>
         <p style="font-size:12.5px;color:var(--sub);margin-bottom:10px">${msg}</p>
         <input class="free" type="email" placeholder="メールアドレス（任意）" data-lead-email>
         <button class="btn btn-primary" style="margin-top:10px" data-lead-btn>登録する</button>
@@ -201,12 +215,14 @@ function renderLeadBox(){
       const email = (inp.value || '').trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ inp.style.borderColor = '#e0563a'; return; }
       btn.disabled = true; btn.textContent = '登録中…';
-      try {
-        await fetch('/api/admin?action=lead-submit', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ storeId: STORE_ID, email, rating: RATING })
-        });
-      } catch(e){}
+      if (!PREVIEW) {
+        try {
+          await fetch('/api/admin?action=lead-submit', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ storeId: STORE_ID, email, rating: RATING })
+          });
+        } catch(e){}
+      }
       box.querySelector('[data-lead-email]').style.display = 'none';
       btn.style.display = 'none';
       box.querySelector('[data-lead-done]').style.display = 'block';
@@ -281,13 +297,15 @@ lowText.oninput = () => { document.getElementById('lowSubmit').disabled = lowTex
 document.getElementById('lowSubmit').onclick = async () => {
   const btn = document.getElementById('lowSubmit');
   btn.disabled = true; btn.textContent = '送信中…';
-  try {
-    await fetch('/api/admin?action=feedback-submit', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ storeId: STORE_ID, rating: RATING, text: lowText.value.trim(), contact: document.getElementById('lowContact').value.trim() })
-    });
-    kpiTrack('lowfb');
-  } catch(e){}
+  if (!PREVIEW) {
+    try {
+      await fetch('/api/admin?action=feedback-submit', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ storeId: STORE_ID, rating: RATING, text: lowText.value.trim(), contact: document.getElementById('lowContact').value.trim() })
+      });
+      kpiTrack('lowfb');
+    } catch(e){}
+  }
   document.getElementById('stepLow').classList.add('hidden');
   document.getElementById('doneTitle').textContent = 'お声をありがとうございました';
   document.getElementById('doneMsg').textContent = SURVEY?.completionMsg || 'いただいたご意見は、サービス改善に活かしてまいります。';
