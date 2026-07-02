@@ -1664,10 +1664,11 @@ body {
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
         <div class="card-header"><div class="card-title">⚡ URLから自動取得</div></div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">店舗のHP・ぐるなび・食べログなどのURLを入れると、AIが店名・業種・営業時間・強み・サービス・キーワードを読み取って下記フォームに反映します（反映後に内容を確認して保存してください）。</p>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">店舗のHP・ぐるなび・食べログ・<b>Instagram</b>などのURLを入れると、AIが店名・業種・営業時間・強み・サービス・キーワードを読み取って下記フォームに反映します（反映後に内容を確認して保存してください）。連携済みのInstagramなら、右のボタンでプロフィール・最近の投稿から取得できます。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="autofillUrl" type="url" placeholder="https://（店舗HP・ぐるなび等のURL）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <input id="autofillUrl" type="url" placeholder="https://（店舗HP・ぐるなび・食べログ・Instagram等のURL）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           <button class="btn btn-primary" onclick="autofillFromUrl()">⚡ 取得して反映</button>
+          <button class="btn btn-outline" onclick="autofillFromInstagram()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>連携Instagramから取得</button>
         </div>
         <div id="autofillStatus" style="font-size:12px;color:var(--text-sub);margin-top:8px"></div>
       </div>
@@ -7503,32 +7504,53 @@ async function autofillFromUrl() {
     });
     const d = await res.json();
     if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
-    const f = d.fields || {};
-    // 空でない項目だけ反映（既存入力を勝手に消さない）
-    const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
-    set('kn-storeName', f.storeName);
-    set('kn-category', f.category);
-    set('kn-phone', f.phone);
-    set('kn-postalCode', f.postalCode);
-    set('kn-address', f.address);
-    set('kn-businessDays', f.businessDays);
-    set('kn-closedDays', f.closedDays);
-    set('kn-businessHours', f.businessHours);
-    set('kn-parking', f.parking);
-    set('kn-nearbyLandmarks', f.nearbyLandmarks);
-    set('kn-description', f.description);
-    set('kn-strengths', f.strengths);
-    set('kn-expertise', f.expertise);
-    set('kn-services', f.services);
-    set('kn-serviceArea', f.serviceArea);
-    set('kn-targetCustomer', f.targetCustomer);
-    if (f.keywords) {
-      const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
-      const merged = [...new Set([...getKnKeywords(), ...kws])];
-      setKnKeywords(merged);
-    }
+    _applyAutofillFields(d.fields || {});
     status.textContent = '✅ 反映しました。内容を確認して「ナレッジを保存」を押してください。';
     showToast('自動取得しました', 'success');
+  } catch (e) { status.textContent = '⚠️ 取得失敗: ' + e.message; }
+}
+
+// autofill結果(fields)をナレッジフォームへ反映（空項目は既存を消さない）。URL/IG両方から使う。
+function _applyAutofillFields(f) {
+  const set = (id, val) => { if (val && String(val).trim()) { const el = document.getElementById(id); if (el) el.value = val; } };
+  set('kn-storeName', f.storeName); set('kn-category', f.category); set('kn-phone', f.phone);
+  set('kn-postalCode', f.postalCode); set('kn-address', f.address);
+  set('kn-businessDays', f.businessDays); set('kn-closedDays', f.closedDays);
+  set('kn-businessHours', f.businessHours); set('kn-parking', f.parking);
+  set('kn-nearbyLandmarks', f.nearbyLandmarks); set('kn-description', f.description);
+  set('kn-strengths', f.strengths); set('kn-expertise', f.expertise); set('kn-services', f.services);
+  set('kn-serviceArea', f.serviceArea); set('kn-targetCustomer', f.targetCustomer);
+  if (f.keywords) {
+    const kws = String(f.keywords).split(/[、,]/).map(s => s.trim()).filter(Boolean);
+    setKnKeywords([...new Set([...getKnKeywords(), ...kws])]);
+  }
+}
+
+// 連携済みInstagramのプロフィール＋最近の投稿キャプションからナレッジを自動反映
+async function autofillFromInstagram() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const status = document.getElementById('autofillStatus');
+  status.textContent = 'Instagramから取得中…（プロフィール・最近の投稿を解析）';
+  try {
+    const sid = '&storeId=' + encodeURIComponent(currentLocationId);
+    const conn = await fetch(`/api/posts?action=instagram&sub=conn-status${sid}`).then(r => r.json());
+    if (!conn.connected) { status.textContent = '⚠️ この店舗のInstagramが未連携です。先に連携してください（連携後、プロフィールと投稿から取得できます）。'; return showToast('Instagram未連携です', 'error'); }
+    const [acct, media] = await Promise.all([
+      fetch(`/api/posts?action=instagram&sub=account${sid}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/posts?action=instagram&sub=media${sid}`).then(r => r.json()).catch(() => ({})),
+    ]);
+    const caps = (media.data || []).map(m => (m.caption || '').trim()).filter(Boolean).slice(0, 15);
+    const text = [
+      acct.name ? `アカウント名: ${acct.name}` : '',
+      acct.username ? `Instagram: @${acct.username}` : '',
+      caps.length ? `最近の投稿キャプション（店の雰囲気・メニュー・強みの手がかり）:\n${caps.join('\n---\n')}` : '',
+    ].filter(Boolean).join('\n');
+    if (text.replace(/\s/g, '').length < 40) { status.textContent = '⚠️ Instagramから十分な情報を取得できませんでした（投稿・プロフィール文が少ない可能性）。'; return; }
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'autofill', sourceText: text }) }).then(r => r.json());
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    _applyAutofillFields(d.fields || {});
+    status.textContent = '✅ Instagramから反映しました。内容を確認して「ナレッジを保存」を押してください。';
+    showToast('Instagramから取得しました', 'success');
   } catch (e) { status.textContent = '⚠️ 取得失敗: ' + e.message; }
 }
 

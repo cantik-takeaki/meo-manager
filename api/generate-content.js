@@ -94,17 +94,23 @@ export default async function handler(req, res) {
   // ── URLから店舗情報を自動抽出（HP/ぐるなび等のWebページ） ──
   if (type === 'autofill') {
     const url = req.body.url;
-    if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: '有効なURLを入力してください' });
+    // sourceText 指定時はURL取得をスキップ（Instagram連携アカウントのプロフィール＋投稿文などを直接渡す用途）
+    const provided = String(req.body.sourceText || '').trim();
     let pageText = '';
-    try {
-      const pr = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; cantik-meo-bot/1.0)' } });
-      let html = await pr.text();
-      html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
-      pageText = html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 7000);
-    } catch (e) {
-      return res.status(400).json({ error: 'URLの取得に失敗しました: ' + e.message });
+    if (provided) {
+      pageText = provided.replace(/\s+/g, ' ').trim().slice(0, 7000);
+    } else {
+      if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: '有効なURLを入力してください' });
+      try {
+        const pr = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; cantik-meo-bot/1.0)' } });
+        let html = await pr.text();
+        html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+        pageText = html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 7000);
+      } catch (e) {
+        return res.status(400).json({ error: 'URLの取得に失敗しました: ' + e.message });
+      }
     }
-    if (pageText.length < 50) return res.status(400).json({ error: 'ページから十分な情報を取得できませんでした（JS主体のページの可能性）' });
+    if (pageText.length < 50) return res.status(400).json({ error: provided ? 'Instagramから十分な情報を取得できませんでした（プロフィール文・投稿キャプションが少ない可能性）' : 'ページから十分な情報を取得できませんでした（JS主体のページの可能性）' });
 
     const exPrompt = `あなたはMEO（Googleマップ集客）の専門家です。
 以下は店舗のWebページ（ホームページやグルメサイト等）から抽出したテキストです。
