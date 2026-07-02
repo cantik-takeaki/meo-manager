@@ -752,21 +752,42 @@ body {
       </div>
     </div>
 
-    <!-- ▼▼ 店舗管理（店舗ページ＋登録・GBPピッカー・順位入力） ▼▼ -->
+    <!-- ▼▼ 店舗管理（一覧→詳細→追加/管理の3ビュー） ▼▼ -->
     <div class="panel" id="panel-stores">
-      <div class="page-header">
-        <div class="page-title">店舗管理</div>
-        <div class="page-sub">クライアント店舗の登録・管理</div>
+
+      <!-- 一覧ビュー（デフォルト） -->
+      <div id="storeListView">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="page-title">店舗管理</div>
+            <div class="page-sub"><span id="storeCount">0</span>件</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="showStoreAdd()">＋ 店舗追加</button>
+        </div>
+        <div class="card" style="padding:14px 16px">
+          <input id="storeSearch" type="text" placeholder="🔍 店舗名・住所・会社名で検索" oninput="renderStoreTable()"
+            style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-size:14px;font-family:inherit">
+        </div>
+        <div class="card" style="padding:8px 4px">
+          <div style="overflow-x:auto">
+            <table class="summary-table">
+              <thead><tr>
+                <th style="padding-left:16px">店舗名</th><th style="text-align:left">クライアント</th><th style="text-align:left">住所</th><th>キーワード</th><th>状態</th><th>口コミ</th><th></th>
+              </tr></thead>
+              <tbody id="storeTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">読み込み中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- ▼▼ 店舗ページ（店舗を選択すると表示・店舗ごとの詳細情報） ▼▼ -->
       <div id="storeDetail" style="display:none">
         <div class="card" style="border-color:rgba(46,143,240,0.35);background:rgba(46,143,240,0.04)">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
             <span style="width:10px;height:10px;border-radius:50%;background:var(--accent)"></span>
             <span id="storeDetailName" style="font-size:18px;font-weight:800"></span>
             <span id="storeDetailCompany" style="font-size:12px;color:var(--text-muted)"></span>
-            <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="document.getElementById('storeDetail').style.display='none'">閉じる</button>
           </div>
         </div>
       <div class="stats-grid">
@@ -989,6 +1010,12 @@ body {
       </div>
       </div>
 
+      <!-- ▼▼ 店舗追加・管理ビュー（新規登録＋GBPピッカー＋手動登録一覧） ▼▼ -->
+      <div id="storeAddView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <div class="page-title" style="font-size:20px">店舗を追加・管理</div>
+        </div>
 
       <div class="card" id="registerStoreCard">
         <div class="card-header"><div class="card-title">➕ 新規店舗登録</div></div>
@@ -1053,6 +1080,7 @@ body {
         <button class="btn btn-primary" style="margin-top:12px" onclick="saveRankings()">順位を保存</button>
         <p style="font-size:11px;color:var(--text-muted);margin-top:10px">※自動取得はSerpApi経由。地点は「市区,都道府県,Japan」形式（英語）が確実です。</p>
       </div>
+      </div><!-- /storeAddView -->
     </div>
 
     <!-- Knowledge -->
@@ -2157,18 +2185,19 @@ function selectLocation(idx, keepPanel) {
     if (el) el.textContent = title;
   });
 
-  // 店舗ページ（店舗管理内）を表示状態にしてヘッダーを更新
-  const sd = document.getElementById('storeDetail');
-  if (sd) sd.style.display = '';
+  // 店舗ページ（店舗管理内）のヘッダーを更新
   const sdn = document.getElementById('storeDetailName');
   if (sdn) sdn.textContent = title;
   const sdc = document.getElementById('storeDetailCompany');
   if (sdc) sdc.textContent = loc.company || loc.clientName || '';
 
-  // 店舗を切り替えたら店舗管理の店舗ページへ（ダッシュボードは全体管理専用）。初期表示keepPanelは移動しない。
+  // 店舗を選んだら店舗管理の「店舗ページ（詳細）」を表示。初期表示keepPanelは移動しない。
   if (!keepPanel) {
+    window._storeKeepDetail = true;   // switchPanelが一覧に戻すのを抑止
     switchPanel('stores');
-    setTimeout(() => sd?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    window._storeKeepDetail = false;
+    showStoreDetail();
+    setTimeout(() => document.getElementById('storeDetail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
   // データを全パネル分ロード
@@ -3767,6 +3796,83 @@ function jumpToStore(storeId) {
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
 }
 
+// ─── 店舗管理の3ビュー切替（一覧 / 詳細 / 追加・管理） ───
+function showStoreList() {
+  document.getElementById('storeListView').style.display = '';
+  document.getElementById('storeDetail').style.display = 'none';
+  document.getElementById('storeAddView').style.display = 'none';
+  loadStoreList();
+}
+function showStoreDetail() {
+  document.getElementById('storeListView').style.display = 'none';
+  document.getElementById('storeAddView').style.display = 'none';
+  document.getElementById('storeDetail').style.display = '';
+}
+function showStoreAdd() {
+  document.getElementById('storeListView').style.display = 'none';
+  document.getElementById('storeDetail').style.display = 'none';
+  document.getElementById('storeAddView').style.display = '';
+  loadClientStores();   // 手動登録店舗一覧
+  renderGbpPicker();    // GBPピッカー
+}
+
+// 店舗一覧テーブル（ぐるっと風：店舗名/クライアント/住所/キーワード/状態/口コミ）
+function loadStoreList() {
+  if (!window._locations) { loadLocations().then(renderStoreTable); return; }
+  renderStoreTable();
+}
+function renderStoreTable() {
+  const body = document.getElementById('storeTableBody');
+  if (!body) return;
+  const locs = window._locations || [];
+  document.getElementById('storeCount').textContent = locs.length;
+  const q = (document.getElementById('storeSearch')?.value || '').trim().toLowerCase();
+  const kwMap = _kwCountMap();
+  const filtered = locs.map((l, i) => ({ l, i })).filter(({ l }) => {
+    if (!q) return true;
+    const addr = (fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || '');
+    return [l.title, l.company, l.clientName, addr].some(v => (v || '').toLowerCase().includes(q));
+  });
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">${locs.length ? '該当する店舗がありません' : '店舗がありません。右上「＋ 店舗追加」から管理対象を追加してください'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = filtered.map(({ l, i }) => {
+    const addr = fullGbpAddress(l.storefrontAddress) || formatAddress(l.storefrontAddress) || '—';
+    const addrShort = addr.length > 18 ? addr.slice(0, 18) + '…' : addr;
+    const kw = kwMap[_storeKey(l)] ?? 0;
+    const company = l.company || l.clientName || '—';
+    return `<tr>
+      <td style="padding-left:16px;text-align:left"><div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="selectLocation(${i})">
+        <span style="width:32px;height:32px;border-radius:8px;background:rgba(16,185,129,0.12);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <span class="st-name" style="color:var(--text)">${escapeHtml(l.title || '店舗')}</span>
+      </div></td>
+      <td style="text-align:left;font-size:12px">${escapeHtml(company)}</td>
+      <td style="text-align:left;font-size:12px;color:var(--text-sub)" title="${escapeHtml(addr)}">${escapeHtml(addrShort)}</td>
+      <td>${kw}件</td>
+      <td><span class="st-badge done">有効</span></td>
+      <td><div style="display:flex;gap:6px;justify-content:center">
+        <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'qr')">QR管理</button>
+        <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'log')">回答履歴</button>
+      </div></td>
+      <td style="cursor:pointer;color:var(--text-muted)" onclick="selectLocation(${i})">›</td>
+    </tr>`;
+  }).join('');
+}
+
+// 口コミ列アクション: 店舗詳細を開き、該当セクションへ
+function storeReviewAction(idx, kind) {
+  selectLocation(idx);
+  setTimeout(() => {
+    if (kind === 'qr') {
+      document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      try { loadFeedback(); } catch (e) {}
+      document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 120);
+}
+
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───
 const _storeKey = (loc) => loc.storeId || (loc.name || '').replace(/\//g, '_');
 // storeId → キーワード数（ダッシュボード集計から）
@@ -3892,9 +3998,12 @@ async function saveClientMeta() {
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
-// クイックアクション: 店舗管理の該当カードへ遷移＋スクロール（任意でヒントToast）
+// クイックアクション: 店舗管理の「追加・管理」ビューを開き該当カードへスクロール（任意でヒントToast）
 function quickGo(cardId, hint) {
+  window._storeKeepDetail = true;
   switchPanel('stores');
+  window._storeKeepDetail = false;
+  showStoreAdd();
   setTimeout(() => {
     document.getElementById(cardId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (hint) showToast(hint, 'success');
@@ -4628,7 +4737,7 @@ function switchPanel(name, triggerEl) {
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
   if (name === 'clients') loadClientList();
-  if (name === 'stores') { loadClientStores(); renderGbpPicker(); }
+  if (name === 'stores' && !window._storeKeepDetail) showStoreList();
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
   if (name === 'instagram') loadMedia();
