@@ -4142,8 +4142,9 @@ function renderStoreTable() {
     const addrShort = addr.length > 18 ? addr.slice(0, 18) + '…' : addr;
     const kw = kwMap[_storeKey(l)] ?? 0;
     const company = l.company || l.clientName || '—';
-    return `<tr>
-      <td style="padding-left:16px;text-align:left"><div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="selectLocation(${i})">
+    // 行全体をクリックで店舗ページ（詳細）へ。アクション列はstopPropagationで独立動作。
+    return `<tr style="cursor:pointer" onclick="selectLocation(${i})" title="クリックで店舗ページを開く">
+      <td style="padding-left:16px;text-align:left"><div style="display:flex;align-items:center;gap:10px">
         <span style="width:32px;height:32px;border-radius:8px;background:rgba(16,185,129,0.12);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
         <span class="st-name" style="color:var(--text)">${escapeHtml(l.title || '店舗')}</span>
       </div></td>
@@ -4151,14 +4152,14 @@ function renderStoreTable() {
       <td style="text-align:left;font-size:12px;color:var(--text-sub)" title="${escapeHtml(addr)}">${escapeHtml(addrShort)}</td>
       <td>${kw}件</td>
       <td><span class="st-badge done">有効</span></td>
-      <td><div style="display:flex;gap:6px;justify-content:center">
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:6px;justify-content:center">
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'qr')">QR管理</button>
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'log')">回答履歴</button>
       </div></td>
-      <td><div style="display:flex;gap:8px;align-items:center;justify-content:center">
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:8px;align-items:center;justify-content:center">
         <button title="編集" onclick="showStoreEdit(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-sub);padding:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button title="削除" onclick="removeStoreFromList(${i})" style="background:none;border:none;cursor:pointer;color:var(--red);padding:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
-        <span style="cursor:pointer;color:var(--text-muted)" onclick="selectLocation(${i})">›</span>
+        <span style="color:var(--text-muted)">›</span>
       </div></td>
     </tr>`;
   }).join('');
