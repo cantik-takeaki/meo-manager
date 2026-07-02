@@ -1843,8 +1843,39 @@ body {
                 </div>
               </div>
               <div>
+                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">英字見出し（任意・おしゃれな英語タイトル）</label>
+                <input id="genEnHead" type="text" maxlength="24" placeholder="例：CORNER / SHIBUYA / SanMichele" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              </div>
+              <div>
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">サブテキスト（任意）</label>
                 <input id="genSub" type="text" maxlength="30" placeholder="例：ご予約受付中／月〜土 17:00〜" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                <label style="font-size:12px;color:var(--text-sub)">テンプレート
+                  <select id="genTemplate" onchange="onGenTemplate()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="standard">スタンダード（下グラデ）</option>
+                    <option value="elegant">エレガント（白セリフ・CORNER風）</option>
+                    <option value="magazine">マガジン（英字大・SHIBUYA風）</option>
+                    <option value="mincho">明朝見出し（SanMichele風）</option>
+                    <option value="bold">筆太ゴシック（塚田農場風）</option>
+                  </select>
+                </label>
+                <label style="font-size:12px;color:var(--text-sub)">和文フォント
+                  <select id="genFont" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="gothic">ゴシック</option>
+                    <option value="mincho">明朝</option>
+                    <option value="maru">丸ゴシック</option>
+                  </select>
+                </label>
+                <label style="font-size:12px;color:var(--text-sub)">文字色
+                  <select id="genTextColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                    <option value="white">白</option>
+                    <option value="black">黒</option>
+                    <option value="gold">ゴールド</option>
+                    <option value="cream">クリーム</option>
+                  </select>
+                </label>
+                <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genVertical" onchange="renderGenImage()"> 和文を縦書き</label>
               </div>
               <div>
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">背景（お店の写真を使うと雰囲気に合います）</label>
@@ -4718,96 +4749,152 @@ function _wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
+const GEN_FONTS = {
+  gothic: '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif',
+  mincho: '"Hiragino Mincho ProN","YuMincho","Yu Mincho","Noto Serif JP",serif',
+  maru: '"Hiragino Maru Gothic ProN","Rounded Mplus 1c","Noto Sans JP",sans-serif',
+};
+const GEN_EN_SERIF = 'Georgia,"Times New Roman","Playfair Display",serif';
+const GEN_EN_SANS = '"Helvetica Neue",Arial,"Noto Sans JP",sans-serif';
+const GEN_TEXTCOLORS = { white: '#ffffff', black: '#1a1a1a', gold: '#c9a86a', cream: '#f3e9d6' };
+
+function onGenTemplate() {
+  const t = document.getElementById('genTemplate').value;
+  const tc = document.getElementById('genTextColor'), vt = document.getElementById('genVertical');
+  // テンプレに合った既定へ（後から変更可）
+  if (t === 'mincho') { tc.value = 'black'; vt.checked = true; }
+  else if (t === 'elegant') { tc.value = 'white'; vt.checked = true; }
+  else if (t === 'bold') { tc.value = 'white'; vt.checked = true; }
+  else if (t === 'magazine') { tc.value = 'gold'; vt.checked = false; }
+  else { tc.value = 'white'; vt.checked = false; }
+  renderGenImage();
+}
+
+// 縦書き（1文字ずつ縦に積む・複数行は右→左）。戻り値=使った横幅
+function _drawVertical(ctx, text, x, yTop, charSize, colGap) {
+  let cx = x, cy = yTop, maxRows = 0, rows = 0, cols = 1;
+  for (const ch of String(text)) {
+    if (ch === '\n') { cx -= colGap; cy = yTop; cols++; rows = 0; continue; }
+    ctx.fillText(ch, cx, cy);
+    cy += charSize * 1.04; rows++; if (rows > maxRows) maxRows = rows;
+  }
+  return { width: cols * colGap, height: maxRows * charSize * 1.04 };
+}
+
 function renderGenImage() {
   const canvas = document.getElementById('genCanvas');
   if (!canvas) return;
   const { w: W, h: H } = _genDims();
   if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-  // プレビュー表示サイズも比率に合わせる
   canvas.style.width = '200px';
   canvas.style.height = (200 * H / W) + 'px';
 
   const ctx = canvas.getContext('2d');
   const pal = GEN_PALETTES[document.getElementById('genColor').value] || GEN_PALETTES.blue;
+  const tmpl = document.getElementById('genTemplate')?.value || 'standard';
   const layout = document.getElementById('genLayout')?.value || 'bottom';
-  const headline = document.getElementById('genHeadline').value || 'キャッチコピーを入力';
+  const jpFont = GEN_FONTS[document.getElementById('genFont')?.value] || GEN_FONTS.gothic;
+  const tcol = GEN_TEXTCOLORS[document.getElementById('genTextColor')?.value] || '#ffffff';
+  const vertical = !!document.getElementById('genVertical')?.checked;
+  const headline = document.getElementById('genHeadline').value || '';
+  const enHead = (document.getElementById('genEnHead')?.value || '').trim();
   const sub = document.getElementById('genSub').value || '';
   const store = currentLocation?.title || '';
-  const FONT = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif';
-  const M = 90; // 左右マージン
-
+  const M = 90;
   ctx.clearRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
 
+  // ── 背景 ──
   if (_genBg) {
-    // 背景はCloudinanで既に比率ぴったり＋スマートクロップ＋補正済み
     const iw = _genBg.naturalWidth, ih = _genBg.naturalHeight;
     const scale = Math.max(W / iw, H / ih);
     const dw = iw * scale, dh = ih * scale;
     ctx.drawImage(_genBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    // スクリム（読みやすさ）
-    if (layout === 'center') {
-      const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.7);
-      rg.addColorStop(0, 'rgba(0,0,0,0.55)'); rg.addColorStop(1, 'rgba(0,0,0,0.2)');
-      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-    } else {
-      const sc = ctx.createLinearGradient(0, H * 0.3, 0, H);
-      sc.addColorStop(0, 'rgba(0,0,0,0)'); sc.addColorStop(0.5, 'rgba(0,0,0,0.4)'); sc.addColorStop(1, 'rgba(0,0,0,0.85)');
-      ctx.fillStyle = sc; ctx.fillRect(0, 0, W, H);
+    // テンプレ別オーバーレイ（読みやすさ。写真の絵を活かすものは薄め＋文字影で対応）
+    if (tmpl === 'standard') {
+      if (layout === 'center') { const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.7); rg.addColorStop(0, 'rgba(0,0,0,0.55)'); rg.addColorStop(1, 'rgba(0,0,0,0.2)'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); }
+      else { const sc = ctx.createLinearGradient(0, H * 0.3, 0, H); sc.addColorStop(0, 'rgba(0,0,0,0)'); sc.addColorStop(0.5, 'rgba(0,0,0,0.4)'); sc.addColorStop(1, 'rgba(0,0,0,0.85)'); ctx.fillStyle = sc; ctx.fillRect(0, 0, W, H); }
+    } else if (tmpl === 'magazine') {
+      const tg = ctx.createLinearGradient(0, 0, 0, H * 0.5); tg.addColorStop(0, 'rgba(0,0,0,0.5)'); tg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = tg; ctx.fillRect(0, 0, W, H * 0.5);
+      const bg2 = ctx.createLinearGradient(0, H * 0.75, 0, H); bg2.addColorStop(0, 'rgba(0,0,0,0)'); bg2.addColorStop(1, 'rgba(0,0,0,0.55)'); ctx.fillStyle = bg2; ctx.fillRect(0, H * 0.6, W, H * 0.4);
+    } else if (tmpl === 'elegant' || tmpl === 'bold') {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(0, 0, W, H); // 全体を少し締める（文字は影で可読）
     }
-    // 上部の軽いビネット
-    const tg = ctx.createLinearGradient(0, 0, 0, H * 0.25);
-    tg.addColorStop(0, 'rgba(0,0,0,0.3)'); tg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = tg; ctx.fillRect(0, 0, W, H * 0.25);
+    // mincho は明るい写真前提でオーバーレイ無し（黒文字＋白影）
   } else {
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, pal.from); g.addColorStop(1, pal.to);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, W * 0.5);
-    rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00');
-    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, pal.from); g.addColorStop(1, pal.to); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const rg = ctx.createRadialGradient(W * 0.85, H * 0.12, 0, W * 0.85, H * 0.12, W * 0.5); rg.addColorStop(0, pal.accent + '55'); rg.addColorStop(1, pal.accent + '00'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
   }
 
-  // 見出し（自動縮小・折返し）
-  ctx.textBaseline = 'alphabetic';
-  let fs = Math.round(W / 10.4); ctx.font = `900 ${fs}px ${FONT}`;
-  let lines = _wrapText(ctx, headline, W - M * 2);
-  while (lines.length > 3 && fs > 56) { fs -= 8; ctx.font = `900 ${fs}px ${FONT}`; lines = _wrapText(ctx, headline, W - M * 2); }
-  const lh = fs * 1.3;
-  const subFs = Math.round(fs * 0.46);
-  const blockH = lines.length * lh + (sub ? subFs + 26 : 0);
+  const shadow = (on, strong) => { if (on) { ctx.shadowColor = strong ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.4)'; ctx.shadowBlur = strong ? 22 : 14; ctx.shadowOffsetY = 3; } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; } };
+  const fitEn = (text, maxW, start, weight) => { let fs = start; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; while (ctx.measureText(text).width > maxW && fs > 40) { fs -= 6; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; } return fs; };
 
-  let topY;
-  if (layout === 'center') topY = H / 2 - blockH / 2 + fs;
-  else topY = H - Math.round(H * 0.11) - blockH + fs;
+  // ══ テンプレート別描画 ══
+  if (tmpl === 'standard') {
+    let fs = Math.round(W / 10.4); ctx.font = `900 ${fs}px ${jpFont}`;
+    let lines = _wrapText(ctx, headline || 'キャッチコピーを入力', W - M * 2);
+    while (lines.length > 3 && fs > 56) { fs -= 8; ctx.font = `900 ${fs}px ${jpFont}`; lines = _wrapText(ctx, headline || ' ', W - M * 2); }
+    const lh = fs * 1.3, subFs = Math.round(fs * 0.46);
+    const blockH = lines.length * lh + (sub ? subFs + 26 : 0);
+    let topY = layout === 'center' ? H / 2 - blockH / 2 + fs : H - Math.round(H * 0.11) - blockH + fs;
+    ctx.fillStyle = pal.accent; ctx.fillRect(M, topY - fs - 34, 80, 10);
+    ctx.fillStyle = tcol; shadow(true, false);
+    let y = topY; lines.forEach(l => { ctx.fillText(l, M, y); y += lh; });
+    shadow(false);
+    if (sub) { ctx.fillStyle = _genBg ? tcol : pal.accent; ctx.font = `700 ${subFs}px ${jpFont}`; shadow(true, false); ctx.fillText(sub, M, y + 6); shadow(false); y += subFs + 18; }
+    if (store) { ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = `700 ${Math.round(fs * 0.38)}px ${jpFont}`; ctx.fillText(store, M, layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05))); }
 
-  // アクセントライン
-  ctx.fillStyle = pal.accent;
-  ctx.fillRect(M, topY - fs - 34, 80, 10);
+  } else if (tmpl === 'elegant') {
+    // 英字セリフ大（中央寄せ・上1/3）＋和文縦書き（左下）
+    if (enHead) { const fs = fitEn(enHead, W - 120, Math.round(W / 5.5), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; ctx.textAlign = 'center'; shadow(true, true); ctx.fillText(enHead, W / 2, H * 0.36); shadow(false); ctx.textAlign = 'left'; }
+    if (headline) {
+      const cs = Math.round(W / 7.5); ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, true);
+      if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.62, cs, cs * 1.25);
+      else { let y = H - Math.round(H * 0.14); _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
+      shadow(false);
+    }
+    if (sub || store) { ctx.font = `600 ${Math.round(W / 26)}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(sub || store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
 
-  // 見出し
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4;
-  let y = topY;
-  lines.forEach(l => { ctx.fillText(l, M, y); y += lh; });
-  ctx.shadowColor = 'transparent';
+  } else if (tmpl === 'magazine') {
+    // 上：小英字ラベル → 巨大英字セリフ → 和文大 → サブ → 左下タグ枠
+    let y = H * 0.09;
+    const label = (sub || 'TOKYO GOURMET').toUpperCase();
+    ctx.font = `600 ${Math.round(W / 34)}px ${GEN_EN_SANS}`; ctx.fillStyle = tcol; shadow(true, false);
+    ctx.save(); ctx.letterSpacing = '4px'; try { ctx.fillText(label.slice(0, 26), M, y); } catch (e) { ctx.fillText(label.slice(0, 26), M, y); } ctx.restore();
+    y += Math.round(W / 20);
+    if (enHead) { const fs = fitEn(enHead, W - M * 1.2, Math.round(W / 4.2), '600'); ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; shadow(true, true); ctx.fillText(enHead, M - 4, y + fs * 0.75); y += fs * 0.95; }
+    if (headline) { const cs = Math.round(W / 8.2); ctx.font = `800 ${cs}px ${jpFont}`; ctx.fillStyle = '#ffffff'; shadow(true, true); let yy = y + cs * 0.9; _wrapText(ctx, headline, W - M * 2).slice(0, 2).forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.15; }); shadow(false); }
+    // 左下タグ枠（東京/3行/グルメ 的な）
+    if (store) {
+      const bx = M, by = H - Math.round(H * 0.17), bw = Math.round(W / 5.2), bh = Math.round(W / 5.2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; shadow(true, false); ctx.strokeRect(bx, by, bw, bh); shadow(false);
+      ctx.fillStyle = '#ffffff'; ctx.font = `700 ${Math.round(W / 32)}px ${jpFont}`; ctx.textAlign = 'center';
+      _wrapText(ctx, store, bw - 16).slice(0, 3).forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + bh / 2 - 6 + i * Math.round(W / 26)));
+      ctx.textAlign = 'left';
+    }
 
-  // サブテキスト
-  if (sub) {
-    ctx.fillStyle = _genBg ? '#ffffff' : pal.accent;
-    ctx.font = `700 ${subFs}px ${FONT}`;
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 10;
-    ctx.fillText(sub, M, y + 6);
-    ctx.shadowColor = 'transparent';
-    y += subFs + 18;
+  } else if (tmpl === 'mincho') {
+    // 英字セリフ（上・黒）＋和文縦書き（左・大）
+    if (enHead) { const fs = fitEn(enHead, W - M * 1.4, Math.round(W / 4.6), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 8; ctx.fillText(enHead, M - 2, H * 0.16); shadow(false); }
+    if (headline) { const cs = Math.round(W / 7.2); ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8;
+      if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.28, cs, cs * 1.28);
+      else { let y = H * 0.3; _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
+      shadow(false); }
+    if (sub) { ctx.font = `500 ${Math.round(W / 28)}px ${GEN_FONTS.mincho}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 6; ctx.fillText(sub, M, H - Math.round(H * 0.06)); shadow(false); }
+
+  } else if (tmpl === 'bold') {
+    // 和文を極太＋白フチで縦書き（左）／英字・価格を添える
+    if (headline) {
+      const cs = Math.round(W / 6.4); ctx.font = `900 ${cs}px ${jpFont}`;
+      ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = cs * 0.12;
+      // フチ→本体の順で1文字ずつ
+      let cx = M + cs * 0.25, cy = H * 0.2;
+      for (const ch of headline) { if (ch === '\n') { cx -= cs * 1.3; cy = H * 0.2; continue; } ctx.strokeText(ch, cx, cy); ctx.fillStyle = tcol; ctx.fillText(ch, cx, cy); cy += cs * 1.04; }
+    }
+    if (enHead || sub) { ctx.font = `800 ${Math.round(W / 20)}px ${GEN_EN_SANS}`; ctx.fillStyle = tcol; shadow(true, true); ctx.textAlign = 'right'; ctx.fillText(enHead || sub, W - M, H - Math.round(H * 0.08)); ctx.textAlign = 'left'; shadow(false); }
+    if (store) { ctx.font = `700 ${Math.round(W / 30)}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
   }
-
-  // 店名
-  if (store) {
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.font = `700 ${Math.round(fs * 0.38)}px ${FONT}`;
-    const sy = layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05));
-    ctx.fillText(store, M, sy);
-  }
+  shadow(false);
 }
 
 async function aiCatchCopy() {
