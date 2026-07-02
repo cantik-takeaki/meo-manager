@@ -496,10 +496,12 @@ body {
 
   <!-- Main -->
   <main class="main">
-    <!-- 現在選択中の店舗バー -->
-    <div id="currentStoreBar" style="display:none;background:rgba(79,125,243,0.08);border-bottom:1px solid rgba(79,125,243,0.2);padding:8px 28px;font-size:13px;display:flex;align-items:center;gap:10px">
+    <!-- 現在選択中の店舗バー（ドロップダウンで切替可能） -->
+    <div id="currentStoreBar" style="display:none;background:rgba(79,125,243,0.08);border-bottom:1px solid rgba(79,125,243,0.2);padding:8px 28px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="color:var(--text-muted)">選択中の店舗：</span>
-      <span id="currentStoreName" style="font-weight:600;color:var(--accent)"></span>
+      <select id="currentStoreSelect" onchange="selectLocation(parseInt(this.value,10))"
+        style="font-weight:600;color:var(--accent);background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:5px 30px 5px 10px;font-size:13px;font-family:inherit;cursor:pointer;max-width:280px"></select>
+      <span id="currentStoreName" style="display:none"></span>
       <span id="currentStoreType" class="badge"></span>
     </div>
 
@@ -1969,6 +1971,24 @@ function getOfficialAddress(k) {
   return addr || pc;
 }
 
+// 上部バーの店舗ドロップダウンを window._locations から構築（会社名でグループ化）
+function populateStoreSelect() {
+  const sel = document.getElementById('currentStoreSelect');
+  if (!sel) return;
+  const locs = window._locations || [];
+  if (!locs.length) { sel.innerHTML = '<option value="">店舗なし</option>'; return; }
+  // 会社名(company)→店舗 でoptgroup化
+  const groups = new Map();
+  locs.forEach((l, i) => {
+    const cn = l.company || l.clientName || l.title || '未分類';
+    if (!groups.has(cn)) groups.set(cn, []);
+    groups.get(cn).push({ i, title: l.title || '店舗' });
+  });
+  sel.innerHTML = [...groups.entries()].map(([cn, items]) =>
+    `<optgroup label="${escapeHtml(cn)}">${items.map(it => `<option value="${it.i}">${escapeHtml(it.title)}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+
 function selectLocation(idx, keepPanel) {
   const loc = window._locations?.[idx];
   if (!loc) return;
@@ -1983,6 +2003,9 @@ function selectLocation(idx, keepPanel) {
   // 現在選択中の店舗バーを更新
   document.getElementById('currentStoreBar').style.display = 'flex';
   document.getElementById('currentStoreName').textContent = title;
+  populateStoreSelect();                         // ドロップダウンを最新化
+  const sel = document.getElementById('currentStoreSelect');
+  if (sel) sel.value = String(idx);              // 現在店舗を選択状態に
   const typeEl = document.getElementById('currentStoreType');
   if (loc._type === 'manual') {
     typeEl.textContent = '手動登録';
