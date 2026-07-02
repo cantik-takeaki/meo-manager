@@ -219,6 +219,67 @@ JSON以外は出力しない。`;
     return res.json({ detected: [...new Set(detected)] });
   }
 
+  // ── URLのページをAIが読み、AIO/LLMO/GEO観点で"質"を判定（スコア＋観点別＋改善提案） ──
+  if (type === 'aio_analyze') {
+    const url = req.body.url;
+    if (!url || !/^https?:\/\//.test(url)) return res.status(400).json({ error: '有効なURLを入力してください' });
+    let html = '';
+    try {
+      const pr = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; cantik-meo-bot/1.0)' } });
+      html = await pr.text();
+    } catch (e) { return res.status(400).json({ error: 'URLの取得に失敗しました: ' + e.message }); }
+    // 構造化データを機械判定して事実としてAIに渡す（AIに推測させない）
+    const schema = [];
+    if (/"@type"\s*:\s*"(LocalBusiness|Dentist|MedicalClinic|Restaurant|HealthAndBeautyBusiness|Store|ProfessionalService|Organization)"/i.test(html)) schema.push('LocalBusiness/Organization');
+    if (/"@type"\s*:\s*"(FAQPage|Question)"/i.test(html)) schema.push('FAQPage');
+    if (/"@type"\s*:\s*"AggregateRating"|"aggregateRating"\s*:/i.test(html)) schema.push('AggregateRating');
+    if (/"@type"\s*:\s*"(Article|BlogPosting|NewsArticle)"/i.test(html)) schema.push('Article');
+    if (/"@type"\s*:\s*"BreadcrumbList"/i.test(html)) schema.push('BreadcrumbList');
+    if (/"@type"\s*:\s*"Product"/i.test(html)) schema.push('Product');
+    const titleM = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const metaDesc = (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i) || [])[1] || '';
+    const h1s = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/gi) || []).map(s => s.replace(/<[^>]+>/g, '').trim()).slice(0, 5);
+    const pageText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 7000);
+    const store = knowledge.storeName || storeName || '';
+    const aPrompt = `あなたはAIO/LLMO/GEO（ChatGPT・Gemini・Perplexity・GoogleのAI検索/AI概要などの生成エンジンに、店舗・企業が"引用・推奨"されるための最適化）の専門家です。
+以下の実在ページを読み、この店舗/企業ページが「AIに引用・推奨されやすいか」を厳しく評価してください。甘く採点しない。
+
+【店舗/企業】${store || '（不明）'}（業種：${knowledge.category || '不明'}）
+【ページタイトル】${titleM ? titleM[1].replace(/<[^>]+>/g, '').trim().slice(0, 120) : '（なし）'}
+【meta description】${metaDesc.slice(0, 200) || '（なし）'}
+【H1見出し】${h1s.join(' / ') || '（なし）'}
+【機械判定された構造化データ(JSON-LD)】${schema.length ? schema.join('、') : '検出なし'}
+【ページ本文（抜粋）】
+${pageText || '（本文が取得できませんでした。JS主体のページの可能性）'}
+
+【評価の観点（各0〜100・statusはgood/weak/missing）】
+1. 構造化データ(Schema/JSON-LD): 上の機械判定を根拠にする（LocalBusiness/FAQPage/AggregateRating/Article等があるか、業種に適切か）
+2. E-E-A-T(経験・専門性・権威性・信頼性): 著者/運営者情報・資格・実績・一次情報・更新性
+3. FAQ・質問応答性: よくある質問、質問形の見出し＋明確な回答、AIがそのまま引用できるQ&A
+4. エンティティの明確さ: 「誰が/何を/どこで/誰に」が曖昧さなく書かれ、店名・地域・サービスが実体として明確か
+5. 事実の密度・引用されやすさ: 具体的な数値・固有名詞・定義・箇条書きなど、AIが抜き出して引用しやすい書き方か
+6. NAP・一次情報: 店名・住所・電話・営業時間など一次情報がページに明記されているか
+
+【出力（JSONのみ・説明や前置き・コードフェンスなし）】
+{"score":0〜100の総合点(整数),"summary":"総評を2〜3文。AI検索に引用されやすいか、最大の弱点は何か","dimensions":[{"name":"構造化データ","score":0,"status":"missing","comment":"具体的に。何があり何が足りないか"},{"name":"E-E-A-T","score":0,"status":"weak","comment":"..."},{"name":"FAQ・質問応答性","score":0,"status":"missing","comment":"..."},{"name":"エンティティの明確さ","score":0,"status":"good","comment":"..."},{"name":"事実の密度・引用性","score":0,"status":"weak","comment":"..."},{"name":"NAP・一次情報","score":0,"status":"good","comment":"..."}],"improvements":[{"priority":"高","action":"具体的な改善アクション","reason":"なぜAIO/LLMO/GEOに効くか"}]}
+improvementsは優先度高→低で3〜6件。コメント・アクションは具体的に（"充実させる"だけでなく何をどうするか）。捏造や効果の断定はしない。`;
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: aPrompt }], max_tokens: 1800, temperature: 0.35 }),
+      });
+      const data = await r.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const s = content.indexOf('{'), e = content.lastIndexOf('}');
+      if (s === -1 || e === -1) return res.status(500).json({ error: 'AI診断に失敗しました（JSON取得不可）' });
+      let result;
+      try { result = JSON.parse(content.slice(s, e + 1)); }
+      catch (er) { return res.status(500).json({ error: 'AI診断結果の解析に失敗しました' }); }
+      return res.json({ result, schema, meta: { title: titleM ? titleM[1].replace(/<[^>]+>/g, '').trim() : '', h1: h1s } });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   // ── 既存ナレッジをMEO最適化して強化（より詳しく・検索されやすく） ──
   if (type === 'meo_enrich') {
     const cur = req.body.current || {};

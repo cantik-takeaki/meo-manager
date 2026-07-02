@@ -2109,6 +2109,18 @@ body {
         </div>
       </div>
 
+      <!-- URLをAIが読んで質を診断（AIO/LLMO/GEO） -->
+      <div class="card" style="border-color:rgba(46,143,240,0.35)">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 2h6"/><path d="M9 13v2M15 13v2"/></svg>AIでページの質を診断</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">GoogleビジネスプロフィールのウェブサイトやHP・記事などのURLを入れると、AIがページを実際に読み込み、<b>AI検索（ChatGPT / Gemini / Perplexity / GoogleのAI概要）に引用・推奨されやすいか</b>を観点別に採点し、改善点を出します。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <input id="aioAnalyzeUrl" type="url" placeholder="診断したいページのURL（GBPのウェブサイト・HP・記事など）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-primary btn-sm" id="aioAnalyzeBtn" onclick="aioAnalyze(event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>AIで内容を診断</button>
+        </div>
+        <div id="aioAnalyzeStatus" style="font-size:12px;color:var(--text-sub);margin-bottom:6px"></div>
+        <div id="aioAnalyzeResult"></div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>対策チェックリスト</div>
@@ -7223,6 +7235,62 @@ async function aioDetect() {
   } catch (e) { status.textContent = '⚠️ 判定に失敗しました: ' + e.message; }
 }
 
+// URLのページをAIが読み、AIO/LLMO/GEO観点で"質"を採点＋改善提案
+async function aioAnalyze(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const url = document.getElementById('aioAnalyzeUrl').value.trim();
+  if (!url) { showToast('URLを入力してください', 'error'); return; }
+  const status = document.getElementById('aioAnalyzeStatus'), res = document.getElementById('aioAnalyzeResult');
+  const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '診断中…'; }
+  status.textContent = 'ページを読み込み、AIがAIO/LLMO/GEO観点で診断中…（15〜25秒）';
+  res.innerHTML = '';
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'aio_analyze', url }) }).then(r => r.json());
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    status.textContent = '';
+    res.innerHTML = renderAioAnalysis(d);
+  } catch (e) { status.textContent = '⚠️ 診断に失敗しました: ' + e.message; }
+  if (btn) { btn.disabled = false; btn.innerHTML = bh; }
+}
+function _aioColor(sc) { return sc >= 75 ? 'var(--accent-2)' : sc >= 45 ? '#d97706' : 'var(--red)'; }
+function _aioStatusChip(st) { const m = { good: ['良好', 'var(--accent-2)'], weak: ['要改善', '#d97706'], missing: ['未対応', 'var(--red)'] }; const [t, c] = m[st] || ['—', 'var(--text-muted)']; return `<span style="font-size:10.5px;font-weight:700;color:#fff;background:${c};padding:1px 8px;border-radius:999px">${t}</span>`; }
+function renderAioAnalysis(d) {
+  const r = d.result || {}, dims = r.dimensions || [], imps = r.improvements || [];
+  const score = Math.max(0, Math.min(100, parseInt(r.score, 10) || 0)), sc = _aioColor(score);
+  const schema = d.schema || [];
+  let html = `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:var(--bg-3);border-radius:10px;padding:14px;margin-top:6px">
+    <div style="text-align:center;min-width:120px">
+      <div style="font-size:11px;color:var(--text-sub)">AIO/LLMO/GEO 総合</div>
+      <div style="font-size:46px;font-weight:900;line-height:1.1;color:${sc}">${score}<span style="font-size:18px;color:var(--text-sub)">/100</span></div>
+    </div>
+    <div style="flex:1;min-width:220px;font-size:13px;line-height:1.7">${escapeHtml(r.summary || '')}
+      <div style="margin-top:6px;font-size:11px;color:var(--text-sub)">検出された構造化データ: ${schema.length ? schema.map(escapeHtml).join('、') : 'なし'}</div>
+    </div>
+  </div>`;
+  html += '<div style="margin-top:14px;display:grid;gap:10px">' + dims.map(dm => {
+    const s = Math.max(0, Math.min(100, parseInt(dm.score, 10) || 0)), c = _aioColor(s);
+    return `<div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:3px">
+        <span style="font-weight:700">${escapeHtml(dm.name || '')} ${_aioStatusChip(dm.status)}</span>
+        <span style="color:${c};font-weight:700">${s}</span>
+      </div>
+      <div style="height:7px;background:var(--border);border-radius:99px;overflow:hidden"><div style="width:${s}%;height:100%;background:${c}"></div></div>
+      <div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;line-height:1.6">${escapeHtml(dm.comment || '')}</div>
+    </div>`;
+  }).join('') + '</div>';
+  if (imps.length) {
+    html += '<div style="margin-top:16px"><div style="font-size:13px;font-weight:700;margin-bottom:8px">優先改善アクション</div>' + imps.map(im => {
+      const pr = im.priority || '中', pc = pr === '高' ? 'var(--red)' : pr === '中' ? '#d97706' : 'var(--text-sub)';
+      return `<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="flex-shrink:0;font-size:10.5px;font-weight:700;color:#fff;background:${pc};padding:2px 9px;border-radius:6px;height:fit-content">優先${escapeHtml(pr)}</span>
+        <div style="font-size:13px;line-height:1.6"><div style="font-weight:600">${escapeHtml(im.action || '')}</div>${im.reason ? `<div style="font-size:11.5px;color:var(--text-sub);margin-top:2px">${escapeHtml(im.reason)}</div>` : ''}</div>
+      </div>`;
+    }).join('') + '</div>';
+  }
+  html += '<p style="font-size:11px;color:var(--text-muted);margin-top:10px">※ AIによる診断です。改善後に再診断すると変化を確認できます。</p>';
+  return html;
+}
+
 // AIO/LLMO/GEO のAI診断（やることリスト）
 async function aioAdvice() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
@@ -7369,6 +7437,9 @@ async function loadAio() {
     const kn = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r=>r.json()).catch(()=>({}));
     const store = kn.storeName || '店舗名';
     const kw = (kn.keywords||[]).filter(Boolean)[0] || 'キーワード';
+    // URL欄を店舗のサイト/GBPウェブサイトで初期入力
+    const siteUrl = kn.website || currentLocation?.websiteUri || currentLocation?.website || '';
+    ['aioAnalyzeUrl', 'aioDetectUrl'].forEach(id => { const el = document.getElementById(id); if (el && !el.value && siteUrl) el.value = siteUrl; });
     document.getElementById('aioTestPrompts').innerHTML = [
       `「${store}はどんなお店ですか？」`,
       `「${kw}でおすすめのお店を教えてください」`,
