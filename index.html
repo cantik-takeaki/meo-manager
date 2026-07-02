@@ -264,6 +264,9 @@ body {
 .summary-table .st-name { font-weight: 600; color: var(--accent); cursor: pointer; }
 .summary-table .st-client { font-size: 11px; color: var(--text-muted); }
 
+/* ─── 店舗編集フォームの入力 ─── */
+.ed-in { display:block; width:100%; margin-top:5px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14px; font-family:inherit; }
+
 /* ─── カードタイトルのアイコンチップ（ぐるっと風・絵文字の格上げ） ─── */
 .ttl-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 9px; flex-shrink: 0; position: relative; top: -1px; }
 .ttl-ico svg { width: 17px; height: 17px; }
@@ -506,8 +509,8 @@ body {
 
   <!-- Main -->
   <main class="main">
-    <!-- 現在選択中の店舗バー（ドロップダウンで切替可能） -->
-    <div id="currentStoreBar" style="display:none;background:rgba(79,125,243,0.08);border-bottom:1px solid rgba(79,125,243,0.2);padding:8px 28px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <!-- 現在選択中の店舗バー（社長指示で非表示・撤去） -->
+    <div id="currentStoreBar" style="display:none !important;background:rgba(79,125,243,0.08);border-bottom:1px solid rgba(79,125,243,0.2);padding:8px 28px;font-size:13px;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="color:var(--text-muted)">選択中の店舗：</span>
       <select id="currentStoreSelect" onchange="selectLocation(parseInt(this.value,10))"
         style="font-weight:600;color:var(--accent);background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:5px 30px 5px 10px;font-size:13px;font-family:inherit;cursor:pointer;max-width:280px"></select>
@@ -1128,6 +1131,136 @@ body {
         <div class="card">
           <div class="card-header"><div class="card-title">回答履歴</div><span id="svHistCount" style="font-size:12px;color:var(--text-sub)"></span></div>
           <div id="svHistList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+        </div>
+      </div>
+
+      <!-- ▼▼ 口コミQR管理ビュー（QR管理ボタンから・ぐるっと相当） ▼▼ -->
+      <div id="storeQrView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <div><div class="page-title" style="font-size:20px">口コミQR管理</div><div class="page-sub">QRコードの発行・有効化・管理　<span id="qrStoreName" style="color:var(--text)"></span></div></div>
+        </div>
+        <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <button class="btn btn-outline btn-sm" onclick="openSurveyEditorFromQr()">✏️ アンケート編集</button>
+          <button class="btn btn-outline btn-sm" onclick="openReviewPop()">🖨 口コミPOP作成</button>
+          <button class="btn btn-primary btn-sm">QR機能</button>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">QR機能</div></div>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;padding:6px 0">
+            <input type="checkbox" id="qrEnableToggle" onchange="toggleQrEnabled(this.checked)" style="width:18px;height:18px">
+            <span>有効にするとお客様がQRコードを読み取れます</span>
+          </label>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;align-items:flex-start">
+            <div style="flex:1;min-width:280px">
+              <div style="font-size:13px;font-weight:700;margin-bottom:6px">QRコード（お客用）</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                <input id="qrUrlInput" readonly style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px">
+                <button class="btn btn-outline btn-sm" onclick="copyReviewLink(false)">URLをコピー</button>
+                <a id="qrDlLink" download="口コミQR.png" href="#" class="btn btn-outline btn-sm">QR画像をDL</a>
+              </div>
+              <div style="font-size:12px;font-weight:700;margin:12px 0 6px">確認用（集計されません）</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <input id="qrPrevInput" readonly style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:12px">
+                <button class="btn btn-outline btn-sm" onclick="copyReviewLink(true)">コピー</button>
+                <a id="qrPrevOpen" href="#" target="_blank" class="btn btn-outline btn-sm">開く</a>
+              </div>
+            </div>
+            <div style="text-align:center"><img id="qrBigImg" style="width:160px;height:160px;border:1px solid var(--border);border-radius:10px;background:#fff"><div style="font-size:11px;color:var(--text-sub);margin-top:4px">店頭POP・レシートに</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">設定状況</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><div style="font-size:12px;color:var(--text-sub)">Google口コミURL</div><div id="qrGoogleStatus" style="font-size:14px;margin-top:3px">—</div></div>
+            <div><div style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL</div><div id="qrLineStatus" style="font-size:14px;margin-top:3px">—</div></div>
+          </div>
+          <button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="showStoreEdit(window._qrIdx)">→ 店舗編集画面でURLを設定する</button>
+        </div>
+
+        <div class="card" style="border-color:rgba(239,68,68,0.25)">
+          <div class="card-header"><div class="card-title">QRコードの再発行</div></div>
+          <p style="font-size:12px;color:var(--text-sub);line-height:1.7">再発行すると現在のQRコードが無効になります。印刷済みのQRがある場合は注意してください。</p>
+          <button class="btn btn-sm" style="margin-top:10px;background:rgba(239,68,68,0.1);color:var(--red);border:none" onclick="reissueQr()">QRコードを再発行する</button>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="showStoreQrResult(window._qrIdx)">📈 口コミQR成果（月別推移・ファネル）を見る</button>
+            <button class="btn btn-outline btn-sm" onclick="showStoreSurvey(window._qrIdx)">📋 アンケート回答履歴・統計を見る</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▼▼ 口コミQR成果ビュー（月別推移・ファネル） ▼▼ -->
+      <div id="storeQrResultView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreQr(window._qrIdx)">← 口コミQR管理</button>
+          <div><div class="page-title" style="font-size:20px">口コミQR成果</div><div class="page-sub">月別推移・導線ファネル</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📈 月別推移</div></div>
+          <div class="kpi-agg-grid" style="grid-template-columns:repeat(5,1fr)">
+            <div class="kpi-agg-cell"><div class="k-l">QRスキャン</div><div class="k-v" id="qrrScan">0</div><div class="mc-sub" id="qrrScanD"></div></div>
+            <div class="kpi-agg-cell"><div class="k-l">アンケート送信</div><div class="k-v" id="qrrSurvey">0</div><div class="mc-sub" id="qrrSurveyD"></div></div>
+            <div class="kpi-agg-cell"><div class="k-l">Google口コミクリック</div><div class="k-v" id="qrrClick">0</div><div class="mc-sub" id="qrrClickD"></div></div>
+            <div class="kpi-agg-cell"><div class="k-l">AI生成</div><div class="k-v" id="qrrAi">0</div><div class="mc-sub" id="qrrAiD"></div></div>
+            <div class="kpi-agg-cell"><div class="k-l">低評価FB</div><div class="k-v" id="qrrLow">0</div><div class="mc-sub" id="qrrLowD"></div></div>
+          </div>
+          <div style="overflow-x:auto;margin-top:14px">
+            <table class="summary-table"><thead><tr><th style="text-align:left">月</th><th>スキャン</th><th>アンケート</th><th>Google</th><th>AI生成</th><th>低評価FB</th></tr></thead>
+            <tbody id="qrrHistBody"></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📊 QR導線ファネル（今月）</div></div>
+          <div id="qrrFunnel"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">⚠️ 低評価フィードバック</div></div>
+          <div id="qrrFeedback"><div class="empty-state" style="padding:30px;text-align:center;color:var(--text-muted)">低評価フィードバックはまだありません</div></div>
+        </div>
+      </div>
+
+      <!-- ▼▼ 店舗情報を編集ビュー ▼▼ -->
+      <div id="storeEditView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreQr(window._qrIdx)">← 戻る</button>
+          <div><div class="page-title" style="font-size:20px">店舗情報を編集</div><div class="page-sub" id="editStoreName"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📋 基本情報</div></div>
+          <div style="display:grid;gap:12px">
+            <label style="font-size:12px;color:var(--text-sub)">店舗名<input id="ed-name" type="text" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">住所<input id="ed-address" type="text" class="ed-in"></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <label style="font-size:12px;color:var(--text-sub)">電話番号<input id="ed-phone" type="text" class="ed-in"></label>
+              <label style="font-size:12px;color:var(--text-sub)">業種・カテゴリ<input id="ed-category" type="text" placeholder="例：とんかつ店" class="ed-in"></label>
+            </div>
+            <label style="font-size:12px;color:var(--text-sub)">WebサイトURL<input id="ed-web" type="url" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">会社名（クライアント）<input id="ed-company" type="text" class="ed-in"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔗 口コミQR設定</div></div>
+          <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">Google口コミ投稿URLとLINE友だち追加URLを設定します。QRの有効化は「口コミQR管理」で行えます。</p>
+          <div style="display:grid;gap:12px">
+            <label style="font-size:12px;color:var(--text-sub)">Google口コミ投稿URL<input id="ed-googleUrl" type="url" placeholder="https://search.google.com/local/writereview?placeid=..." class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL（任意）<input id="ed-lineUrl" type="url" placeholder="https://lin.ee/..." class="ed-in"></label>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📝 口コミPOP文言</div></div>
+          <div style="display:grid;gap:12px">
+            <label style="font-size:12px;color:var(--text-sub)">POPタイトル<input id="ed-popTitle" type="text" placeholder="お客様の声をお聞かせください" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">POP説明文<input id="ed-popDesc" type="text" placeholder="サービス向上のため、ぜひご意見をお聞かせください。" class="ed-in"></label>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:20px">
+          <button class="btn btn-outline" onclick="showStoreQr(window._qrIdx)">キャンセル</button>
+          <button class="btn btn-primary" onclick="saveStoreEdit()">更新する</button>
         </div>
       </div>
     </div>
@@ -2221,12 +2354,9 @@ function selectLocation(idx, keepPanel) {
 
   const title = loc.title || '';
 
-  // 現在選択中の店舗バーを更新
-  document.getElementById('currentStoreBar').style.display = 'flex';
+  // 現在選択中の店舗バーは非表示（社長指示で撤去）。店舗切替はサイドバー・店舗一覧で行う。
+  document.getElementById('currentStoreBar').style.display = 'none';
   document.getElementById('currentStoreName').textContent = title;
-  populateStoreSelect();                         // ドロップダウンを最新化
-  const sel = document.getElementById('currentStoreSelect');
-  if (sel) sel.value = String(idx);              // 現在店舗を選択状態に
   const typeEl = document.getElementById('currentStoreType');
   if (loc._type === 'manual') {
     typeEl.textContent = '手動登録';
@@ -2354,8 +2484,10 @@ function reviewPageUrl(preview) {
   // 依頼URLは store+name のみ（固定URL）。Google口コミURLは review.html が
   // survey KV(SURVEY.googleUrl) から解決するため、URLに g= を埋め込まない。
   // preview=true は確認用（スタッフ確認・集計されない）。
+  const tok = _surveyCache?.qrToken ? '&t=' + encodeURIComponent(_surveyCache.qrToken) : '';
   return location.origin + '/review.html?store=' + encodeURIComponent(currentLocationId)
     + '&name=' + encodeURIComponent(currentLocation?.title || '当店')
+    + tok
     + (preview ? '&preview=1' : '');
 }
 
@@ -3870,7 +4002,7 @@ function jumpToStore(storeId) {
 
 // ─── 店舗管理の4ビュー切替（一覧 / 詳細 / 追加・管理 / 回答履歴） ───
 function _storeViews(show) {
-  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView'].forEach(id => {
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
   });
 }
@@ -3979,17 +4111,185 @@ function renderStoreTable() {
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'qr')">QR管理</button>
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'log')">回答履歴</button>
       </div></td>
-      <td style="cursor:pointer;color:var(--text-muted)" onclick="selectLocation(${i})">›</td>
+      <td><div style="display:flex;gap:8px;align-items:center;justify-content:center">
+        <button title="編集" onclick="showStoreEdit(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-sub);padding:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button title="削除" onclick="removeStoreFromList(${i})" style="background:none;border:none;cursor:pointer;color:var(--red);padding:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
+        <span style="cursor:pointer;color:var(--text-muted)" onclick="selectLocation(${i})">›</span>
+      </div></td>
     </tr>`;
   }).join('');
 }
 
-// 口コミ列アクション: QR管理→店舗詳細のQR/依頼欄へ、回答履歴→アンケート回答履歴ビューへ
+// 口コミ列アクション: QR管理→口コミQR管理ビュー、回答履歴→アンケート回答履歴ビューへ
 function storeReviewAction(idx, kind) {
   if (kind === 'log') { showStoreSurvey(idx); return; }
-  // QR管理: 店舗詳細を開いて口コミ依頼(QR)セクションへスクロール
-  selectLocation(idx);
-  setTimeout(() => document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+  showStoreQr(idx);
+}
+
+// 店舗を一覧から削除（管理対象GBP＝管理から外す / 手動登録＝レコード削除）
+async function removeStoreFromList(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  const name = loc.title || '店舗';
+  if (loc.locId) { // 管理対象のGBP店舗 → 管理対象から外す
+    if (!confirm(`「${name}」を管理対象から削除しますか？\n（Googleビジネスプロフィール本体は削除されません。店舗管理の「＋店舗追加」で戻せます）`)) return;
+    await toggleManaged(loc.locId, false); // ここでloadLocations→一覧再描画
+  } else if (loc.storeId) { // 手動登録店舗 → レコード削除
+    await deleteStore(loc.storeId); // 内部でconfirm・再読込
+  }
+}
+
+// ─── 口コミQR管理ビュー ───
+async function _ensureQrStore(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return null;
+  window._qrIdx = idx;
+  currentLocation = loc;
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
+  // survey設定を取得（キャッシュ）
+  if (!_surveyCache || _surveyCache._forStore !== currentLocationId) {
+    try { const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); _surveyCache = { ...s, _forStore: currentLocationId }; } catch (e) { _surveyCache = _surveyCache || {}; }
+  }
+  return loc;
+}
+
+async function showStoreQr(idx) {
+  const loc = await _ensureQrStore(idx);
+  if (!loc) return;
+  _storeViews('storeQrView');
+  document.getElementById('qrStoreName').textContent = loc.title || '';
+  // 有効化トグル
+  const tog = document.getElementById('qrEnableToggle'); if (tog) tog.checked = (_surveyCache?.qrEnabled !== false);
+  // URL/QR（お客用・確認用）
+  const url = reviewPageUrl(), purl = reviewPageUrl(true);
+  const qimg = (u) => 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=' + encodeURIComponent(u);
+  document.getElementById('qrUrlInput').value = url;
+  document.getElementById('qrBigImg').src = qimg(url);
+  document.getElementById('qrDlLink').href = qimg(url);
+  document.getElementById('qrPrevInput').value = purl;
+  document.getElementById('qrPrevOpen').href = purl;
+  // 設定状況
+  const g = document.getElementById('qrGoogleStatus');
+  g.innerHTML = _surveyCache?.googleUrl ? '<span style="color:var(--accent-2);font-weight:700">設定済み</span>' : '<span style="color:var(--gold);font-weight:700">未設定</span>';
+  const l = document.getElementById('qrLineStatus');
+  l.innerHTML = _surveyCache?.lineUrl ? '<span style="color:var(--accent-2);font-weight:700">設定済み</span>' : '<span style="color:var(--text-muted)">未設定（任意）</span>';
+}
+
+function openSurveyEditorFromQr() {
+  // 既存のアンケート編集は店舗詳細内。詳細を開いて編集を展開する。
+  selectLocation(window._qrIdx);
+  setTimeout(() => { try { openSurveyEditor(); } catch (e) {} document.getElementById('surveyEditor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200);
+}
+
+async function reissueQr() {
+  if (!currentLocationId) return;
+  if (!confirm('QRコードを再発行します。\n現在のQR（印刷済み含む）はすべて無効になります。よろしいですか？')) return;
+  try {
+    const res = await fetch(`/api/admin?action=reissue-qr&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '再発行に失敗しました', 'error');
+    if (_surveyCache) _surveyCache.qrToken = d.qrToken;
+    showToast('QRコードを再発行しました。新しいQRを印刷し直してください', 'success');
+    showStoreQr(window._qrIdx); // URL/QRを更新表示
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+// ─── 口コミQR成果ビュー ───
+async function showStoreQrResult(idx) {
+  const loc = await _ensureQrStore(idx);
+  if (!loc) return;
+  _storeViews('storeQrResultView');
+  const sid = encodeURIComponent(currentLocationId);
+  try {
+    const [hist, fb] = await Promise.all([
+      fetch(`/api/admin?action=kpi-history&storeId=${sid}`).then(r => r.json()).catch(() => ({ months: [] })),
+      fetch(`/api/admin?action=feedback&storeId=${sid}`).then(r => r.json()).catch(() => ({ feedback: [] })),
+    ]);
+    const M = hist.months || [];
+    const cur = M[0] || {}, prev = M[1] || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const delta = (id, c, p) => { const d = (c || 0) - (p || 0); const el = document.getElementById(id); if (el) el.textContent = '今月　' + (d > 0 ? '前月比+' + d : d < 0 ? '前月比' + d : '前月比なし'); };
+    set('qrrScan', (cur.scan || 0) + '件'); delta('qrrScanD', cur.scan, prev.scan);
+    set('qrrSurvey', (cur.survey || 0) + '件'); delta('qrrSurveyD', cur.survey, prev.survey);
+    set('qrrClick', (cur.click || 0) + '件'); delta('qrrClickD', cur.click, prev.click);
+    set('qrrAi', (cur.ai || 0) + '件'); delta('qrrAiD', cur.ai, prev.ai);
+    set('qrrLow', (cur.lowfb || 0) + '件'); delta('qrrLowD', cur.lowfb, prev.lowfb);
+    // 月別テーブル
+    const body = document.getElementById('qrrHistBody');
+    body.innerHTML = M.map((m, i) => `<tr>
+      <td style="text-align:left">${m.ym}${i === 0 ? ' <span class="st-badge" style="background:rgba(46,143,240,0.12);color:var(--accent)">集計中</span>' : ''}</td>
+      <td>${m.scan}</td><td>${m.survey}</td><td>${m.click}</td><td>${m.ai}</td><td>${m.lowfb}</td></tr>`).join('');
+    // ファネル（今月）
+    const steps = [
+      { k: 'QRスキャン', v: cur.scan || 0 }, { k: 'アンケート開始', v: cur.rate || 0 },
+      { k: 'アンケート送信', v: cur.survey || 0 }, { k: 'AI生成', v: cur.ai || 0 },
+      { k: 'Google口コミクリック', v: cur.click || 0 },
+    ];
+    const max = Math.max(1, steps[0].v);
+    const anyData = steps.some(s => s.v > 0);
+    document.getElementById('qrrFunnel').innerHTML = steps.map((s, i) => {
+      const pct = Math.round((s.v / max) * 100);
+      return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+        <span style="width:22px;height:22px;border-radius:50%;background:var(--bg-3);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i + 1}</span>
+        <div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${s.k}</span><span style="font-weight:700">${s.v}件</span></div>
+        <div style="height:8px;background:var(--bg-3);border-radius:4px;overflow:hidden"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep))"></div></div></div>
+      </div>`;
+    }).join('') + (anyData ? '' : '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:14px">この月のデータはありません</div>');
+    // 低評価FB
+    const fbArr = fb.feedback || [];
+    document.getElementById('qrrFeedback').innerHTML = fbArr.length ? fbArr.map(f => {
+      const d = new Date(f.at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return `<div style="padding:12px;border-bottom:1px solid var(--border)"><div style="display:flex;gap:8px;align-items:center"><span class="st-badge" style="background:rgba(239,68,68,0.1);color:var(--red)">★${f.rating || '-'}</span><span style="font-size:11px;color:var(--text-muted)">${d}</span></div><div style="font-size:13px;margin-top:6px">${escapeHtml(f.text || '')}</div>${f.contact ? `<div style="font-size:11px;color:var(--text-sub);margin-top:4px">連絡先: ${escapeHtml(f.contact)}</div>` : ''}</div>`;
+    }).join('') : '<div class="empty-state" style="padding:30px;text-align:center;color:var(--text-muted)">低評価フィードバックはまだありません</div>';
+  } catch (e) { showToast('取得に失敗しました: ' + e.message, 'error'); }
+}
+
+// ─── 店舗情報を編集ビュー ───
+async function showStoreEdit(idx) {
+  const loc = await _ensureQrStore(idx);
+  if (!loc) return;
+  _storeViews('storeEditView');
+  document.getElementById('editStoreName').textContent = loc.title || '';
+  // ナレッジ取得（category/phone/address/web等）
+  let k = {};
+  try { k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
+  window._editKnowledge = k || {};
+  const v = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  v('ed-name', k.storeName || loc.title);
+  v('ed-address', k.address || fullGbpAddress(loc.storefrontAddress) || '');
+  v('ed-phone', k.phone || loc.phoneNumbers?.primaryPhone || '');
+  v('ed-category', k.category || '');
+  v('ed-web', k.websiteUri || loc.websiteUri || '');
+  v('ed-company', loc.company || loc.clientName || '');
+  v('ed-googleUrl', _surveyCache?.googleUrl || '');
+  v('ed-lineUrl', _surveyCache?.lineUrl || '');
+  v('ed-popTitle', _surveyCache?.title || '');
+  v('ed-popDesc', _surveyCache?.intro || '');
+}
+
+async function saveStoreEdit() {
+  if (!currentLocationId) return;
+  const val = (id) => document.getElementById(id)?.value.trim() || '';
+  try {
+    // ①ナレッジ（店舗名/住所/電話/業種/Web）を保存
+    const k = { ...(window._editKnowledge || {}), storeName: val('ed-name'), address: val('ed-address'), phone: val('ed-phone'), category: val('ed-category'), websiteUri: val('ed-web') };
+    await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(k) });
+    // ②アンケート（Google/LINE URL・POP文言）を保存
+    await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ googleUrl: val('ed-googleUrl'), lineUrl: val('ed-lineUrl'), title: val('ed-popTitle'), intro: val('ed-popDesc') }),
+    });
+    // ③会社名（クライアント分け）を保存
+    const company = val('ed-company');
+    const loc = window._locations?.[window._qrIdx];
+    if (loc?.locId && company) {
+      await fetch('/api/admin?action=managed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on: true, location: { locId: loc.locId, title: loc.title, company } }) });
+    }
+    _surveyCache = null; // 再取得させる
+    showToast('店舗情報を更新しました', 'success');
+    await loadLocations();
+    showStoreQr(window._qrIdx);
+  } catch (e) { showToast('保存に失敗しました: ' + e.message, 'error'); }
 }
 
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───

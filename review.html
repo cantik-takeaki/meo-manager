@@ -134,6 +134,7 @@ const STORE_ID = params.get('store') || '';
 const STORE_NAME = params.get('name') || '当店';
 // 確認用（プレビュー）モード：スタッフ確認用。KPI集計・リード・フィードバックを記録しない。
 const PREVIEW = params.get('preview') === '1';
+const QTOKEN = params.get('t') || '';   // QR再発行トークン（一致しない旧QRは無効）
 let SURVEY = null;
 let RATING = 0;
 
@@ -152,7 +153,12 @@ function kpiTrack(ev, value){
     body: JSON.stringify({ storeId: STORE_ID, event: ev, value }), keepalive:true
   }).catch(()=>{}); } catch(e){}
 }
-kpiTrack('scan');
+
+function showStopped(title, msg){
+  document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
+  const wrap = document.querySelector('.wrap');
+  if (wrap) wrap.insertAdjacentHTML('beforeend', `<div class="card" style="text-align:center;padding:40px 20px"><div style="font-size:40px">🙏</div><h2 style="margin:12px 0;font-size:18px">${title}</h2><p style="color:var(--sub);font-size:14px">${msg}</p></div>`);
+}
 
 // アンケート設定を読み込んで反映
 async function loadSurvey(){
@@ -161,6 +167,12 @@ async function loadSurvey(){
     SURVEY = await r.json();
   } catch(e){ SURVEY = null; }
   SURVEY = SURVEY || {};
+  // QR再発行チェック：店舗がトークンを発行済みで、URLのtが一致しない場合は「無効なQR」表示（旧印刷QR対策）
+  if (SURVEY.qrToken && QTOKEN !== SURVEY.qrToken) {
+    showStopped('このQRコードは無効です', '新しいQRコードをご利用ください。お手数ですが店舗スタッフにお知らせください。');
+    return;
+  }
+  kpiTrack('scan');  // 有効なQRのみスキャンを集計
   // 受付停止（qrEnabled=false）: アンケート本体を隠して停止メッセージを表示
   if (SURVEY.qrEnabled === false) {
     document.querySelectorAll('.card').forEach(c => c.style.display = 'none');

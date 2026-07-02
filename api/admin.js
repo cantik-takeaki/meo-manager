@@ -55,6 +55,7 @@ export default async function handler(req, res) {
     lowThreshold: 4,   // この評価未満は「店内フィードバック」へ分岐（4 = ★1〜3が分岐）
     gateMode: 'branch', // 'branch'=満足度で分岐 / 'all'=全員Google誘導（コンプライアンス安全）
     qrEnabled: true,   // 口コミ受付ON/OFF（OFFで顧客ページが停止表示）
+    qrToken: '',       // QR再発行トークン（空=未再発行。再発行するとURLの t= と一致しない旧QRを無効化）
     googleUrl: '',
     lineUrl: '',
   };
@@ -220,6 +221,34 @@ export default async function handler(req, res) {
     const last = { ...KPI_ZERO, ...(await kvGet(`kpi_${storeId}_${prev}`) || {}) };
     const avg = (o) => (o.rateCount > 0 ? Math.round((o.rateSum / o.rateCount) * 10) / 10 : null);
     return res.json({ month: ym, current: cur, previous: last, avgSatisfaction: avg(cur), avgSatisfactionPrev: avg(last) });
+  }
+
+  // ── 口コミQR成果：直近6ヶ月のKPI履歴（月別推移テーブル・ファネル用）──
+  if (action === 'kpi-history' && req.method === 'GET') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const now = new Date();
+    const months = [];
+    for (let i = 0; i < 6; i++) {
+      const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = dt.toISOString().slice(0, 7);
+      const k = { ...KPI_ZERO, ...(await kvGet(`kpi_${storeId}_${ym}`) || {}) };
+      const avg = k.rateCount > 0 ? Math.round((k.rateSum / k.rateCount) * 10) / 10 : null;
+      months.push({ ym, scan: k.scan || 0, rate: k.rate || 0, survey: k.survey || 0, ai: k.ai || 0, click: k.click || 0, line: k.line || 0, lowfb: k.lowfb || 0, avg });
+    }
+    return res.json({ months }); // months[0]=今月
+  }
+
+  // ── QRコードの再発行：新しいトークンを発行し、旧QR（旧トークン）を無効化 ──
+  if (action === 'reissue-qr' && req.method === 'POST') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `survey_${storeId}`;
+    const cur = { ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) };
+    cur.qrToken = generateId(); // 新トークン。review.htmlはこれと一致しないURLを無効表示にする
+    cur.qrReissuedAt = new Date().toISOString();
+    await kvSet(key, cur);
+    return res.json({ success: true, qrToken: cur.qrToken });
   }
 
   // ── アンケート設定 取得/保存（管理側）──
