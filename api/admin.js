@@ -652,6 +652,62 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
+  // ══ Notion連携（登録店舗・企業ナレッジをNotionデータベースに反映） ══
+  // 設定はenv(NOTION_TOKEN/NOTION_DB_ID)優先、無ければKV(notion_config)。トークンは秘匿のため返さない。
+  const notionCfg = async () => {
+    const kv = await kvGet('notion_config') || {};
+    return { token: process.env.NOTION_TOKEN || kv.token || '', dbId: process.env.NOTION_DB_ID || kv.dbId || '' };
+  };
+  if (action === 'notion-config') {
+    if (req.method === 'GET') {
+      const c = await notionCfg();
+      return res.json({ configured: !!(c.token && c.dbId), hasToken: !!c.token, hasDb: !!c.dbId, envManaged: !!(process.env.NOTION_TOKEN) });
+    }
+    if (req.method === 'POST') {
+      if (process.env.NOTION_TOKEN) return res.status(400).json({ error: 'Notion設定はVercel環境変数で管理されています（画面からの変更は不可）' });
+      const { token, dbId } = req.body || {};
+      const cur = await kvGet('notion_config') || {};
+      const next = { token: (token || '').trim() || cur.token || '', dbId: (dbId || '').trim() || cur.dbId || '' };
+      if (!next.token || !next.dbId) return res.status(400).json({ error: 'Integrationトークンとデータベースidの両方が必要です' });
+      await kvSet('notion_config', next);
+      return res.json({ success: true, configured: true });
+    }
+  }
+  if (req.method === 'POST' && action === 'notion-sync') {
+    const c = await notionCfg();
+    if (!c.token || !c.dbId) return res.status(400).json({ error: 'Notionが未設定です（設定でIntegrationトークンとデータベースidを保存してください）', notConfigured: true });
+    const storeId = req.query.storeId || req.body.storeId;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const k = await kvGet(`knowledge_${storeId}`) || {};
+    const rk = await kvGet(`rankings_${storeId}`) || {};
+    const kws = (rk.keywords || []).filter(Boolean);
+    const name = k.storeName || req.body.storeName || '店舗';
+    const NHEAD = { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' };
+    const rt = (t) => [{ type: 'text', text: { content: String(t || '').slice(0, 1900) } }];
+    const para = (label, val) => val ? ({ object: 'block', type: 'paragraph', paragraph: { rich_text: rt(`${label}：${val}`) } }) : null;
+    const children = [
+      para('業種', k.category), para('住所', [k.postalCode, k.address].filter(Boolean).join(' ')),
+      para('電話', k.phone), para('営業時間', k.businessHours), para('定休日', k.closedDays),
+      para('対策キーワード', kws.join('、')), para('強み・特徴', k.strengths),
+      para('専門性・実績(E-E-A-T)', k.expertise), para('サービス・メニュー', k.services),
+      para('対応エリア', k.serviceArea), para('ターゲット', k.targetCustomer),
+      para('WebサイトURL', k.website), para('storeId', storeId),
+    ].filter(Boolean);
+    try {
+      // upsert: KVに保存したページIDがあれば旧ページをアーカイブして作り直す（内容を最新に）
+      const prevId = (await kvGet(`notion_page_${storeId}`)) || null;
+      if (prevId) { try { await fetch(`https://api.notion.com/v1/pages/${prevId}`, { method: 'PATCH', headers: NHEAD, body: JSON.stringify({ archived: true }) }); } catch (e) {} }
+      const body = { parent: { database_id: c.dbId }, properties: { title: { title: rt(name) } }, children };
+      const r = await fetch('https://api.notion.com/v1/pages', { method: 'POST', headers: NHEAD, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (d.object === 'error') return res.status(400).json({ error: 'Notion: ' + (d.message || 'エラー') + '（データベースにタイトル列があり、Integrationがそのdbに共有(接続)されているか確認してください）' });
+      if (d.id) await kvSet(`notion_page_${storeId}`, d.id);
+      return res.json({ success: true, url: d.url || '', pageId: d.id || '' });
+    } catch (e) {
+      return res.status(500).json({ error: 'Notion同期に失敗: ' + e.message });
+    }
+  }
+
   // ── 単一キーワードの順位入力（その日付エントリの該当indexだけ更新） ──
   if (req.method === 'POST' && action === 'rank-input') {
     const storeId = req.query.storeId || req.body.storeId;

@@ -129,10 +129,12 @@ ${pageText}
 - category: 検索で使われる業種名（例「美容室」「整骨院」「焼き鳥居酒屋」）
 - nearbyLandmarks: ページにある最寄り駅・目印・徒歩分などのアクセス情報（地域検索に効く。無ければ空）
 - keywords: 「地域名×業種」「地域名×業種×ニーズ/メニュー」の検索されやすい語を読点区切りで。MEOの基本は主力5〜7個に絞ることなので、王道の主力語を5〜7個を中心にし、必要に応じてロングテールを数個添える（詰め込みすぎない）。実際に検索されそうな組み合わせにする（例「相模原 焼き鳥」「相模原 居酒屋 個室」）
-- strengths: ページから読み取れる強み・特徴を、検索意図に合うキーワードを自然に含めて簡潔に
-- services: 主要なサービス・メニューを（あれば価格も）具体的に。検索される語を含める
-- targetCustomer: ページから推測できる主な客層
-- description: 来店を促す自然な紹介文（誇大表現・効果の断定はしない）
+- strengths: ページから読み取れる強み・特徴を、MEO・ローカルSEOで効くよう"厚く"書く（4〜6文）。地域名・サービス名・専門性・こだわり・利用シーンを自然に含め、"なぜこの店なのか"が伝わる密度に。抽象語だけで終わらせず根拠まで。ページに無い実績・数値は創作しない
+- expertise: 差別化ポイント・専門性・実績（E-E-A-T：経験/専門性/権威性/信頼性）。資格・特化分野・経歴・第三者評価・実績年数などページから読み取れる事実を具体化し、AI検索に引用されやすい書き方に。無理な創作はしない（無ければ空）
+- services: 主要なサービス・メニューを（あれば価格も）具体的に列挙。各項目に特徴・おすすめ理由を一言添えて情報量を増やし、検索される語を含める
+- serviceArea: 対応エリア・周辺地域。店舗所在地から来店が見込める近隣の市区町村・駅・地域名を複数挙げてMEOの守備範囲を広げる（地理的に妥当な範囲で。ページに地域情報があれば優先）
+- targetCustomer: ページから推測できる主な客層（年代・性別・利用シーン・悩み）
+- description: 来店を促す自然な紹介文（180〜280字・地域名と業種を自然に含む・誇大表現や効果の断定はしない）
 
 ■共通
 - ページに無い事実・実績・数値を創作しない
@@ -147,7 +149,7 @@ ${pageText}
         body: JSON.stringify({
           model: GROQ_MODEL,
           messages: [{ role: 'user', content: exPrompt }],
-          max_tokens: 700, temperature: 0.3,
+          max_tokens: 1500, temperature: 0.3,
         }),
       });
       const data = await r.json();
@@ -235,23 +237,25 @@ JSON以外は出力しない。`;
 【現在の説明】${cur.description || ''}
 【現在のキーワード】${curKw.join('、') || 'なし'}
 ${req.body.gbpContext ? `\n【Googleの情報（GBPカテゴリ・平均評価・実際の口コミ抜粋）】\n${req.body.gbpContext}\n→ 上記のGoogle口コミで実際に褒められている点・利用シーンを、strengths/services に事実の範囲で反映する（口コミの表現をヒントに具体化）。ただし口コミ本文の丸写しや、書かれていない実績の捏造はしない。\n` : ''}
-【強化ルール】
+【強化ルール】MEO・ローカルSEOで実際に効くよう、情報量を厚く・具体的に。ただし架空の数値/実績/受賞は作らない（与えられた情報と一般的事実の範囲で具体化する）。
 - keywords: 「地域名×業種」「地域名×業種×ニーズ/メニュー」「地域名×悩み」「隣接エリア×業種」など実際に検索される語。MEOは専門性（Topical Relevance）重視のため、王道の主力語5〜7個を軸にし、必要に応じてロングテールを数個添える（多すぎるとテーマが散らばるので詰め込まない）。読点区切り
-- strengths: 検索意図と差別化を意識し、具体的な特徴を3〜5文でしっかり書く（地域名・サービス名・専門性・実績・こだわりを自然に含む。MEOで効くよう情報量を厚めに。ただし架空の数値や実績は作らない）
-- services: 主要メニュー/サービスを検索される語を含めて具体的に列挙（価格があれば残す。各サービスの特徴も一言添えて情報量を増やす）
-- description: 来店を促す自然な紹介文（150〜250字・地域名と業種を自然に含む）
-- targetCustomer: 主な客層を具体的に
+- strengths: 検索意図と差別化を意識し、具体的な特徴を4〜6文でしっかり書く。地域名・サービス名・専門性・こだわり・利用シーンを自然に含め、"なぜこの店なのか"が伝わる密度にする。抽象語（安心・丁寧 だけ）で終わらせず、その根拠まで書く
+- expertise: 差別化ポイント・専門性・実績（E-E-A-T：経験/専門性/権威性/信頼性）。資格・経歴・特化分野・第三者評価・実績年数などを、与えられた情報から具体化。AIや検索に"引用されやすい"事実ベースの記述にする（無ければ、その業種で信頼につながる観点を一般論として2〜3点提示）
+- services: 主要メニュー/サービスを検索される語を含めて具体的に列挙（価格があれば残す。各サービスの特徴・こだわり・おすすめ理由を一言添えて情報量を増やす）
+- serviceArea: 対応エリア・周辺地域。店舗の所在地から来店が見込める近隣の市区町村・駅・地域名を複数挙げてMEOの守備範囲を広げる（例「相模原市全域・座間市・大和市・町田エリアからも来店」）。地理的に妥当な範囲にする
+- description: 来店を促す自然な紹介文（180〜280字・地域名と業種を自然に含む）
+- targetCustomer: 主な客層を具体的に（年代・性別・利用シーン・悩み）
 - nearbyLandmarks: 分かれば最寄り駅・目印・徒歩分（無ければ現状維持/空）
 - tips: さらにMEO順位・評価を上げる具体アクションを5個（GBP属性設定・写真追加・口コミ依頼・投稿テーマ・FAQ登録など）。各行「・」始まり。効果断定や捏造はしない
 
 【出力JSON】（tipsは改行区切りの文字列、他は文字列）
-{"keywords":"","strengths":"","services":"","description":"","targetCustomer":"","nearbyLandmarks":"","tips":""}
-JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対策キーワードは特に strengths / services / description に自然に反映する。' : ''}`;
+{"keywords":"","strengths":"","expertise":"","services":"","serviceArea":"","description":"","targetCustomer":"","nearbyLandmarks":"","tips":""}
+JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対策キーワードは特に strengths / services / serviceArea / description に自然に反映する。' : ''}`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: enPrompt }], max_tokens: 900, temperature: 0.5 }),
+        body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: enPrompt }], max_tokens: 1500, temperature: 0.5 }),
       });
       const data = await r.json();
       const content = data.choices?.[0]?.message?.content?.trim() || '';
