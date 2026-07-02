@@ -4604,8 +4604,9 @@ async function loadDiagnosis() {
   card.style.display = 'block';
   document.getElementById('meoDiagStore').textContent = currentLocation?.title || '';
 
-  let k = {};
+  let k = {}, rk = {};
   try { k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
+  try { rk = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
   const gbpConnected = currentLocation?._type === 'gbp' || currentLocation?.gbpConnected;
   let rv = {};
   if (gbpConnected && currentLocation?.name) {
@@ -4615,7 +4616,10 @@ async function loadDiagnosis() {
       rv = r.stats || {};
     } catch (e) {}
   }
+  // キーワードは対策キーワード（旧ナレッジ欄の統合先）＋旧ナレッジ欄の合算で判定
   const kw = (k.keywords || []).filter(Boolean);
+  const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
+  const kwCount = new Set([...kw, ...rkKw]).size;
   const items = [
     { label: '店名', w: 6, ok: !!k.storeName },
     { label: '業種カテゴリ', w: 6, ok: !!k.category },
@@ -4626,7 +4630,7 @@ async function loadDiagnosis() {
     { label: '強み・特徴', w: 8, ok: !!k.strengths },
     { label: '提供サービス', w: 8, ok: !!k.services },
     { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
-    { label: 'キーワード設定', w: 8, ok: kw.length >= 3 },
+    { label: 'キーワード設定', w: 8, ok: kwCount >= 3 },
     { label: 'GBP連携', w: 10, ok: !!gbpConnected },
     { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
     { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
@@ -6571,7 +6575,10 @@ async function runAiConsul() {
       fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({ history: [], keywords: [] })),
     ]);
     const rv = (rvData && rvData.stats) || {};
+    // キーワードは対策キーワード（旧ナレッジ欄の統合先）＋旧ナレッジ欄の合算で判定
     const kw = (k.keywords || []).filter(Boolean);
+    const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
+    const kwCount = new Set([...kw, ...rkKw]).size;
     // ② MEO健康診断（loadDiagnosisと同一の14項目・重み）
     const items = [
       { label: '店名', w: 6, ok: !!k.storeName },
@@ -6583,7 +6590,7 @@ async function runAiConsul() {
       { label: '強み・特徴', w: 8, ok: !!k.strengths },
       { label: '提供サービス', w: 8, ok: !!k.services },
       { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
-      { label: 'キーワード設定', w: 8, ok: kw.length >= 3 },
+      { label: 'キーワード設定', w: 8, ok: kwCount >= 3 },
       { label: 'GBP連携', w: 10, ok: !!gbpConnected },
       { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
       { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
@@ -6594,10 +6601,11 @@ async function runAiConsul() {
     const score = Math.round((earned / total) * 100);
     const lbl = score >= 80 ? '良好' : score >= 60 ? '改善の余地あり' : '要改善';
     const col = score >= 80 ? 'var(--accent-2)' : score >= 60 ? 'var(--gold)' : 'var(--red)';
-    // 最新の順位（あれば）
+    // 最新の順位（あれば）。history[].rankingsはrk.keywordsにindex対応なので、そちらを正とする
     const hist = rk.history || [];
     const lastR = hist[hist.length - 1];
-    const rankings = kw.map((w, i) => ({ keyword: w, rank: lastR ? (parseInt(lastR.rankings?.[i], 10) || null) : null }));
+    const rankSrc = (rk.keywords && rk.keywords.length) ? rk.keywords : kw;
+    const rankings = rankSrc.map((w, i) => ({ keyword: w, rank: lastR ? (parseInt(lastR.rankings?.[i], 10) || null) : null }));
     // ③ AI助言（既存diagnosisタイプを再利用）
     const d = await fetch('/api/generate-content', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
