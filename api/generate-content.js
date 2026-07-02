@@ -241,7 +241,9 @@ JSON以外は出力しない。`;
     const h1s = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/gi) || []).map(s => s.replace(/<[^>]+>/g, '').trim()).slice(0, 5);
     const pageText = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 7000);
-    const store = knowledge.storeName || storeName || '';
+    // このブロックは早期returnするため、下部の共通ナレッジ取得より前に自前で取得する
+    const knowledge = await kvGet(`knowledge_${locationId}`) || {};
+    const store = knowledge.storeName || '';
     const aPrompt = `あなたはAIO/LLMO/GEO（ChatGPT・Gemini・Perplexity・GoogleのAI検索/AI概要などの生成エンジンに、店舗・企業が"引用・推奨"されるための最適化）の専門家です。
 以下の実在ページを読み、この店舗/企業ページが「AIに引用・推奨されやすいか」を厳しく評価してください。甘く採点しない。
 
@@ -611,6 +613,40 @@ ${context}
 - 18文字以内。短く印象的に
 - 店の実情報に基づく。架空の事実や誇大表現・効果断定はしない
 - 鉤括弧や記号で囲わない。キャッチコピーの言葉だけを出力`;
+  }
+
+  // 画像に載せるおしゃれな英字タイトル（マガジン/ブランドロゴ風）
+  if (type === 'en_headline') {
+    prompt = `あなたは${knowledge.storeName || storeName}のクリエイティブディレクターです。Instagram/Googleポストの画像に重ねる、雑誌の表紙やブランドロゴのような短い英字タイトルを1つだけ作ってください。
+
+【店舗情報】
+- 店名: ${knowledge.storeName || storeName}
+- 業種: ${knowledge.category || '不明'}
+- 強み: ${strengths || '不明'}
+- 地域: ${knowledge.address || ''}
+
+【ルール】
+- 英単語1〜3語・合計20文字以内（例のスタイル: CORNER / SHIBUYA NIGHT / SanMichele / CRAFT & SMOKE）
+- 店の雰囲気・地名・業種を感じさせるものにする。日本語は使わない
+- 実在しない受賞歴・No.1表現は使わない
+- 引用符や記号で囲わない（&は可）。英字タイトルの言葉だけを出力`;
+  }
+
+  // 画像下部に添える短いサブテキスト
+  if (type === 'subtext') {
+    prompt = `あなたは${storeName}の広告担当です。Instagram/Googleポストの画像の下部に添える短いサブテキストを1つだけ作ってください。
+
+【店舗情報】
+- 店名: ${knowledge.storeName || storeName}
+- 業種: ${knowledge.category || '不明'}
+- 営業時間: ${knowledge.businessHours || '不明'}
+- 定休日: ${knowledge.closedDays || '不明'}
+- 強み: ${strengths || '不明'}
+
+【ルール】
+- 22文字以内。営業案内・予約案内・お店の魅力の一言など、画像の添え文として自然なもの
+- 店の実情報に基づく。営業時間が不明なら時間は書かない。架空の事実や誇大表現・効果断定はしない
+- 鉤括弧や記号で囲わない。サブテキストの言葉だけを出力`;
   }
 
   // 業種に合わせた月間投稿テーマを複数生成（月間プランの土台）

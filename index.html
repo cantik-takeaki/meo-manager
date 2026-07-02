@@ -462,6 +462,10 @@ body {
 .gen-el-row input[type=range] { flex:1; min-width:80px; accent-color:var(--accent); height:4px; }
 .gen-el-row label { display:flex; align-items:center; gap:3px; color:var(--text-sub); white-space:nowrap; }
 .gen-el-row input[type=color] { width:32px; height:26px; border:1px solid var(--border); border-radius:5px; background:none; cursor:pointer; padding:1px; flex-shrink:0; }
+.gen-2col { display:grid; grid-template-columns:minmax(0,420px) minmax(0,1fr); gap:18px; align-items:start; }
+@media (max-width:1023px) { .gen-2col { grid-template-columns:1fr; } }
+/* 投稿画像作成ページ表示中は他の子を常時抑止（非同期のインサイト表示等が後から割り込むのも防ぐ） */
+#panel-instagram.gen-open > :not(#igGenView) { display:none !important; }
 </style>
 </head>
 <body>
@@ -1805,6 +1809,188 @@ body {
         </div>
       </div>
 
+      <!-- 投稿画像作成（個別ページ・口コミPOP作成と同型） -->
+      <div id="igGenView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="closeImageGen()">← 前のページへ</button>
+          <div style="flex:1;min-width:180px">
+            <div class="page-title" style="font-size:20px">投稿画像作成</div>
+            <div class="page-sub">写真とテキストから投稿用の画像を作成（無料・ブラウザ内生成）</div>
+          </div>
+          <span id="igGenStatus" style="font-size:12px;color:var(--text-sub)"></span>
+          <button class="btn btn-success btn-sm" onclick="saveGenImage()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>ライブラリに保存</button>
+        </div>
+
+        <div class="gen-2col">
+          <!-- 左：編集パネル -->
+          <div>
+            <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;margin-bottom:14px">
+              <button class="pop-tab pop-tab-on" data-tab="basic" onclick="igGenTab('basic')">基本</button>
+              <button class="pop-tab" data-tab="text" onclick="igGenTab('text')">テキスト</button>
+              <button class="pop-tab" data-tab="color" onclick="igGenTab('color')">カラー</button>
+              <button class="pop-tab" data-tab="image" onclick="igGenTab('image')">画像</button>
+            </div>
+
+            <!-- 基本 -->
+            <div class="pop-panel" data-panel="basic">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">テンプレート</div></div>
+                <select id="genTemplate" onchange="igGenSyncTpl();onGenTemplate()" style="display:none">
+                  <option value="standard">スタンダード（下グラデ）</option>
+                  <option value="elegant">エレガント（白セリフ・CORNER風）</option>
+                  <option value="magazine">マガジン（英字大・SHIBUYA風）</option>
+                  <option value="mincho">明朝見出し（SanMichele風）</option>
+                  <option value="bold">筆太ゴシック（塚田農場風）</option>
+                </select>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <button class="pop-tpl pop-tpl-on gen-tpl" data-tpl="standard" onclick="igGenSetTpl('standard')">スタンダード<br><span style="font-weight:400;font-size:11px;opacity:.75">下グラデ・万能</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="elegant" onclick="igGenSetTpl('elegant')">エレガント<br><span style="font-weight:400;font-size:11px;opacity:.75">白セリフ・CORNER風</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="magazine" onclick="igGenSetTpl('magazine')">マガジン<br><span style="font-weight:400;font-size:11px;opacity:.75">英字大・SHIBUYA風</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="mincho" onclick="igGenSetTpl('mincho')">明朝見出し<br><span style="font-weight:400;font-size:11px;opacity:.75">SanMichele風</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="bold" onclick="igGenSetTpl('bold')" style="grid-column:1 / -1">筆太ゴシック<br><span style="font-weight:400;font-size:11px;opacity:.75">塚田農場風・縦書き特化</span></button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">テキスト内容</div></div>
+                <div style="display:grid;gap:11px">
+                  <div>
+                    <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">見出し（キャッチコピー）</label>
+                    <div style="display:flex;gap:6px">
+                      <input id="genHeadline" type="text" maxlength="22" placeholder="例：本格炭火焼きを、相模原で" oninput="renderGenImage()" style="flex:1;min-width:0;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                      <button class="btn btn-outline btn-sm" onclick="aiCatchCopy()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">英字見出し（任意・おしゃれな英語タイトル）</label>
+                    <div style="display:flex;gap:6px">
+                      <input id="genEnHead" type="text" maxlength="24" placeholder="例：CORNER / SHIBUYA / SanMichele" oninput="renderGenImage()" style="flex:1;min-width:0;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                      <button class="btn btn-outline btn-sm" onclick="aiEnHead()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">サブテキスト（任意）</label>
+                    <div style="display:flex;gap:6px">
+                      <input id="genSub" type="text" maxlength="30" placeholder="例：ご予約受付中／月〜土 17:00〜" oninput="renderGenImage()" style="flex:1;min-width:0;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                      <button class="btn btn-outline btn-sm" onclick="aiSubText()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">サイズ・文字位置</div></div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                  <label style="font-size:12px;color:var(--text-sub)">サイズ
+                    <select id="genAspect" onchange="changeGenAspect()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                      <option value="portrait">縦長 4:5（投稿推奨）</option>
+                      <option value="square">正方形 1:1</option>
+                      <option value="story">ストーリー/リール 9:16</option>
+                    </select>
+                  </label>
+                  <label style="font-size:12px;color:var(--text-sub)">文字位置
+                    <select id="genLayout" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                      <option value="bottom">下</option>
+                      <option value="center">中央</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- テキスト -->
+            <div class="pop-panel" data-panel="text" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">フォント・向き</div></div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                  <label style="font-size:12px;color:var(--text-sub)">和文フォント
+                    <select id="genFont" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                      <option value="gothic">ゴシック</option>
+                      <option value="mincho">明朝</option>
+                      <option value="maru">丸ゴシック</option>
+                    </select>
+                  </label>
+                  <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:4px"><input type="checkbox" id="genVertical" onchange="renderGenImage()"> 和文を縦書き</label>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">文字サイズ（要素ごと）</div></div>
+                <div style="display:grid;gap:16px">
+                  <div class="pop-slider"><div class="pop-slabel"><span>見出し</span><span class="pop-sval" id="genFsValHead">100%</span></div><input type="range" id="genHeadSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Head',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>英字見出し</span><span class="pop-sval" id="genFsValEn">100%</span></div><input type="range" id="genEnSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('En',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>サブテキスト</span><span class="pop-sval" id="genFsValSub">100%</span></div><input type="range" id="genSubSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Sub',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>店名</span><span class="pop-sval" id="genFsValStore">100%</span></div><input type="range" id="genStoreSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Store',this.value)"></div>
+                </div>
+                <div style="text-align:right;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="igGenResetFs()">デフォルトに戻す</button></div>
+              </div>
+            </div>
+
+            <!-- カラー -->
+            <div class="pop-panel" data-panel="color" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">全体カラー</div></div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                  <label style="font-size:12px;color:var(--text-sub)">配色/濃さ
+                    <select id="genColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                      <option value="blue">ブルー</option>
+                      <option value="green">グリーン</option>
+                      <option value="warm">ウォーム</option>
+                      <option value="pink">ピンク</option>
+                      <option value="dark">ダーク</option>
+                    </select>
+                  </label>
+                  <label style="font-size:12px;color:var(--text-sub)">文字色
+                    <select id="genTextColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                      <option value="white">白</option>
+                      <option value="black">黒</option>
+                      <option value="gold">ゴールド</option>
+                      <option value="cream">クリーム</option>
+                    </select>
+                  </label>
+                </div>
+                <p style="font-size:11px;color:var(--text-sub);margin-top:8px">配色は背景が写真なしグラデーションのときの色味、文字色は全体の基本色です。</p>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">文字色（要素ごと）</div></div>
+                <div style="display:grid;gap:10px">
+                  <div class="gen-el-row"><span>見出し</span><label><input type="checkbox" id="genHeadAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genHeadColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>英字見出し</span><label><input type="checkbox" id="genEnAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genEnColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>サブテキスト</span><label><input type="checkbox" id="genSubAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genSubColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>店名</span><label><input type="checkbox" id="genStoreAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genStoreColor" value="#ffffff" oninput="renderGenImage()"></div>
+                </div>
+                <p style="font-size:11px;color:var(--text-sub);margin-top:8px">「自動色」ONならテンプレートに合う色を自動で使います。OFFにすると個別に指定できます。</p>
+              </div>
+            </div>
+
+            <!-- 画像 -->
+            <div class="pop-panel" data-panel="image" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">背景写真</div></div>
+                <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります。</p>
+                <div id="genBgPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+                <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:4px;margin-top:12px"><input type="checkbox" id="genEnhance" checked onchange="changeGenAspect()"> 自動補正（明るさ・コントラスト）</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右：ライブプレビュー -->
+          <div style="min-width:0">
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="font-size:13px">ライブプレビュー</div></div>
+              <div style="display:flex;justify-content:center;padding:14px 6px;background:var(--bg-3);border-radius:10px">
+                <canvas id="genCanvas" width="1080" height="1350" style="width:min(440px,100%);height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14)"></canvas>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="font-size:13px">使い方のポイント</div></div>
+              <ul style="font-size:12px;color:var(--text-sub);line-height:2;padding-left:18px;margin:0">
+                <li>「画像」タブで店舗写真を背景に選ぶと仕上がりが良くなります</li>
+                <li>見出し・英字見出し・サブテキストはAIボタンで自動生成できます</li>
+                <li>保存すると写真ライブラリに入り、そのまま投稿に使えます</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 写真ライブラリ -->
       <div class="card">
         <div class="card-header"><div class="card-title">写真ライブラリ</div></div>
@@ -1815,96 +2001,6 @@ body {
         <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M17 9h5M2 15h5M17 15h5"/></svg>動画をアップロード</button>
         <button class="btn btn-outline" onclick="toggleImageGen()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>画像を生成</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
-
-        <div id="imageGenPanel" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <canvas id="genCanvas" width="1080" height="1080" style="width:200px;height:200px;border-radius:8px;border:1px solid var(--border);flex-shrink:0;align-self:flex-start"></canvas>
-            <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px">
-              <div>
-                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">見出し（キャッチコピー）</label>
-                <div style="display:flex;gap:6px">
-                  <input id="genHeadline" type="text" maxlength="22" placeholder="例：本格炭火焼きを、相模原で" oninput="renderGenImage()" style="flex:1;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-                  <button class="btn btn-outline btn-sm" onclick="aiCatchCopy()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
-                </div>
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">英字見出し（任意・おしゃれな英語タイトル）</label>
-                <input id="genEnHead" type="text" maxlength="24" placeholder="例：CORNER / SHIBUYA / SanMichele" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">サブテキスト（任意）</label>
-                <input id="genSub" type="text" maxlength="30" placeholder="例：ご予約受付中／月〜土 17:00〜" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-              </div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-                <label style="font-size:12px;color:var(--text-sub)">テンプレート
-                  <select id="genTemplate" onchange="onGenTemplate()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="standard">スタンダード（下グラデ）</option>
-                    <option value="elegant">エレガント（白セリフ・CORNER風）</option>
-                    <option value="magazine">マガジン（英字大・SHIBUYA風）</option>
-                    <option value="mincho">明朝見出し（SanMichele風）</option>
-                    <option value="bold">筆太ゴシック（塚田農場風）</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub)">和文フォント
-                  <select id="genFont" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="gothic">ゴシック</option>
-                    <option value="mincho">明朝</option>
-                    <option value="maru">丸ゴシック</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub)">文字色
-                  <select id="genTextColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="white">白</option>
-                    <option value="black">黒</option>
-                    <option value="gold">ゴールド</option>
-                    <option value="cream">クリーム</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genVertical" onchange="renderGenImage()"> 和文を縦書き</label>
-              </div>
-              <div style="border-top:1px dashed var(--border);padding-top:8px;margin-top:2px">
-                <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px">文字の詳細設定（要素ごとにサイズ・色）</div>
-                <div style="display:grid;gap:7px">
-                  <div class="gen-el-row"><span>見出し</span><input type="range" id="genHeadSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genHeadAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genHeadColor" value="#ffffff" oninput="renderGenImage()"></div>
-                  <div class="gen-el-row"><span>英字見出し</span><input type="range" id="genEnSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genEnAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genEnColor" value="#ffffff" oninput="renderGenImage()"></div>
-                  <div class="gen-el-row"><span>サブ</span><input type="range" id="genSubSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genSubAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genSubColor" value="#ffffff" oninput="renderGenImage()"></div>
-                  <div class="gen-el-row"><span>店名</span><input type="range" id="genStoreSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genStoreAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genStoreColor" value="#ffffff" oninput="renderGenImage()"></div>
-                </div>
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">背景（お店の写真を使うと雰囲気に合います）</label>
-                <div id="genBgPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-              </div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                <label style="font-size:12px;color:var(--text-sub)">サイズ
-                  <select id="genAspect" onchange="changeGenAspect()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="portrait">縦長 4:5（投稿推奨）</option>
-                    <option value="square">正方形 1:1</option>
-                    <option value="story">ストーリー/リール 9:16</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub)">配色/濃さ
-                  <select id="genColor" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="blue">ブルー</option>
-                    <option value="green">グリーン</option>
-                    <option value="warm">ウォーム</option>
-                    <option value="pink">ピンク</option>
-                    <option value="dark">ダーク</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub)">文字位置
-                  <select id="genLayout" onchange="renderGenImage()" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                    <option value="bottom">下</option>
-                    <option value="center">中央</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genEnhance" checked onchange="changeGenAspect()"> 自動補正</label>
-                <button class="btn btn-success btn-sm" onclick="saveGenImage()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>ライブラリに保存</button>
-              </div>
-              <p style="font-size:11px;color:var(--text-sub)">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります（無料・ブラウザ内生成）。</p>
-            </div>
-          </div>
-        </div>
 
         <div id="mediaGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:16px"></div>
       </div>
@@ -4664,9 +4760,11 @@ async function loadIgInsights() {
 async function loadMedia() {
   const gallery = document.getElementById('mediaGallery');
   const sub = document.getElementById('instagramSubtitle');
-  // 店舗切り替え時は前の店舗の状態をリセット（投稿作成欄・選択写真をクリア）
+  // 店舗切り替え時は前の店舗の状態をリセット（投稿作成欄・選択写真・生成背景をクリア）
   _igSelected = null;
   _genBg = null;
+  _genBgBaseUrl = null; // 残すとサイズ/自動補正変更で前店舗の写真が背景に復活する
+  _genBgTainted = false;
   const composeCard = document.getElementById('igComposeCard');
   if (composeCard) composeCard.style.display = 'none';
   const statusEl = document.getElementById('mediaUploadStatus');
@@ -4812,24 +4910,74 @@ function changeGenAspect() {
   else renderGenImage();
 }
 
-// 選択した写真を背景に使って画像生成（ギャラリーの🎨生成から）
+// 選択した写真を背景に使って画像生成（ギャラリーの生成ボタンから）
 function genFromPhoto(i) {
   const m = _mediaList[i];
   if (!m || m.isVideo) return showToast('画像を選んでください', 'error');
-  const panel = document.getElementById('imageGenPanel');
-  panel.style.display = 'block';
+  openImageGen();
   showToast('この写真を背景に画像を生成します', 'success');
   selectGenBg(m.url || m.squareUrl); // 元URLを背景に設定＋描画（読み込み後に自動描画）
   aiCatchCopy();
-  panel.scrollIntoView({ behavior: 'smooth' });
 }
 
-function toggleImageGen() {
+// ── 投稿画像作成の個別ページ（storePopViewと同型）──
+// 他の子はCSS（#panel-instagram.gen-open）で常時抑止する。インライン書き換え方式だと
+// 非同期のインサイト表示（loadIgInsights）等が後から割り込むため、クラス方式にしている。
+function openImageGen() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const p = document.getElementById('imageGenPanel');
-  const show = p.style.display === 'none';
-  p.style.display = show ? 'block' : 'none';
-  if (show) { renderGenBgPicker(); renderGenImage(); }
+  const panel = document.getElementById('panel-instagram');
+  const view = document.getElementById('igGenView');
+  if (!panel || !view) return;
+  const st = document.getElementById('igGenStatus');
+  if (st) st.textContent = ''; // 前回の保存結果を持ち越さない
+  panel.classList.add('gen-open');
+  view.style.display = 'block';
+  igGenTab('basic');
+  igGenSyncControls();
+  renderGenBgPicker();
+  renderGenImage();
+  view.scrollIntoView({ block: 'start' });
+}
+function closeImageGen() {
+  const view = document.getElementById('igGenView');
+  if (!view || view.style.display === 'none') return;
+  view.style.display = 'none';
+  document.getElementById('panel-instagram')?.classList.remove('gen-open');
+}
+function toggleImageGen() { openImageGen(); } // 旧ボタン互換
+function igGenTab(name) {
+  document.querySelectorAll('#igGenView .pop-tab').forEach(b => b.classList.toggle('pop-tab-on', b.dataset.tab === name));
+  document.querySelectorAll('#igGenView .pop-panel').forEach(p => { p.style.display = (p.dataset.panel === name) ? '' : 'none'; });
+}
+function igGenSetTpl(t) {
+  const sel = document.getElementById('genTemplate');
+  if (sel) sel.value = t;
+  igGenSyncTpl();
+  onGenTemplate();
+}
+function igGenSyncTpl() {
+  const t = document.getElementById('genTemplate')?.value || 'standard';
+  document.querySelectorAll('#igGenView .gen-tpl').forEach(b => b.classList.toggle('pop-tpl-on', b.dataset.tpl === t));
+}
+function igGenFs(p, v) {
+  const e = document.getElementById('genFsVal' + p);
+  if (e) e.textContent = Math.round(v * 100) + '%';
+  renderGenImage();
+}
+function igGenResetFs() {
+  ['Head', 'En', 'Sub', 'Store'].forEach(p => {
+    const s = document.getElementById('gen' + p + 'Size'); if (s) s.value = 1;
+    const e = document.getElementById('genFsVal' + p); if (e) e.textContent = '100%';
+  });
+  renderGenImage();
+}
+function igGenSyncControls() {
+  igGenSyncTpl();
+  ['Head', 'En', 'Sub', 'Store'].forEach(p => {
+    const s = document.getElementById('gen' + p + 'Size');
+    const e = document.getElementById('genFsVal' + p);
+    if (s && e) e.textContent = Math.round(s.value * 100) + '%';
+  });
 }
 
 // 背景ピッカー（グラデ＋ライブラリの写真）
@@ -4918,8 +5066,7 @@ function renderGenImage() {
   if (!canvas) return;
   const { w: W, h: H } = _genDims();
   if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-  canvas.style.width = '200px';
-  canvas.style.height = (200 * H / W) + 'px';
+  // 表示サイズはCSS（width:min(440px,100%) + height:auto）が比率ごと追従する
 
   const ctx = canvas.getContext('2d');
   const pal = GEN_PALETTES[document.getElementById('genColor').value] || GEN_PALETTES.blue;
@@ -5030,20 +5177,24 @@ function renderGenImage() {
   shadow(false);
 }
 
-async function aiCatchCopy() {
+// 画像テキスト欄のAI生成（type: catchcopy / en_headline / subtext）
+async function _aiGenField(type, inputId, maxLen) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const inp = document.getElementById('genHeadline');
+  const inp = document.getElementById(inputId);
   const old = inp.value; inp.value = '生成中...';
   try {
     const res = await fetch('/api/generate-content', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId: currentLocationId, type: 'catchcopy' }),
+      body: JSON.stringify({ locationId: currentLocationId, type }),
     });
     const d = await res.json();
-    inp.value = (d.content || old).replace(/[「」『』"']/g, '').trim().slice(0, 22);
+    inp.value = (d.content || old).replace(/[「」『』"']/g, '').trim().split('\n')[0].slice(0, maxLen);
     renderGenImage();
   } catch (e) { inp.value = old; showToast('生成に失敗しました', 'error'); }
 }
+async function aiCatchCopy() { return _aiGenField('catchcopy', 'genHeadline', 22); }
+async function aiEnHead() { return _aiGenField('en_headline', 'genEnHead', 24); }
+async function aiSubText() { return _aiGenField('subtext', 'genSub', 30); }
 
 async function saveGenImage() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
@@ -5053,7 +5204,7 @@ async function saveGenImage() {
   } catch (e) {
     return showToast('この背景写真はブラウザの制約で保存できません。別の写真を選ぶか、Chromeでお試しください', 'error');
   }
-  const status = document.getElementById('mediaUploadStatus');
+  const status = document.getElementById('igGenStatus') || document.getElementById('mediaUploadStatus');
   status.textContent = '生成画像を保存中...';
   try {
     const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`, {
@@ -6996,7 +7147,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'stores' && !window._storeKeepDetail) showStoreList();
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
-  if (name === 'instagram') loadMedia();
+  if (name === 'instagram') { closeImageGen(); loadMedia(); }
   if (name === 'posts') loadPostImages();
   if (name === 'rankmgr') loadRankMgr();
   if (name === 'rankreport') loadRankReport();
