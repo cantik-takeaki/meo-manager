@@ -411,6 +411,29 @@ body {
 .pop-color-row .pop-clabel { font-size:13px; color:var(--text); width:88px; flex-shrink:0; }
 .pop-color-row input[type=color] { width:46px; height:38px; border:1px solid var(--border); border-radius:8px; background:none; cursor:pointer; padding:2px; }
 .pop-color-row .pop-chex { font-size:12.5px; color:var(--text-muted); font-family:ui-monospace,monospace; }
+
+/* ─── 順位管理 / 順位レポート ─── */
+.rk-card { background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:16px 14px; text-align:center; }
+.rk-card .rk-l { font-size:12px; color:var(--text-sub); }
+.rk-card .rk-v { font-size:28px; font-weight:800; margin-top:5px; line-height:1.05; }
+.rk-card .rk-u { font-size:11px; color:var(--text-muted); margin-top:3px; }
+.rk-gold { background:rgba(245,158,11,0.09); border-color:rgba(245,158,11,0.28); }
+.rk-gold .rk-v { color:#d97706; }
+.rk-blue { background:rgba(46,143,240,0.08); border-color:rgba(46,143,240,0.28); }
+.rk-blue .rk-v { color:var(--accent); }
+.rk-goldn .rk-v { color:#d97706; }
+.rk-greenn .rk-v { color:var(--accent-2); }
+.rk-redn .rk-v { color:var(--red); }
+.rm-kw { border:1px solid var(--border); border-left:4px solid var(--border); border-radius:10px; padding:11px 14px; cursor:pointer; transition:all .15s; background:var(--bg-2); position:relative; }
+.rm-kw:hover { border-color:var(--border-active); }
+.rm-kw.on { background:rgba(46,143,240,0.06); box-shadow:0 0 0 1px var(--accent) inset; }
+.rm-kw .rm-kw-name { font-weight:700; font-size:13px; }
+.rm-kw .rm-kw-area { font-size:11px; color:var(--text-sub); margin-top:3px; display:flex; align-items:center; gap:3px; }
+.rm-kw .rm-kw-rank { font-size:12px; color:var(--text-muted); margin-top:5px; }
+.rm-kw .rm-dot { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:9px; height:9px; border-radius:50%; }
+.rm-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
+.rm-legend .rm-leg { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-sub); }
+.rm-legend .rm-leg i { width:14px; height:3px; border-radius:2px; display:inline-block; }
 </style>
 </head>
 <body>
@@ -496,6 +519,16 @@ body {
       <button class="nav-item" onclick="showPanel('knowledge', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
         企業ナレッジ
+      </button>
+
+      <div class="sidebar-section">順位</div>
+      <button class="nav-item" onclick="showPanel('rankmgr', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        順位管理
+      </button>
+      <button class="nav-item" onclick="showPanel('rankreport', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+        順位レポート
       </button>
 
       <div class="sidebar-section">店舗切替</div>
@@ -2116,6 +2149,95 @@ body {
         </div>
       </div>
     </div>
+
+    <!-- 順位管理 -->
+    <div class="panel" id="panel-rankmgr">
+      <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div class="page-title">順位管理</div>
+          <div class="page-sub">キーワード順位の推移を確認</div>
+        </div>
+        <input type="file" id="rmImportFile" accept=".csv,text/csv" style="display:none" onchange="rmImportCsv(this)">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('rmImportFile').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5"/><path d="M12 5v12"/></svg>CSVインポート</button>
+        <button class="btn btn-outline btn-sm" onclick="rmExportCsv()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>CSVエクスポート</button>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:18px;align-items:start">
+        <!-- 左 -->
+        <div>
+          <div class="card">
+            <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:6px">店舗を選択</label>
+            <select id="rmStore" class="ed-in" style="margin-top:0" onchange="rmSelectStore()"></select>
+          </div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div class="card-title" style="font-size:13px">キーワード</div>
+              <button class="btn btn-outline btn-sm" onclick="rmToggleAll()">すべて選択</button>
+            </div>
+            <div id="rmKwList" style="display:grid;gap:8px"></div>
+            <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:12px">クリックで選択 / 複数選択でグラフ比較</div>
+          </div>
+        </div>
+        <!-- 右 -->
+        <div style="min-width:0">
+          <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--text-sub)">表示期間</span>
+            <input type="date" id="rmStart" class="ed-in" style="max-width:165px;margin:0" onchange="rmRender()">
+            <span style="color:var(--text-muted)">〜</span>
+            <input type="date" id="rmEnd" class="ed-in" style="max-width:165px;margin:0" onchange="rmRender()">
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+            <div class="rk-card"><div class="rk-l">対策KW数</div><div class="rk-v" id="rmKwCount">0</div><div class="rk-u">件</div></div>
+            <div class="rk-card"><div class="rk-l">平均順位</div><div class="rk-v" id="rmAvg">—</div><div class="rk-u">位</div></div>
+            <div class="rk-card rk-gold"><div class="rk-l">TOP3</div><div class="rk-v" id="rmTop3">0</div><div class="rk-u">件</div></div>
+            <div class="rk-card rk-blue"><div class="rk-l">TOP10</div><div class="rk-v" id="rmTop10">0</div><div class="rk-u">件</div></div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:14px">
+              <span id="rmSelCount" style="font-size:22px;font-weight:800">0</span>
+              <span style="font-size:13px;color:var(--text-sub)">/ <span id="rmKwTotal">0</span> キーワード選択中</span>
+            </div>
+            <div id="rmChart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 順位レポート -->
+    <div class="panel" id="panel-rankreport">
+      <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div class="page-title">順位レポート</div>
+          <div class="page-sub">期間を指定してキーワード順位サマリーを確認</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="rrExportCsv()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>CSVダウンロード</button>
+      </div>
+      <div class="card">
+        <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:6px">店舗</label>
+        <select id="rrStore" class="ed-in" style="margin-top:0;margin-bottom:14px"></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <label style="font-size:12px;color:var(--text-sub)">開始日<input type="date" id="rrStart" class="ed-in"></label>
+          <label style="font-size:12px;color:var(--text-sub)">終了日<input type="date" id="rrEnd" class="ed-in"></label>
+        </div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="rrGenerate()">レポート生成</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        <div class="rk-card"><div class="rk-l">管理キーワード</div><div class="rk-v" id="rrKw">0</div></div>
+        <div class="rk-card rk-goldn"><div class="rk-l">TOP3 圏内</div><div class="rk-v" id="rrTop3">0</div></div>
+        <div class="rk-card rk-greenn"><div class="rk-l">TOP10 圏内</div><div class="rk-v" id="rrTop10">0</div></div>
+        <div class="rk-card rk-redn"><div class="rk-l">圏外</div><div class="rk-v" id="rrOut">0</div></div>
+      </div>
+      <div class="card" style="padding:8px 4px">
+        <div style="overflow-x:auto">
+          <table class="summary-table">
+            <thead><tr>
+              <th style="text-align:left;padding-left:16px">キーワード</th><th>エリア</th>
+              <th>開始順位</th><th>終了順位</th><th>最高</th><th>平均</th><th>推移</th>
+            </tr></thead>
+            <tbody id="rrBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">店舗を選択して「レポート生成」を押してください</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -2302,7 +2424,7 @@ async function init() {
     // リロード時は直前のページを復元（ログイン直後はdashboardに設定済み）。ダッシュボードは初期表示のまま。
     try {
       const saved = sessionStorage.getItem('rakuraku_panel');
-      const valid = ['dashboard', 'clients', 'stores', 'reviews', 'posts', 'instagram', 'citation', 'aio', 'protection', 'knowledge'];
+      const valid = ['dashboard', 'clients', 'stores', 'reviews', 'posts', 'instagram', 'citation', 'aio', 'protection', 'knowledge', 'rankmgr', 'rankreport'];
       if (saved && saved !== 'dashboard' && valid.includes(saved)) switchPanel(saved);
     } catch (e) {}
   } catch {
@@ -2500,6 +2622,7 @@ async function loadLocations() {
       pushLoc(a);
     });
     window._locations = locations;
+    if (typeof fillRankSelects === 'function') fillRankSelects(); // 順位ページのドロップダウンも更新
 
     // ── クライアント（会社名）＞店舗 でグルーピング ──
     // 管理対象は会社名(company)で分ける。未設定はGBPアカウント名→未分類の順でフォールバック。
@@ -3060,6 +3183,255 @@ function popPrint() {
   <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>
   </body></html>`);
   w.document.close();
+}
+
+// ══ 順位管理 / 順位レポート（トップレベル2ページ）══
+const RANK_PALETTE = ['#2e8ff0', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9', '#f97316'];
+function rankSet(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
+function fmtRankV(v) { const r = parseInt(v, 10); return (Number.isFinite(r) && r >= 1) ? r + '位' : '圏外'; }
+function rankColorV(v) { const r = parseInt(v, 10); if (!Number.isFinite(r) || r < 1) return 'var(--text-muted)'; if (r <= 3) return 'var(--accent-2)'; if (r <= 10) return '#d97706'; return 'var(--text-sub)'; }
+function storeIdOfLoc(loc) { return loc ? (loc.storeId || (loc.name || '').replace(/\//g, '_')) : ''; }
+function storeAreaOf(loc) {
+  const a = loc && loc.storefrontAddress;
+  if (a && typeof a === 'object') return a.locality || a.administrativeArea || a.sublocality || '—';
+  return (loc && loc.area) || '—';
+}
+function histInRange(history, s, e) { return (history || []).filter(h => h && h.date && (!s || h.date >= s) && (!e || h.date <= e)); }
+function fillStoreSelect(sel) {
+  if (!sel) return;
+  const locs = window._locations || [];
+  if (!locs.length) { sel.innerHTML = '<option value="">店舗がありません</option>'; return; }
+  const cur = sel.value;
+  const groups = new Map();
+  locs.forEach((l, i) => { const cn = l.company || l.clientName || l.title || '未分類'; if (!groups.has(cn)) groups.set(cn, []); groups.get(cn).push({ i, title: l.title || '店舗' }); });
+  sel.innerHTML = [...groups].map(([cn, items]) => `<optgroup label="${escapeHtml(cn)}">${items.map(it => `<option value="${it.i}">${escapeHtml(it.title)}</option>`).join('')}</optgroup>`).join('');
+  if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+function fillRankSelects() { fillStoreSelect(document.getElementById('rmStore')); fillStoreSelect(document.getElementById('rrStore')); }
+
+// CSVダウンロード（クライアント側Blob・BOM付きでExcel日本語対応）
+function downloadCsv(filename, rows) {
+  const esc = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const csv = '﻿' + rows.map(r => r.map(esc).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function parseCsv(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else { if (c === '"') q = true; else if (c === ',') { row.push(cur); cur = ''; } else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; } else if (c === '\r') { } else cur += c; }
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.length && r.some(c => c.trim() !== ''));
+}
+
+// ── 順位管理 ──
+async function loadRankMgr() {
+  fillStoreSelect(document.getElementById('rmStore'));
+  const rmS = document.getElementById('rmStart'), rmE = document.getElementById('rmEnd');
+  if (rmS && !rmS.value) { const t = new Date(); const s = new Date(); s.setMonth(s.getMonth() - 3); rmS.value = s.toISOString().slice(0, 10); rmE.value = t.toISOString().slice(0, 10); }
+  await rmSelectStore();
+}
+async function rmSelectStore() {
+  const sel = document.getElementById('rmStore'); const idx = parseInt(sel && sel.value, 10);
+  window._rmStoreIdx = Number.isFinite(idx) ? idx : null;
+  const loc = window._locations?.[window._rmStoreIdx];
+  const list = document.getElementById('rmKwList');
+  if (!loc) { if (list) list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px">店舗を選択してください</div>'; window._rmData = null; window._rmKwEntries = []; window._rmSel = new Set(); rmRender(); return; }
+  const sid = storeIdOfLoc(loc);
+  if (list) list.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:10px">読み込み中...</div>';
+  let d;
+  try { d = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(sid)}`).then(r => r.json()); } catch (e) { d = { keywords: [], history: [] }; }
+  window._rmData = { keywords: d.keywords || [], history: d.history || [] };
+  window._rmKwEntries = (d.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(en => en.k.trim());
+  window._rmSel = new Set(window._rmKwEntries.map(en => en.i));
+  rmRender();
+}
+function rmRange() { return { s: document.getElementById('rmStart')?.value || '', e: document.getElementById('rmEnd')?.value || '' }; }
+function rmToggleKw(i) { if (!window._rmSel) window._rmSel = new Set(); window._rmSel.has(i) ? window._rmSel.delete(i) : window._rmSel.add(i); rmRender(); }
+function rmToggleAll() {
+  const entries = window._rmKwEntries || [];
+  if (window._rmSel && window._rmSel.size >= entries.length && entries.length) window._rmSel = new Set();
+  else window._rmSel = new Set(entries.map(en => en.i));
+  rmRender();
+}
+function rmRenderKwList() {
+  const list = document.getElementById('rmKwList'); if (!list) return;
+  const D = window._rmData, entries = window._rmKwEntries || [];
+  const loc = window._locations?.[window._rmStoreIdx];
+  const area = storeAreaOf(loc);
+  if (!entries.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px">この店舗にはキーワードが登録されていません</div>'; return; }
+  // 順位バッジも表示期間でフィルタした最終履歴を使う（右のサマリーカードと数値を一致させる）
+  const { s, e } = rmRange();
+  const last = histInRange(D?.history, s, e).at(-1)?.rankings || [];
+  list.innerHTML = entries.map((e, pos) => {
+    const color = RANK_PALETTE[pos % RANK_PALETTE.length];
+    const on = window._rmSel?.has(e.i);
+    const rv = last[e.i];
+    return `<div class="rm-kw${on ? ' on' : ''}" style="border-left-color:${color}" onclick="rmToggleKw(${e.i})">
+      <div class="rm-kw-name">${escapeHtml(e.k)}</div>
+      <div class="rm-kw-area"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(area)}</div>
+      <div class="rm-kw-rank" style="color:${rankColorV(rv)}">${fmtRankV(rv)}</div>
+      ${on ? `<span class="rm-dot" style="background:${color}"></span>` : ''}
+    </div>`;
+  }).join('');
+}
+function rmRender() {
+  const D = window._rmData, entries = window._rmKwEntries || [];
+  const { s, e } = rmRange();
+  const hist = D ? histInRange(D.history, s, e) : [];
+  const last = hist.at(-1)?.rankings || [];
+  let top3 = 0, top10 = 0, sum = 0, cnt = 0;
+  entries.forEach(en => { const r = parseInt(last[en.i], 10); if (Number.isFinite(r) && r >= 1) { if (r <= 3) top3++; if (r <= 10) top10++; sum += r; cnt++; } });
+  rankSet('rmKwCount', entries.length);
+  rankSet('rmAvg', cnt ? (Math.round(sum / cnt * 10) / 10) : '—');
+  rankSet('rmTop3', top3); rankSet('rmTop10', top10);
+  rankSet('rmSelCount', window._rmSel?.size || 0); rankSet('rmKwTotal', entries.length);
+  rmRenderKwList();
+  rmRenderChart(hist);
+}
+function rmEmptyChart() {
+  return `<div class="empty-state" style="padding:44px 20px;text-align:center;color:var(--text-muted)">
+    <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" stroke-width="1.4" style="opacity:.5"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+    <p style="font-weight:700;color:var(--text-sub);margin:10px 0 2px">順位データがありません</p>
+    <p style="font-size:12px">次回の自動取得後に表示されます。</p></div>`;
+}
+function rmRenderChart(hist) {
+  const box = document.getElementById('rmChart'); if (!box) return;
+  const entries = window._rmKwEntries || [];
+  const sel = entries.filter((en, pos) => window._rmSel?.has(en.i)).map(en => ({ ...en, pos: entries.indexOf(en) }));
+  const dates = hist.map(h => h.date);
+  const hasData = sel.some(en => hist.some(h => { const r = parseInt((h.rankings || [])[en.i], 10); return Number.isFinite(r) && r >= 1; }));
+  if (!dates.length || !sel.length || !hasData) { box.innerHTML = rmEmptyChart(); return; }
+  const W = 760, H = 300, pad = { t: 20, r: 20, b: 46, l: 42 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+  // Y軸: 順位ドメイン（1が上）
+  let maxR = 1; sel.forEach(en => hist.forEach(h => { const r = parseInt((h.rankings || [])[en.i], 10); if (Number.isFinite(r) && r >= 1) maxR = Math.max(maxR, r); }));
+  const axisMax = Math.min(20, Math.max(10, maxR));
+  const xFor = i => pad.l + (dates.length <= 1 ? plotW / 2 : (i / (dates.length - 1)) * plotW);
+  const yFor = r => pad.t + ((r - 1) / (axisMax - 1)) * plotH;
+  // グリッド + Y目盛り
+  const yTicks = axisMax <= 10 ? [1, 3, 5, 10] : [1, 3, 5, 10, axisMax];
+  let g = '';
+  yTicks.forEach(r => { if (r > axisMax) return; const y = yFor(r); g += `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${W - pad.r}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/><text x="${pad.l - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-muted)">${r}位</text>`; });
+  // X目盛り（最大8ラベル）
+  const step = Math.ceil(dates.length / 8);
+  dates.forEach((d, i) => { if (i % step !== 0 && i !== dates.length - 1) return; const x = xFor(i); const md = d.slice(5).replace('-', '/'); g += `<text x="${x.toFixed(1)}" y="${H - pad.b + 18}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${md}</text>`; });
+  // 各系列
+  let lines = '', legend = '';
+  sel.forEach(en => {
+    const color = RANK_PALETTE[en.pos % RANK_PALETTE.length];
+    const pts = [];
+    hist.forEach((h, i) => { const r = parseInt((h.rankings || [])[en.i], 10); if (Number.isFinite(r) && r >= 1) pts.push({ x: xFor(i), y: yFor(Math.min(r, axisMax)) }); });
+    if (pts.length) {
+      const dpath = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+      lines += `<path d="${dpath}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+      lines += pts.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4" fill="#fff" stroke="${color}" stroke-width="2"/>`).join('');
+    }
+    legend += `<div class="rm-leg"><i style="background:${color}"></i>${escapeHtml(en.k)}</div>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${g}${lines}</svg><div class="rm-legend">${legend}</div>`;
+}
+function rmExportCsv() {
+  const D = window._rmData, entries = window._rmKwEntries || [];
+  const loc = window._locations?.[window._rmStoreIdx];
+  if (!loc || !entries.length) return showToast('店舗とキーワードを選択してください', 'error');
+  const { s, e } = rmRange(); const hist = histInRange(D.history, s, e);
+  const dates = hist.map(h => h.date);
+  const area = storeAreaOf(loc);
+  const header = ['キーワード', 'エリア', ...dates];
+  const rows = entries.map(en => [en.k, area, ...hist.map(h => { const r = parseInt((h.rankings || [])[en.i], 10); return (Number.isFinite(r) && r >= 1) ? r : '圏外'; })]);
+  downloadCsv(`順位_${(loc.title || 'store')}_${s}_${e}.csv`, [header, ...rows]);
+}
+function rmImportCsv(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  const loc = window._locations?.[window._rmStoreIdx];
+  if (!loc) { input.value = ''; return showToast('先に店舗を選択してください', 'error'); }
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const rows = parseCsv(String(ev.target.result));
+      if (rows.length < 2) throw new Error('データがありません');
+      const header = rows[0].map(h => h.replace(/^﻿/, '').trim());
+      const dateCols = []; header.forEach((h, ci) => { if (/^\d{4}-\d{2}-\d{2}$/.test(h)) dateCols.push({ ci, date: h }); });
+      // キーワード列(先頭)が非空の行だけを母集合にし、keywords と rankings を必ず同じ行・同じ長さで作る（位置対応を保つ）
+      const dataRows = rows.slice(1).filter(r => (r[0] || '').trim());
+      const kws = dataRows.map(r => (r[0] || '').trim());
+      if (!kws.length) throw new Error('キーワード列が空です');
+      const sid = storeIdOfLoc(loc);
+      if (!dateCols.length) {
+        await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(sid)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: kws }) });
+        showToast(`${kws.length}件のキーワードを取り込みました`, 'success');
+      } else {
+        for (const dc of dateCols) {
+          const rankings = dataRows.map(r => { const v = (r[dc.ci] || '').trim(); if (!v || v === '圏外') return null; const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; });
+          await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(sid)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: kws, rankings, date: dc.date }) });
+        }
+        showToast(`${kws.length}KW × ${dateCols.length}日分を取り込みました`, 'success');
+      }
+      await rmSelectStore();
+    } catch (err) { showToast('取り込み失敗: ' + err.message, 'error'); }
+    input.value = '';
+  };
+  reader.readAsText(f);
+}
+
+// ── 順位レポート ──
+async function loadRankReport() {
+  fillStoreSelect(document.getElementById('rrStore'));
+  const s = document.getElementById('rrStart'), e = document.getElementById('rrEnd');
+  if (s && !s.value) { const now = new Date(); const first = new Date(now.getFullYear(), now.getMonth(), 1); const lastD = new Date(now.getFullYear(), now.getMonth() + 1, 0); s.value = first.toISOString().slice(0, 10); e.value = lastD.toISOString().slice(0, 10); }
+  rrGenerate();
+}
+async function rrGenerate() {
+  const sel = document.getElementById('rrStore'); const idx = parseInt(sel && sel.value, 10);
+  const loc = window._locations?.[Number.isFinite(idx) ? idx : -1];
+  const body = document.getElementById('rrBody');
+  window._rrRows = [];
+  if (!loc) { if (body) body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">店舗を選択してください</td></tr>'; rankSet('rrKw', 0); rankSet('rrTop3', 0); rankSet('rrTop10', 0); rankSet('rrOut', 0); return; }
+  const sid = storeIdOfLoc(loc); const s = document.getElementById('rrStart').value, e = document.getElementById('rrEnd').value;
+  window._rrMeta = { title: loc.title || 'store', s, e }; // CSVファイル名は生成時点の店舗・期間で固定（後から選択変更しても取り違えない）
+  if (body) body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-sub);padding:20px">生成中...</td></tr>';
+  let D; try { D = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(sid)}`).then(r => r.json()); } catch (err) { D = { keywords: [], history: [] }; }
+  const entries = (D.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(en => en.k.trim());
+  const hist = histInRange(D.history, s, e);
+  const area = storeAreaOf(loc);
+  let top3 = 0, top10 = 0, out = 0;
+  const cell = v => v == null ? '<span style="color:var(--text-muted)">圏外</span>' : `<span style="color:${rankColorV(v)};font-weight:600">${v}位</span>`;
+  const rowsHtml = entries.map(en => {
+    const series = hist.map(h => { const r = parseInt((h.rankings || [])[en.i], 10); return (Number.isFinite(r) && r >= 1) ? r : null; });
+    const finite = series.filter(r => r != null);
+    const firstVal = series.length ? series[0] : null;
+    const lastVal = series.length ? series[series.length - 1] : null;
+    const best = finite.length ? Math.min(...finite) : null;
+    const avg = finite.length ? Math.round(finite.reduce((a, b) => a + b, 0) / finite.length * 10) / 10 : null;
+    // 圏外は「期間内に記録があるのに順位なし(null)」のみ＝表セルの圏外表示と完全一致させる
+    if (lastVal != null) { if (lastVal <= 3) top3++; if (lastVal <= 10) top10++; } else if (hist.length) { out++; }
+    let trend = '<span style="color:var(--text-muted)">—</span>';
+    if (firstVal != null && lastVal != null) { const d = firstVal - lastVal; trend = d > 0 ? `<span style="color:var(--accent-2)">▲ ${d}</span>` : d < 0 ? `<span style="color:var(--red)">▼ ${-d}</span>` : '<span style="color:var(--text-muted)">→ 0</span>'; }
+    window._rrRows.push([en.k, area, firstVal == null ? '圏外' : firstVal, lastVal == null ? '圏外' : lastVal, best == null ? '圏外' : best, avg == null ? '' : avg, (firstVal != null && lastVal != null) ? (firstVal - lastVal) : '']);
+    return `<tr>
+      <td style="text-align:left;padding-left:16px;font-weight:600">${escapeHtml(en.k)}</td>
+      <td>${escapeHtml(area)}</td>
+      <td>${cell(firstVal)}</td>
+      <td>${cell(lastVal)}</td>
+      <td>${best != null ? `<span style="color:${rankColorV(best)};font-weight:600">${best}位</span>` : '<span style="color:var(--text-muted)">圏外</span>'}</td>
+      <td>${avg != null ? avg : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${trend}</td>
+    </tr>`;
+  }).join('');
+  if (body) body.innerHTML = rowsHtml || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">キーワードが登録されていません</td></tr>';
+  rankSet('rrKw', entries.length); rankSet('rrTop3', top3); rankSet('rrTop10', top10); rankSet('rrOut', out);
+}
+function rrExportCsv() {
+  if (!window._rrRows || !window._rrRows.length) return showToast('先にレポートを生成してください', 'error');
+  const m = window._rrMeta || { title: 'store', s: '', e: '' };
+  const header = ['キーワード', 'エリア', '開始順位', '終了順位', '最高', '平均', '推移'];
+  downloadCsv(`順位レポート_${m.title}_${m.s}_${m.e}.csv`, [header, ...window._rrRows]);
 }
 
 // ── アンケート編集 ──
@@ -5940,6 +6312,7 @@ function switchPanel(name, triggerEl) {
     dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
     posts: '投稿管理', instagram: 'Instagram投稿', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
+    rankmgr: '順位管理', rankreport: '順位レポート',
   };
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
@@ -5949,6 +6322,8 @@ function switchPanel(name, triggerEl) {
   if (name === 'aio') loadAio();
   if (name === 'instagram') loadMedia();
   if (name === 'posts') loadPostImages();
+  if (name === 'rankmgr') loadRankMgr();
+  if (name === 'rankreport') loadRankReport();
 }
 
 function showPanel(name, el) {
