@@ -951,7 +951,7 @@ body {
         </div>
 
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="openSurveyEditor()">✏️ アンケートを編集</button>
+          <button class="btn btn-outline btn-sm" onclick="showSurveyEdit(window._qrIdx ?? currentLocation?._idx)">✏️ アンケートを編集</button>
           <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
           <button class="btn btn-outline btn-sm" onclick="loadLeads()">📩 リード一覧<span id="leadBadge"></span></button>
         </div>
@@ -966,65 +966,6 @@ body {
         </div>
 
         <!-- アンケート編集（折りたたみ） -->
-        <div id="surveyEditor" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-          <div style="font-weight:700;font-size:14px;margin-bottom:10px">✏️ アンケート編集</div>
-          <div style="display:grid;gap:10px">
-            <label style="font-size:12px;color:var(--text-sub)">タイトル（ページ見出し）
-              <input id="svTitle" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">導入文
-              <input id="svIntro" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">満足度の質問文（★評価の見出し・お客さんに表示）
-              <input id="svRatingQ" type="text" placeholder="本日の満足度はいかがでしたか？" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-                <label style="font-size:12px;color:var(--text-sub)">良かった点の選択肢（カンマ区切り）</label>
-                <button class="btn btn-outline btn-sm" onclick="aiSurveyPoints()">✨ AIで業種別に生成</button>
-              </div>
-              <textarea id="svPoints" rows="2" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical"></textarea>
-            </div>
-            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-              <label style="font-size:12px;color:var(--text-sub)">低評価の分岐
-                <select id="svGate" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                  <option value="branch">満足度で分岐（低評価は店内で受け止め）</option>
-                  <option value="all">全員Googleへ誘導</option>
-                </select>
-              </label>
-              <label style="font-size:12px;color:var(--text-sub)">店内フィードバックにする評価
-                <select id="svThreshold" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
-                  <option value="4">★3以下を店内へ</option>
-                  <option value="3">★2以下を店内へ</option>
-                  <option value="5">★4以下を店内へ</option>
-                </select>
-              </label>
-            </div>
-            <label style="font-size:12px;color:var(--text-sub)">Google口コミ投稿URL（必須・これがないと投稿画面に進めません）
-              <input id="svGoogle" type="url" placeholder="https://g.page/.../review または https://search.google.com/local/writereview?placeid=..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL（任意・完了画面に表示）
-              <input id="svLine" type="url" placeholder="https://lin.ee/..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの見出し（★3以下のSTEP2）
-              <input id="svLowHeading" type="text" placeholder="もう少し詳しくお聞かせください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの案内文
-              <input id="svLowMsg" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">低評価フィードバックの通知先メール（この宛先に届きます・空欄で送信なし）
-              <input id="svFeedbackEmail" type="email" placeholder="例：info@your-company.co.jp" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <label style="font-size:12px;color:var(--text-sub)">送信完了メッセージ
-              <input id="svDone" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            </label>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-success btn-sm" onclick="saveSurvey()">保存する</button>
-              <button class="btn btn-outline btn-sm" onclick="document.getElementById('surveyEditor').style.display='none'">閉じる</button>
-            </div>
-            <p style="font-size:11px;color:var(--text-sub);line-height:1.6">※「満足度で分岐」は、低評価のお客様をGoogleでなく店内フィードバックへ誘導します。評価を守れますが、Googleは恣意的な口コミ選別（レビューゲーティング）を推奨していません。公平に運用したい場合は「全員Googleへ誘導」を選んでください。</p>
-          </div>
-        </div>
 
         <!-- 低評価フィードバック一覧（折りたたみ） -->
         <div id="feedbackBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
@@ -1082,7 +1023,7 @@ body {
       <!-- ▼▼ 店舗追加・管理ビュー（新規登録＋GBPピッカー＋手動登録一覧） ▼▼ -->
       <div id="storeAddView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div class="page-title" style="font-size:20px">店舗を追加・管理</div>
         </div>
 
@@ -1154,7 +1095,7 @@ body {
       <!-- ▼▼ アンケート回答履歴ビュー（回答履歴ボタンから・ぐるっと相当） ▼▼ -->
       <div id="storeSurveyView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div class="page-title" style="font-size:20px">アンケート回答履歴</div>
           <span id="svHistStore" style="font-size:13px;color:var(--text-muted)"></span>
         </div>
@@ -1179,7 +1120,7 @@ body {
       <!-- ▼▼ 口コミQR管理ビュー（QR管理ボタンから・ぐるっと相当） ▼▼ -->
       <div id="storeQrView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div><div class="page-title" style="font-size:20px">口コミQR管理</div><div class="page-sub">QRコードの発行・有効化・管理　<span id="qrStoreName" style="color:var(--text)"></span></div></div>
         </div>
         <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
@@ -1239,7 +1180,7 @@ body {
       <!-- ▼▼ 口コミQR成果ビュー（月別推移・ファネル） ▼▼ -->
       <div id="storeQrResultView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreQr(window._qrIdx)">← 口コミQR管理</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div><div class="page-title" style="font-size:20px">口コミQR成果</div><div class="page-sub">月別推移・導線ファネル</div></div>
         </div>
         <div class="card">
@@ -1269,7 +1210,7 @@ body {
       <!-- ▼▼ 店舗情報を編集ビュー ▼▼ -->
       <div id="storeEditView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreQr(window._qrIdx)">← 戻る</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div><div class="page-title" style="font-size:20px">店舗情報を編集</div><div class="page-sub" id="editStoreName"></div></div>
         </div>
         <div class="card">
@@ -1301,7 +1242,7 @@ body {
           </div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:20px">
-          <button class="btn btn-outline" onclick="showStoreQr(window._qrIdx)">キャンセル</button>
+          <button class="btn btn-outline" onclick="storeBack()">キャンセル</button>
           <button class="btn btn-primary" onclick="saveStoreEdit()">更新する</button>
         </div>
       </div>
@@ -1309,7 +1250,7 @@ body {
       <!-- ▼▼ 一括順位入力ビュー ▼▼ -->
       <div id="storeBulkRankView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div style="flex:1"><div class="page-title" style="font-size:20px">一括順位入力</div><div class="page-sub" id="bulkStoreName"></div></div>
           <button class="btn btn-outline btn-sm" onclick="showBulkRank(window._qrIdx)">↺ クリア</button>
           <button class="btn btn-primary btn-sm" onclick="saveBulkRank()">💾 保存</button>
@@ -1332,7 +1273,7 @@ body {
       <!-- ▼▼ 競合店舗管理ビュー ▼▼ -->
       <div id="storeCompetitorView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div style="flex:1"><div class="page-title" style="font-size:20px">競合店舗管理</div><div class="page-sub" id="compStoreName"></div></div>
           <button class="btn btn-primary btn-sm" onclick="openCompetitorForm()">＋ 追加</button>
         </div>
@@ -1364,7 +1305,7 @@ body {
       <!-- ▼▼ 店舗レポートビュー（店舗分析ボタンから） ▼▼ -->
       <div id="storeReportView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div style="flex:1"><div class="page-title" style="font-size:20px">店舗レポート</div><div class="page-sub" id="repStoreName"></div></div>
           <button class="btn btn-primary btn-sm" onclick="printStoreReport()">📄 店舗レポートPDF</button>
         </div>
@@ -1405,6 +1346,72 @@ body {
           <div class="card-header"><div class="card-title">💬 担当者コメント（PDFに出力）</div></div>
           <textarea id="repComment" rows="3" placeholder="例：今月は○○キーワードでTOP3を達成しました。引き続き…" class="ed-in" style="resize:vertical"></textarea>
           <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="saveReportComment()">コメントを保存</button>
+        </div>
+      </div>
+
+      <!-- ▼▼ アンケート編集ビュー（個別ページ） ▼▼ -->
+      <div id="storeSurveyEditView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
+          <div><div class="page-title" style="font-size:20px">アンケート編集</div><div class="page-sub" id="svEditStoreName"></div></div>
+        </div>
+        <div class="card">
+          <div style="display:grid;gap:10px">
+            <label style="font-size:12px;color:var(--text-sub)">タイトル（ページ見出し）
+              <input id="svTitle" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">導入文
+              <input id="svIntro" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">満足度の質問文（★評価の見出し・お客さんに表示）
+              <input id="svRatingQ" type="text" placeholder="本日の満足度はいかがでしたか？" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <label style="font-size:12px;color:var(--text-sub)">良かった点の選択肢（カンマ区切り）</label>
+                <button class="btn btn-outline btn-sm" onclick="aiSurveyPoints()">✨ AIで業種別に生成</button>
+              </div>
+              <textarea id="svPoints" rows="2" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical"></textarea>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+              <label style="font-size:12px;color:var(--text-sub)">低評価の分岐
+                <select id="svGate" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                  <option value="branch">満足度で分岐（低評価は店内で受け止め）</option>
+                  <option value="all">全員Googleへ誘導</option>
+                </select>
+              </label>
+              <label style="font-size:12px;color:var(--text-sub)">店内フィードバックにする評価
+                <select id="svThreshold" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;margin-left:4px">
+                  <option value="4">★3以下を店内へ</option>
+                  <option value="3">★2以下を店内へ</option>
+                  <option value="5">★4以下を店内へ</option>
+                </select>
+              </label>
+            </div>
+            <label style="font-size:12px;color:var(--text-sub)">Google口コミ投稿URL（必須・これがないと投稿画面に進めません）
+              <input id="svGoogle" type="url" placeholder="https://g.page/.../review または https://search.google.com/local/writereview?placeid=..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL（任意・完了画面に表示）
+              <input id="svLine" type="url" placeholder="https://lin.ee/..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの見出し（★3以下のSTEP2）
+              <input id="svLowHeading" type="text" placeholder="もう少し詳しくお聞かせください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの案内文
+              <input id="svLowMsg" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フィードバックの通知先メール（この宛先に届きます・空欄で送信なし）
+              <input id="svFeedbackEmail" type="email" placeholder="例：info@your-company.co.jp" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">送信完了メッセージ
+              <input id="svDone" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-success btn-sm" onclick="saveSurvey()">保存する</button>
+              <button class="btn btn-outline btn-sm" onclick="storeBack()">閉じる</button>
+            </div>
+            <p style="font-size:11px;color:var(--text-sub);line-height:1.6">※「満足度で分岐」は、低評価のお客様をGoogleでなく店内フィードバックへ誘導します。評価を守れますが、Googleは恣意的な口コミ選別（レビューゲーティング）を推奨していません。公平に運用したい場合は「全員Googleへ誘導」を選んでください。</p>
+          </div>
         </div>
       </div>
     </div>
@@ -2561,8 +2568,7 @@ async function loadKpi() {
   const sid = currentLocationId;
   if (!sid) { card.style.display = 'none'; return; }
   card.style.display = 'block';
-  document.getElementById('surveyEditor').style.display = 'none';
-  document.getElementById('feedbackBox').style.display = 'none';
+  const _fb = document.getElementById('feedbackBox'); if (_fb) _fb.style.display = 'none';
   renderReviewLink(); // ①依頼URL/QR/Googleバナー/受付トグルを描画
   body.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>';
   if (funnelEl) funnelEl.innerHTML = '';
@@ -2791,11 +2797,19 @@ async function openReviewPop() {
 }
 
 // ── アンケート編集 ──
-async function openSurveyEditor() {
+// アンケート編集を個別ページで開く
+async function showSurveyEdit(idx) {
+  const loc = window._locations?.[idx];
+  if (loc) { window._qrIdx = idx; currentLocation = loc; currentLocationId = loc.storeId || loc.name.replace(/\//g, '_'); }
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  const box = document.getElementById('surveyEditor');
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
-  if (box.style.display === 'none') return;
+  _storeViews('storeSurveyEditView');
+  const nm = document.getElementById('svEditStoreName'); if (nm) nm.textContent = currentLocation?.title || '';
+  await loadSurveyEditorValues();
+}
+// 旧名の互換（既存の呼び出しをそのまま活かす）
+function openSurveyEditor() { showSurveyEdit(window._qrIdx ?? currentLocation?._idx); }
+async function loadSurveyEditorValues() {
+  if (!currentLocationId) return;
   try {
     const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
     _surveyCache = s;
@@ -4193,11 +4207,42 @@ function jumpToStore(storeId) {
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
 }
 
-// ─── 店舗管理の4ビュー切替（一覧 / 詳細 / 追加・管理 / 回答履歴） ───
+// ─── 店舗管理のビュー切替＋ナビ履歴（前のページに戻る） ───
+window._storeNav = [];        // 訪れたビューの履歴スタック
+window._storeCurView = null;  // 現在のビュー
+window._navBack = false;      // 戻る操作中フラグ（履歴に積まない）
+// 各ビューを再表示する関数（戻る用）。同じ店舗(window._qrIdx)を対象に再描画。
+const _storeViewShow = {
+  storeListView: () => showStoreList(),
+  storeDetail: () => showStoreDetail(),
+  storeAddView: () => showStoreAdd(),
+  storeSurveyView: () => showStoreSurvey(window._qrIdx),
+  storeQrView: () => showStoreQr(window._qrIdx),
+  storeQrResultView: () => showStoreQrResult(window._qrIdx),
+  storeEditView: () => showStoreEdit(window._qrIdx),
+  storeBulkRankView: () => showBulkRank(window._qrIdx),
+  storeCompetitorView: () => showStoreCompetitors(window._qrIdx),
+  storeReportView: () => showStoreReport(window._qrIdx),
+  storeSurveyEditView: () => showSurveyEdit(window._qrIdx),
+};
 function _storeViews(show) {
-  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView', 'storeCompetitorView', 'storeReportView'].forEach(id => {
+  // 履歴管理：戻る操作でなければ、直前のビューを積む
+  if (window._navBack) { window._navBack = false; }
+  else if (window._storeCurView && window._storeCurView !== show) {
+    window._storeNav.push(window._storeCurView);
+    if (window._storeNav.length > 40) window._storeNav.shift();
+  }
+  window._storeCurView = show;
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView', 'storeCompetitorView', 'storeReportView', 'storeSurveyEditView'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
   });
+}
+// 一個前のページに戻る（履歴が無ければ店舗ページ→一覧の順でフォールバック）
+function storeBack() {
+  const prev = window._storeNav.pop();
+  if (prev && _storeViewShow[prev]) { window._navBack = true; _storeViewShow[prev](); return; }
+  // フォールバック：詳細が表示可能なら詳細、なければ一覧
+  if (window._qrIdx != null) showStoreDetail(); else showStoreList();
 }
 function showStoreList() { _storeViews('storeListView'); loadStoreList(); }
 function showStoreDetail() { _storeViews('storeDetail'); }
@@ -4370,9 +4415,7 @@ async function showStoreQr(idx) {
 }
 
 function openSurveyEditorFromQr() {
-  // 既存のアンケート編集は店舗詳細内。詳細を開いて編集を展開する。
-  selectLocation(window._qrIdx);
-  setTimeout(() => { try { openSurveyEditor(); } catch (e) {} document.getElementById('surveyEditor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200);
+  showSurveyEdit(window._qrIdx); // アンケート編集の個別ページへ
 }
 
 async function reissueQr() {
@@ -4506,7 +4549,7 @@ function _moreGo(what) {
   else if (what === 'survey') showStoreSurvey(idx);
   else if (what === 'edit') showStoreEdit(idx);
   else if (what === 'competitor') showStoreCompetitors(idx);
-  else if (what === 'editsurvey') { document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth' }); try { openSurveyEditor(); } catch (e) {} }
+  else if (what === 'editsurvey') showSurveyEdit(idx);
 }
 
 // ─── 一括順位入力 ───
