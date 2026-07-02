@@ -4396,11 +4396,15 @@ async function generateReply(i) {
         reviewerName: review.reviewer?.displayName,
         reviewDate: review.createTime || '',
         tone: document.getElementById(`tone-${i}`)?.value || 'polite',
-        // このお店が過去にした返信を文体の見本として渡す（雰囲気・句読点を合わせる）
-        pastReplies: allReviews
-          .filter(r => r.reviewReply?.comment && r.name !== review.name)
-          .map(r => r.reviewReply.comment)
-          .slice(0, 8),
+        // このお店が過去にした返信を文体の見本として渡す（雰囲気・句読点を合わせる）。
+        // 同じ評価帯（高評価↔高評価 / 低評価↔低評価）の返信を優先し、足りなければ他も足して最大20件。
+        pastReplies: (() => {
+          const withReply = allReviews.filter(r => r.reviewReply?.comment && r.name !== review.name);
+          const isPos = rating >= 4;
+          const same = withReply.filter(r => (starRatingToNum(r.starRating) >= 4) === isPos);
+          const others = withReply.filter(r => (starRatingToNum(r.starRating) >= 4) !== isPos);
+          return [...same, ...others].map(r => r.reviewReply.comment).slice(0, 20);
+        })(),
       }),
     });
     const data = await res.json();
