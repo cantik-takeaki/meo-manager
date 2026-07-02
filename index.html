@@ -428,8 +428,12 @@ body {
         ダッシュボード
       </button>
       <button class="nav-item" onclick="showPanel('clients', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        クライアント
+      </button>
+      <button class="nav-item" onclick="showPanel('stores', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
-        クライアント・店舗
+        店舗管理
       </button>
       <button class="nav-item" onclick="showPanel('reviews', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
@@ -672,7 +676,57 @@ body {
     </div>
 
     <!-- Clients -->
+    <!-- ▼▼ クライアント（会社単位の管理：一覧⇄詳細） ▼▼ -->
     <div class="panel" id="panel-clients">
+      <!-- 一覧ビュー -->
+      <div id="clientListView">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="page-title">クライアント管理</div>
+            <div class="page-sub"><span id="clientCount">0</span>件</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="quickGo('gbpPickerCard','店舗を管理対象に追加し、会社名を設定するとクライアントとして分類されます')">＋ クライアント追加</button>
+        </div>
+        <div class="card" style="padding:14px 16px">
+          <input id="clientSearch" type="text" placeholder="🔍 クライアント名で検索" oninput="renderClientList()"
+            style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-size:14px;font-family:inherit">
+        </div>
+        <div class="card" style="padding:8px 4px">
+          <div style="overflow-x:auto">
+            <table class="summary-table">
+              <thead><tr>
+                <th style="padding-left:16px">クライアント名</th><th>メール</th><th>店舗数</th><th>ステータス</th>
+              </tr></thead>
+              <tbody id="clientTableBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">読み込み中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 詳細ビュー -->
+      <div id="clientDetailView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showClientList()">← 戻る</button>
+          <span id="cdName" style="font-size:22px;font-weight:800"></span>
+          <span class="badge badge-active">有効</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="quickGo('gbpPickerCard')">＋ 店舗を追加/管理</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">基本情報</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div><div style="font-size:12px;color:var(--text-sub)">メール</div><div id="cdEmail" style="font-size:14px;margin-top:3px">未設定</div></div>
+            <div><div style="font-size:12px;color:var(--text-sub)">電話番号</div><div id="cdPhone" style="font-size:14px;margin-top:3px">未設定</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">登録店舗 <span id="cdStoreCount" style="color:var(--text-sub);font-weight:400;font-size:13px"></span></div></div>
+          <div id="cdStoreList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ▼▼ 店舗管理（店舗ページ＋登録・GBPピッカー・順位入力） ▼▼ -->
+    <div class="panel" id="panel-stores">
       <div class="page-header">
         <div class="page-title">店舗管理</div>
         <div class="page-sub">クライアント店舗の登録・管理</div>
@@ -1937,7 +1991,7 @@ async function loadLocations() {
       storeList.innerHTML = hasGbp
         ? `<div style="padding:10px 12px;font-size:12px;color:var(--side-text-sub);line-height:1.7">
              まだ管理対象の店舗がありません。<br>Googleに${(window._allGbp||[]).length}件あります。
-             <button onclick="showPanel('clients')" style="margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;width:100%">店舗管理で追加する</button>
+             <button onclick="showPanel('stores')" style="margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;width:100%">店舗管理で追加する</button>
            </div>`
         : '<div style="padding:10px 12px;font-size:12px;color:var(--side-text-sub);line-height:1.7">店舗がありません。右上「Googleと連携」で接続してください。</div>';
     } else {
@@ -2086,7 +2140,7 @@ function selectLocation(idx, keepPanel) {
 
   // 店舗を切り替えたら店舗管理の店舗ページへ（ダッシュボードは全体管理専用）。初期表示keepPanelは移動しない。
   if (!keepPanel) {
-    switchPanel('clients');
+    switchPanel('stores');
     setTimeout(() => sd?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
@@ -3686,9 +3740,85 @@ function jumpToStore(storeId) {
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
 }
 
+// ─── クライアント管理（会社単位の一覧⇄詳細） ───
+const _storeKey = (loc) => loc.storeId || (loc.name || '').replace(/\//g, '_');
+// storeId → キーワード数（ダッシュボード集計から）
+function _kwCountMap() {
+  const m = {};
+  (window._dashSummary?.perStore || []).forEach(s => { m[s.storeId] = s.kwCount || 0; });
+  return m;
+}
+
+function loadClientList() {
+  showClientList();
+  if (!window._clients) { loadLocations().then(renderClientList); return; }
+  renderClientList();
+}
+
+function renderClientList() {
+  const body = document.getElementById('clientTableBody');
+  if (!body) return;
+  const clients = window._clients || [];
+  document.getElementById('clientCount').textContent = clients.length;
+  const q = (document.getElementById('clientSearch')?.value || '').trim().toLowerCase();
+  const filtered = clients.filter(c => !q || (c.name || '').toLowerCase().includes(q));
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">${clients.length ? '該当するクライアントがありません' : 'クライアントがありません。店舗管理で店舗を管理対象に追加し、会社名を設定してください'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = filtered.map(c => {
+    // クライアントのメール（店舗のclientEmailがあれば拾う）
+    const email = (c.stores.find(s => s.clientEmail)?.clientEmail) || '';
+    return `<tr style="cursor:pointer" onclick="openClientDetail(${JSON.stringify(c.name).replace(/"/g, '&quot;')})">
+      <td style="padding-left:16px"><div style="display:flex;align-items:center;gap:10px">
+        <span style="width:30px;height:30px;border-radius:8px;background:rgba(46,143,240,0.12);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg></span>
+        <span class="st-name" style="color:var(--text)">${escapeHtml(c.name)}</span>
+      </div></td>
+      <td style="color:${email ? 'var(--text)' : 'var(--text-muted)'}">${email ? escapeHtml(email) : '—'}</td>
+      <td>${c.stores.length}店舗</td>
+      <td><span class="st-badge done">有効</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function openClientDetail(name) {
+  const client = (window._clients || []).find(c => c.name === name);
+  if (!client) return;
+  document.getElementById('clientListView').style.display = 'none';
+  document.getElementById('clientDetailView').style.display = '';
+  document.getElementById('cdName').textContent = client.name;
+  const email = client.stores.find(s => s.clientEmail)?.clientEmail || '';
+  document.getElementById('cdEmail').textContent = email || '未設定';
+  const phone = client.stores.find(s => s.phoneNumbers?.primaryPhone)?.phoneNumbers?.primaryPhone || '';
+  document.getElementById('cdPhone').textContent = phone || '未設定';
+  document.getElementById('cdStoreCount').textContent = `${client.stores.length}件`;
+  const kwMap = _kwCountMap();
+  const list = document.getElementById('cdStoreList');
+  list.innerHTML = client.stores.map(loc => {
+    const addr = fullGbpAddress(loc.storefrontAddress) || formatAddress(loc.storefrontAddress) || '';
+    const kw = kwMap[_storeKey(loc)] ?? 0;
+    return `<div onclick="selectLocation(${loc._idx})" style="display:flex;align-items:center;gap:12px;padding:14px 6px;border-bottom:1px solid var(--border);cursor:pointer">
+      <span style="width:34px;height:34px;border-radius:8px;background:rgba(16,185,129,0.12);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${escapeHtml(loc.title || '店舗')}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(addr)}</div>
+      </div>
+      <span style="font-size:12px;color:var(--text-sub);white-space:nowrap">${kw}キーワード</span>
+      <span style="color:var(--text-muted)">›</span>
+    </div>`;
+  }).join('') || '<div style="padding:16px;color:var(--text-muted);font-size:13px">店舗がありません</div>';
+}
+
+function showClientList() {
+  const dv = document.getElementById('clientDetailView');
+  const lv = document.getElementById('clientListView');
+  if (dv) dv.style.display = 'none';
+  if (lv) lv.style.display = '';
+}
+
 // クイックアクション: 店舗管理の該当カードへ遷移＋スクロール（任意でヒントToast）
 function quickGo(cardId, hint) {
-  switchPanel('clients');
+  switchPanel('stores');
   setTimeout(() => {
     document.getElementById(cardId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (hint) showToast(hint, 'success');
@@ -4415,13 +4545,14 @@ function switchPanel(name, triggerEl) {
     });
   }
   const titles = {
-    dashboard: 'ダッシュボード', clients: 'クライアント・店舗', reviews: '口コミ管理',
+    dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
     posts: '投稿管理', instagram: 'Instagram投稿', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
   };
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
-  if (name === 'clients') { loadClientStores(); renderGbpPicker(); }
+  if (name === 'clients') loadClientList();
+  if (name === 'stores') { loadClientStores(); renderGbpPicker(); }
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
   if (name === 'instagram') loadMedia();
