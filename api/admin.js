@@ -415,11 +415,14 @@ export default async function handler(req, res) {
   }
 
   // ── SerpApiで順位を自動取得 ──
-  // SerpApi 今月の使用回数（無料枠100/月の管理）
+  // 月間上限は環境変数 SERPAPI_MONTHLY_LIMIT で設定（既定=無料枠の100/月）。
+  // 課金プランに上げた場合はVercel環境変数に契約枠を入れるだけで、コード変更なしで反映される。
+  // ※GCP Places API課金事故と同種の「気づかず課金枠突入」を避けるため、既定は安全側(100)。
+  const SERPAPI_LIMIT = Math.max(1, parseInt(process.env.SERPAPI_MONTHLY_LIMIT, 10) || 100);
   if (req.method === 'GET' && action === 'serpapi-usage') {
     const ym = new Date().toISOString().slice(0, 7);
     const used = await kvGet(`serpapi_usage_${ym}`) || 0;
-    return res.json({ month: ym, used, limit: 250, remaining: Math.max(0, 250 - used) });
+    return res.json({ month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
   }
 
   // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)
@@ -428,11 +431,11 @@ export default async function handler(req, res) {
     if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
     const { keyword, location, store } = req.query;
     if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
-    // 無料枠100/月の上限ガード
+    // 月間上限ガード（既定=無料枠100・環境変数で変更可）。上限到達で自動停止し課金枠突入を防ぐ。
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
     const used = await kvGet(usedKey) || 0;
-    if (used >= 250) return res.status(429).json({ error: '今月の無料枠（250回）に達しました。来月リセットされます', overLimit: true, used });
+    if (used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
     try {
       const callSerp = async (loc) => {
         const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
