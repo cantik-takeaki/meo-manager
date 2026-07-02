@@ -1975,11 +1975,14 @@ function renderGbpConnectState(user) {
   if (connected) {
     el.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--accent-2);font-weight:700;background:rgba(16,185,129,0.1);padding:4px 10px;border-radius:999px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Google連携済み</span>`;
   } else {
-    el.innerHTML = `<a href="/api/auth/login" class="btn btn-primary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+    // location.replace で開始：連携完了後に「戻る」で Google の使い捨てOAuth URL(400)に戻らないようにする
+    el.innerHTML = `<button onclick="connectGoogle()" class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px">
       <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" opacity=".9"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" opacity=".7"/></svg>
-      Googleと連携</a>`;
+      Googleと連携</button>`;
   }
 }
+// Google連携を開始（履歴を置換して戻るでGoogle 400に戻らないようにする）
+function connectGoogle() { window.location.replace('/api/auth/login'); }
 
 // ─── パスワード変更 ───
 function openChangePw() {
@@ -3219,7 +3222,7 @@ async function renderIgConnect() {
           ※未連携の間は共通アカウント（@cantik.ink）に投稿します。
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="${connectUrl}" class="btn btn-primary btn-sm">Instagramを連携</a>
+          <button class="btn btn-primary btn-sm" onclick="window.location.replace('${connectUrl}')">Instagramを連携</button>
           <button class="btn btn-outline btn-sm" onclick="copyConnectUrl('${connectUrl}')">連携URLをコピー</button>
         </div>
       </div>`;
