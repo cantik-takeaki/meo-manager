@@ -604,8 +604,8 @@ body {
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <span id="dashUpdated" style="font-size:12px;color:var(--text-muted)"></span>
-          <button class="btn btn-outline btn-sm" onclick="loadDashboardSummary()">🔄 更新</button>
-          <button class="btn btn-outline btn-sm" onclick="generateReport()">📄 月次レポート（PDF）</button>
+          <button class="btn btn-outline btn-sm" onclick="loadDashboardSummary()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
+          <button class="btn btn-outline btn-sm" onclick="generateReport()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>月次レポート（PDF）</button>
         </div>
       </div>
 
@@ -741,13 +741,13 @@ body {
           <option value="lowest">評価の低い順</option>
           <option value="unreplied">未返信を先に</option>
         </select>
-        <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
-        <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()">📤 生成した返信を一括投稿</button>
+        <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>未返信すべてに返信生成</button>
+        <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>生成した返信を一括投稿</button>
       </div>
       <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。まず「返信生成」でドラフトを作り、内容を確認してから「一括投稿」でまとめてGoogleに反映できます（1件ずつ投稿も可）。</p>
 
       <div class="card" style="border-color:rgba(79,125,243,0.25)">
-        <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>口コミ分析（AI）</div>
           <button class="btn btn-primary btn-sm" onclick="analyzeReviews()">分析する</button>
         </div>
         <p style="font-size:12px;color:var(--text-sub)">口コミ全体をAIが分析し、褒められている点・改善点・傾向と、サービス/投稿への活かし方を抽出します。</p>
@@ -796,7 +796,7 @@ body {
           <span id="cdName" style="font-size:22px;font-weight:800"></span>
           <span class="badge badge-active">有効</span>
           <div style="margin-left:auto;display:flex;gap:8px">
-            <button class="btn btn-outline btn-sm" onclick="editClientMeta()">✏️ 編集</button>
+            <button class="btn btn-outline btn-sm" onclick="editClientMeta()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>️ 編集</button>
             <button class="btn btn-primary btn-sm" onclick="quickGo('gbpPickerCard')">＋ 店舗を追加/管理</button>
           </div>
         </div>
@@ -907,7 +907,7 @@ body {
 
       <div class="card" id="meoDiagCard" style="display:none">
         <div class="card-header">
-          <div class="card-title">📊 MEO診断</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>MEO診断</div>
           <div class="card-sub" id="meoDiagStore"></div>
         </div>
         <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
@@ -927,7 +927,7 @@ body {
       </div>
 
       <div class="card" id="rankDashCard" style="display:none">
-        <div class="card-header"><div class="card-title">🔍 キーワード順位</div><div class="card-sub" id="rankDashDate"></div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>キーワード順位</div><div class="card-sub" id="rankDashDate"></div></div>
         <div id="rankDashList"></div>
       </div>
 
@@ -981,7 +981,7 @@ body {
       </div>
 
       <div class="card" id="assistantCard" style="display:none;border-color:rgba(56,224,200,0.3)">
-        <div class="card-header"><div class="card-title">💬 AI相談（この店舗の次の一手）</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>AI相談（この店舗の次の一手）</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <input id="askInput" type="text" placeholder="例：来店を増やすには次に何をすべき？" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')askAssistant()">
           <button class="btn btn-primary btn-sm" onclick="askAssistant()">相談する</button>
@@ -995,7 +995,7 @@ body {
       </div>
 
       <div class="card" id="gbpCheckCard" style="display:none">
-        <div class="card-header"><div class="card-title">✅ GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
         <div id="gbpCheckList"></div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
           <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
@@ -1004,7 +1004,7 @@ body {
       </div>
 
       <div class="card" id="kpiCard" style="display:none">
-        <div class="card-header"><div class="card-title">📈 口コミ促進（今月）</div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>口コミ促進（今月）</div>
           <button class="btn btn-outline btn-sm" onclick="loadKpi()">更新</button>
         </div>
 
@@ -1053,7 +1053,7 @@ body {
 
         <!-- 導線ファネルの数値を手動修正・リセット -->
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="toggleKpiEdit()">🔧 数値を修正</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleKpiEdit()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 005.4-5.4l-2.6 2.6-2-2z"/></svg>数値を修正</button>
           <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="resetKpi()">↺ 今月をリセット</button>
         </div>
         <div id="kpiEditBox" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg-3)">
@@ -1073,9 +1073,9 @@ body {
         </div>
 
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="showSurveyEdit(window._qrIdx ?? currentLocation?._idx)">✏️ アンケートを編集</button>
-          <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
-          <button class="btn btn-outline btn-sm" onclick="loadLeads()">📩 リード一覧<span id="leadBadge"></span></button>
+          <button class="btn btn-outline btn-sm" onclick="showSurveyEdit(window._qrIdx ?? currentLocation?._idx)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>️ アンケートを編集</button>
+          <button class="btn btn-outline btn-sm" onclick="loadFeedback()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>低評価フィードバック<span id="fbBadge"></span></button>
+          <button class="btn btn-outline btn-sm" onclick="loadLeads()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M2 7l10 6 10-6"/></svg>リード一覧<span id="leadBadge"></span></button>
         </div>
 
         <!-- リード一覧（折りたたみ） -->
@@ -1097,7 +1097,7 @@ body {
       </div>
 
       <div class="card" id="competitorCard">
-        <div class="card-header"><div class="card-title">🥊 競合分析</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><rect x="6" y="10" width="4" height="7"/><rect x="14" y="6" width="4" height="11"/></svg>競合分析</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <input id="compKeyword" type="text" placeholder="キーワード（例：相模原 美容室）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
@@ -1114,7 +1114,7 @@ body {
           <div class="card-title">インサイト（直近3ヶ月）</div>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="card-sub" id="insightsStore"></div>
-            <button class="btn btn-primary btn-sm" onclick="analyzeInsightAnomaly()">🔍 AI異常検知・傾向分析</button>
+            <button class="btn btn-primary btn-sm" onclick="analyzeInsightAnomaly()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>AI異常検知・傾向分析</button>
           </div>
         </div>
         <div class="stats-grid" id="insightsGrid">
@@ -1130,12 +1130,12 @@ body {
       </div>
 
       <div class="card" id="alertsCard" style="display:none">
-        <div class="card-header"><div class="card-title">⚠️ 要対応：低評価の未返信口コミ</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>️ 要対応：低評価の未返信口コミ</div></div>
         <div id="alertsList"></div>
       </div>
 
       <div class="card" id="actionLogCard" style="display:none">
-        <div class="card-header"><div class="card-title">📋 施策履歴・作業ログ</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>施策履歴・作業ログ</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <input id="logText" type="text" placeholder="実施した施策を記録（例：GBPに写真3枚追加）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')addActionLog()">
           <button class="btn btn-outline btn-sm" onclick="addActionLog()">＋ 記録</button>
@@ -1152,7 +1152,7 @@ body {
         </div>
 
       <div class="card" id="registerStoreCard">
-        <div class="card-header"><div class="card-title">➕ 新規店舗登録</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg>新規店舗登録</div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店舗名 *</label>
@@ -1168,20 +1168,20 @@ body {
 
       <!-- 発行済みURL表示 -->
       <div id="newStoreResult" style="display:none" class="card" style="border-color:rgba(52,211,153,0.4)">
-        <div class="card-title" style="color:var(--accent-2)">✅ 登録完了！クライアントに以下を共有してください</div>
+        <div class="card-title" style="color:var(--accent-2)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>登録完了！クライアントに以下を共有してください</div>
         <div style="background:var(--bg-3);border-radius:8px;padding:14px;font-size:13px;line-height:2">
           <div>🔗 <strong>ログインURL:</strong> <span id="newStoreUrl" style="color:var(--accent)"></span></div>
           <div>🆔 <strong>店舗ID:</strong> <span id="newStoreId"></span></div>
           <div>🔑 <strong>パスワード:</strong> <span id="newStorePw" style="color:var(--gold);font-weight:600"></span></div>
         </div>
         <p style="font-size:12px;color:var(--text-muted);margin-top:8px">※ パスワードは一度しか表示されません。必ずメモしてください。</p>
-        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="copyCredentials()">📋 コピー</button>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="copyCredentials()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>コピー</button>
       </div>
 
       <!-- Googleから取得した店舗（オーナー登録済み）→ 管理対象を選抜 -->
       <div class="card" id="gbpPickerCard">
         <div class="card-header">
-          <div class="card-title">🔗 Googleから取得した店舗（オーナー/管理者登録済み）</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>Googleから取得した店舗（オーナー/管理者登録済み）</div>
           <span id="gbpPickerCount" style="font-size:12px;color:var(--text-sub)"></span>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.7">
@@ -1200,14 +1200,14 @@ body {
       <!-- 順位入力 -->
       <div class="card" id="rankingInputCard" style="display:none">
         <div class="card-header">
-          <div class="card-title">📊 キーワード順位を入力</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>キーワード順位を入力</div>
           <span style="font-size:12px;color:var(--text-sub)" id="rankingInputStore"></span>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:14px">手動入力するか、検索地点を指定して「自動取得」で順位を取得できます。</p>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
           <input id="rankLocation" type="text" placeholder="検索地点（例：Shinjuku,Tokyo,Japan）"
             style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
-          <button class="btn btn-outline btn-sm" onclick="autoFetchAllRanks()">⚡ 全キーワード自動取得</button>
+          <button class="btn btn-outline btn-sm" onclick="autoFetchAllRanks()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>全キーワード自動取得</button>
           <span id="serpUsage" style="font-size:11px;color:var(--text-sub)"></span>
         </div>
         <div id="rankingInputFields"></div>
@@ -1248,7 +1248,7 @@ body {
           <div><div class="page-title" style="font-size:20px">口コミQR管理</div><div class="page-sub">QRコードの発行・有効化・管理　<span id="qrStoreName" style="color:var(--text)"></span></div></div>
         </div>
         <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-          <button class="btn btn-outline btn-sm" onclick="openSurveyEditorFromQr()">✏️ アンケート編集</button>
+          <button class="btn btn-outline btn-sm" onclick="openSurveyEditorFromQr()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>️ アンケート編集</button>
           <button class="btn btn-outline btn-sm" onclick="openReviewPop()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>口コミPOP作成</button>
           <button class="btn btn-primary btn-sm">QR機能</button>
         </div>
@@ -1295,8 +1295,8 @@ body {
 
         <div class="card">
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-outline btn-sm" onclick="showStoreQrResult(window._qrIdx)">📈 口コミQR成果（月別推移・ファネル）を見る</button>
-            <button class="btn btn-outline btn-sm" onclick="showStoreSurvey(window._qrIdx)">📋 アンケート回答履歴・統計を見る</button>
+            <button class="btn btn-outline btn-sm" onclick="showStoreQrResult(window._qrIdx)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>口コミQR成果（月別推移・ファネル）を見る</button>
+            <button class="btn btn-outline btn-sm" onclick="showStoreSurvey(window._qrIdx)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>アンケート回答履歴・統計を見る</button>
           </div>
         </div>
       </div>
@@ -1308,7 +1308,7 @@ body {
           <div><div class="page-title" style="font-size:20px">口コミQR成果</div><div class="page-sub">月別推移・導線ファネル</div></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">📈 月別推移</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>月別推移</div></div>
           <div class="kpi-agg-grid" style="grid-template-columns:repeat(5,1fr)">
             <div class="kpi-agg-cell"><div class="k-l">QRスキャン</div><div class="k-v" id="qrrScan">0</div><div class="mc-sub" id="qrrScanD"></div></div>
             <div class="kpi-agg-cell"><div class="k-l">アンケート送信</div><div class="k-v" id="qrrSurvey">0</div><div class="mc-sub" id="qrrSurveyD"></div></div>
@@ -1322,11 +1322,11 @@ body {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">📊 QR導線ファネル（今月）</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>QR導線ファネル（今月）</div></div>
           <div id="qrrFunnel"></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">⚠️ 低評価フィードバック</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>️ 低評価フィードバック</div></div>
           <div id="qrrFeedback"><div class="empty-state" style="padding:30px;text-align:center;color:var(--text-muted)">低評価フィードバックはまだありません</div></div>
         </div>
       </div>
@@ -1338,7 +1338,7 @@ body {
           <div><div class="page-title" style="font-size:20px">店舗情報を編集</div><div class="page-sub" id="editStoreName"></div></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">📋 基本情報</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>基本情報</div></div>
           <div style="display:grid;gap:12px">
             <label style="font-size:12px;color:var(--text-sub)">店舗名<input id="ed-name" type="text" class="ed-in"></label>
             <label style="font-size:12px;color:var(--text-sub)">住所<input id="ed-address" type="text" class="ed-in"></label>
@@ -1351,7 +1351,7 @@ body {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">🔗 口コミQR設定</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>口コミQR設定</div></div>
           <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">Google口コミ投稿URLとLINE友だち追加URLを設定します。QRの有効化は「口コミQR管理」で行えます。</p>
           <div style="display:grid;gap:12px">
             <label style="font-size:12px;color:var(--text-sub)">Google口コミ投稿URL<input id="ed-googleUrl" type="url" placeholder="https://search.google.com/local/writereview?placeid=..." class="ed-in"></label>
@@ -1359,7 +1359,7 @@ body {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">📝 口コミPOP文言</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>口コミPOP文言</div></div>
           <div style="display:grid;gap:12px">
             <label style="font-size:12px;color:var(--text-sub)">POPタイトル<input id="ed-popTitle" type="text" placeholder="お客様の声をお聞かせください" class="ed-in"></label>
             <label style="font-size:12px;color:var(--text-sub)">POP説明文<input id="ed-popDesc" type="text" placeholder="サービス向上のため、ぜひご意見をお聞かせください。" class="ed-in"></label>
@@ -1377,7 +1377,7 @@ body {
           <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div style="flex:1"><div class="page-title" style="font-size:20px">一括順位入力</div><div class="page-sub" id="bulkStoreName"></div></div>
           <button class="btn btn-outline btn-sm" onclick="showBulkRank(window._qrIdx)">↺ クリア</button>
-          <button class="btn btn-primary btn-sm" onclick="saveBulkRank()">💾 保存</button>
+          <button class="btn btn-primary btn-sm" onclick="saveBulkRank()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>保存</button>
         </div>
         <div class="card">
           <label style="font-size:12px;color:var(--text-sub)">計測日 <span style="color:var(--red)">*</span>
@@ -1431,7 +1431,7 @@ body {
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
           <div style="flex:1"><div class="page-title" style="font-size:20px">店舗レポート</div><div class="page-sub" id="repStoreName"></div></div>
-          <button class="btn btn-primary btn-sm" onclick="printStoreReport()">📄 店舗レポートPDF</button>
+          <button class="btn btn-primary btn-sm" onclick="printStoreReport()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>店舗レポートPDF</button>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -1450,7 +1450,7 @@ body {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">⭐ Google口コミ統計</div><span style="font-size:11px;color:var(--text-muted)">GBP同期済みデータ</span></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>Google口コミ統計</div><span style="font-size:11px;color:var(--text-muted)">GBP同期済みデータ</span></div>
           <div class="kpi-agg-grid" style="grid-template-columns:repeat(4,1fr)">
             <div class="kpi-agg-cell"><div class="k-l">累積口コミ件数</div><div class="k-v" id="repRvTotal">—</div></div>
             <div class="kpi-agg-cell"><div class="k-l">平均評価</div><div class="k-v" id="repRvAvg">—</div></div>
@@ -1459,15 +1459,15 @@ body {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">🔑 キーワード別詳細</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3l1 3-2 2 2 2-3 3-2-2z"/></svg>キーワード別詳細</div></div>
           <div style="overflow-x:auto"><table class="summary-table"><thead><tr><th style="text-align:left;padding-left:16px">キーワード</th><th>今回順位</th><th>前回</th><th>前月比</th></tr></thead><tbody id="repKwBody"></tbody></table></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">🥊 競合比較</div><button class="btn btn-outline btn-sm" onclick="_moreGo('competitor')">競合を管理</button></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><rect x="6" y="10" width="4" height="7"/><rect x="14" y="6" width="4" height="11"/></svg>競合比較</div><button class="btn btn-outline btn-sm" onclick="_moreGo('competitor')">競合を管理</button></div>
           <div id="repCompetitors"></div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">💬 担当者コメント（PDFに出力）</div></div>
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>担当者コメント（PDFに出力）</div></div>
           <textarea id="repComment" rows="3" placeholder="例：今月は○○キーワードでTOP3を達成しました。引き続き…" class="ed-in" style="resize:vertical"></textarea>
           <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="saveReportComment()">コメントを保存</button>
         </div>
@@ -1493,7 +1493,7 @@ body {
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
                 <label style="font-size:12px;color:var(--text-sub)">良かった点の選択肢（カンマ区切り）</label>
-                <button class="btn btn-outline btn-sm" onclick="aiSurveyPoints()">✨ AIで業種別に生成</button>
+                <button class="btn btn-outline btn-sm" onclick="aiSurveyPoints()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで業種別に生成</button>
               </div>
               <textarea id="svPoints" rows="2" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;resize:vertical"></textarea>
             </div>
@@ -1665,11 +1665,11 @@ body {
       </div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
-        <div class="card-header"><div class="card-title">⚡ URLから自動取得</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>URLから自動取得</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">店舗のHP・ぐるなび・食べログ・<b>Instagram</b>などのURLを入れると、AIが店名・業種・営業時間・強み・サービス・キーワードを読み取って下記フォームに反映します（反映後に内容を確認して保存してください）。連携済みのInstagramなら、右のボタンでプロフィール・最近の投稿から取得できます。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <input id="autofillUrl" type="url" placeholder="https://（店舗HP・ぐるなび・食べログ・Instagram等のURL）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary" onclick="autofillFromUrl()">⚡ 取得して反映</button>
+          <button class="btn btn-primary" onclick="autofillFromUrl()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>取得して反映</button>
           <button class="btn btn-outline" onclick="autofillFromInstagram()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>連携Instagramから取得</button>
         </div>
         <div id="autofillStatus" style="font-size:12px;color:var(--text-sub);margin-top:8px"></div>
@@ -1677,7 +1677,7 @@ body {
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">📋 基本情報</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>基本情報</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
@@ -1724,25 +1724,25 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">🔑 MEOキーワード</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.5 12.5L20 3l1 3-2 2 2 2-3 3-2-2z"/></svg>MEOキーワード</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">投稿・返信・順位計測に使われます。「地域名×業種」「地域名×業種×ニーズ/メニュー」で具体的に。<b>MEOで最適なのは主力5〜7個</b>。増やしすぎるとテーマが散らばり専門性（Topical Relevance）が薄まります。まず主力を固め、必要に応じてロングテールを数個足す形が理想です。</p>
         <div id="kn-kwList" style="display:flex;flex-direction:column;gap:8px"></div>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-outline btn-sm" onclick="addKeywordRow()">＋ キーワードを追加</button>
-          <button class="btn btn-primary btn-sm" onclick="suggestKeywords()">✨ おすすめキーワード10個を提案</button>
+          <button class="btn btn-primary btn-sm" onclick="suggestKeywords()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>おすすめキーワード10個を提案</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;padding-top:8px;border-top:1px dashed var(--border)">
           <input id="kn-areaInput" type="text" placeholder="狙いたい周辺地域（任意・例：座間市 大和市 町田）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary btn-sm" onclick="suggestAreaKeywords()">📍 周辺地域のキーワードを生成</button>
+          <button class="btn btn-primary btn-sm" onclick="suggestAreaKeywords()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>周辺地域のキーワードを生成</button>
         </div>
         <div id="kwAreaStatus" style="font-size:11px;color:var(--text-sub);margin-top:6px"></div>
 
         <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)">
-          <button class="link-btn" onclick="toggleKwPlanner()">🔢 Google広告 キーワードプランナーの実データを取り込む</button>
+          <button class="link-btn" onclick="toggleKwPlanner()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/></svg>Google広告 キーワードプランナーの実データを取り込む</button>
           <div id="kwPlannerBox" style="display:none;margin-top:8px">
             <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">Google広告 → ツール → キーワードプランナーで「キーワード候補」を表示 → ダウンロードしたCSV、または表をコピーしてここに貼り付け（キーワードと月間平均検索数の列があればOK）。検索ボリューム順に並べて取り込めます。</p>
             <textarea id="kwPlannerInput" placeholder="例（貼り付け）：&#10;相模原 美容室	1300&#10;座間 美容室	480&#10;相模原 縮毛矯正	210" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;min-height:90px;font-family:inherit"></textarea>
-            <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="importKwPlanner()">📥 取り込む（ボリューム順）</button>
+            <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="importKwPlanner()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>取り込む（ボリューム順）</button>
             <div id="kwPlannerList" style="margin-top:10px"></div>
           </div>
         </div>
@@ -1756,7 +1756,7 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">💪 店舗の強み・サービス（MEO重視）</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="12" cy="8" r="6"/><path d="M8.5 13.5L7 22l5-3 5 3-1.5-8.5"/></svg>店舗の強み・サービス（MEO重視）</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">ここが投稿・診断・口コミ返信の質を決めます。<b>地域名・専門性・具体的なメニュー名や価格</b>を入れ、できるだけ詳しく。「🚀AIでMEO強化」で自動で濃くできます。</p>
         <div style="display:flex;flex-direction:column;gap:12px">
           <div>
@@ -1787,11 +1787,11 @@ body {
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-primary" onclick="saveKnowledge()">💾 ナレッジを保存</button>
-        <button class="btn btn-outline" onclick="meoEnrich()">🚀 AIでMEO強化（HP・食べログ・Google口コミ・対策KWを反映）</button>
+        <button class="btn btn-primary" onclick="saveKnowledge()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>ナレッジを保存</button>
+        <button class="btn btn-outline" onclick="meoEnrich()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.7-.84.7-2.13-.1-2.9a2.18 2.18 0 00-2.9-.1z"/><path d="M12 15l-3-3a22 22 0 012-3.95A12.9 12.9 0 0122 2c0 2.72-.78 7.5-6 11a22 22 0 01-4 2z"/></svg>AIでMEO強化（HP・食べログ・Google口コミ・対策KWを反映）</button>
       </div>
       <div class="card" id="meoEnrichCard" style="display:none;border-color:rgba(52,211,153,0.4)">
-        <div class="card-header"><div class="card-title">🚀 さらにMEOを上げる施策</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.7-.84.7-2.13-.1-2.9a2.18 2.18 0 00-2.9-.1z"/><path d="M12 15l-3-3a22 22 0 012-3.95A12.9 12.9 0 0122 2c0 2.72-.78 7.5-6 11a22 22 0 01-4 2z"/></svg>さらにMEOを上げる施策</div></div>
         <div id="meoEnrichTips" style="font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text)"></div>
       </div>
     </div>
@@ -1815,7 +1815,7 @@ body {
 
       <!-- Instagramインサイト（manage_insights） -->
       <div class="card" id="igInsightsCard" style="display:none">
-        <div class="card-header"><div class="card-title">📊 Instagramインサイト</div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>Instagramインサイト</div>
           <button class="btn btn-outline btn-sm" onclick="loadIgInsights()">更新</button>
         </div>
         <div id="igInsightsBody" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
@@ -1830,8 +1830,8 @@ body {
         <input type="file" id="mediaFileInput" accept="image/*" multiple style="display:none" onchange="uploadMedia(this.files)">
         <input type="file" id="mediaVideoInput" accept="video/*" style="display:none" onchange="uploadVideo(this.files[0])">
         <button class="btn btn-primary" onclick="document.getElementById('mediaFileInput').click()">＋ 写真をアップロード</button>
-        <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()">🎬 動画をアップロード</button>
-        <button class="btn btn-outline" onclick="toggleImageGen()">🎨 画像を生成</button>
+        <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M17 9h5M2 15h5M17 15h5"/></svg>動画をアップロード</button>
+        <button class="btn btn-outline" onclick="toggleImageGen()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>画像を生成</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
 
         <div id="imageGenPanel" style="display:none;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-3)">
@@ -1842,7 +1842,7 @@ body {
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:2px">見出し（キャッチコピー）</label>
                 <div style="display:flex;gap:6px">
                   <input id="genHeadline" type="text" maxlength="22" placeholder="例：本格炭火焼きを、相模原で" oninput="renderGenImage()" style="flex:1;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-                  <button class="btn btn-outline btn-sm" onclick="aiCatchCopy()" title="AIで生成">✨AI</button>
+                  <button class="btn btn-outline btn-sm" onclick="aiCatchCopy()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
                 </div>
               </div>
               <div>
@@ -1908,7 +1908,7 @@ body {
                   </select>
                 </label>
                 <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genEnhance" checked onchange="changeGenAspect()"> 自動補正</label>
-                <button class="btn btn-success btn-sm" onclick="saveGenImage()">💾 ライブラリに保存</button>
+                <button class="btn btn-success btn-sm" onclick="saveGenImage()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>ライブラリに保存</button>
               </div>
               <p style="font-size:11px;color:var(--text-sub)">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります（無料・ブラウザ内生成）。</p>
             </div>
@@ -1933,21 +1933,21 @@ body {
                   <option value="square">正方形 1:1</option>
                 </select>
               </label>
-              <button class="btn btn-primary btn-sm" onclick="generateIgCaption()">✨ AIでキャプション生成</button>
+              <button class="btn btn-primary btn-sm" onclick="generateIgCaption()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIでキャプション生成</button>
             </div>
           </div>
         </div>
         <textarea id="igPostCaption" placeholder="ここにキャプションが表示されます（生成後に自由に編集できます）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:200px;font-family:inherit;line-height:1.7;margin-top:14px"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="generateIgCaption()">再生成</button>
-          <button class="btn btn-success" onclick="publishIgPost()">📤 Instagramに投稿（承認の上）</button>
+          <button class="btn btn-success" onclick="publishIgPost()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>Instagramに投稿（承認の上）</button>
         </div>
         <p style="font-size:11px;color:var(--text-sub);margin-top:8px">※現在は連携済みアカウント（@cantik.ink）へ投稿します。各クライアントのアカウントへの投稿は、Instagram API審査の通過後に各社を連携して可能になります。</p>
       </div>
 
       <!-- DM管理 -->
       <div class="card">
-        <div class="card-header"><div class="card-title">💬 メッセージ（DM）</div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>メッセージ（DM）</div>
           <button class="btn btn-outline btn-sm" onclick="loadConversations()">更新</button>
         </div>
         <div style="display:flex;gap:14px;flex-wrap:wrap">
@@ -1969,7 +1969,7 @@ body {
 
       <!-- コメント管理 -->
       <div class="card">
-        <div class="card-header"><div class="card-title">💬 投稿のコメント</div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>投稿のコメント</div>
           <button class="btn btn-outline btn-sm" onclick="loadIgPostsForComments()">投稿を読み込み</button>
         </div>
         <select id="igCommentPostSelect" onchange="loadPostComments()" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:10px">
@@ -1988,7 +1988,7 @@ body {
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">🛡️ 正規情報の登録</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>️ 正規情報の登録</div>
           <span class="badge badge-pending" id="baselineStatus">未設定</span>
         </div>
         <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px;line-height:1.7">
@@ -2023,14 +2023,14 @@ body {
         </div>
         <div id="baselineInfo" style="display:none;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;font-size:12px;color:var(--accent-2)"></div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" onclick="saveBaseline()">💾 正規情報として保存</button>
-          <button class="btn btn-outline" onclick="importBaselineFromKnowledge()">⚡ 企業ナレッジから取り込む</button>
-          <button class="btn btn-outline" onclick="checkNow()">🔍 変更チェック</button>
+          <button class="btn btn-primary" onclick="saveBaseline()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>正規情報として保存</button>
+          <button class="btn btn-outline" onclick="importBaselineFromKnowledge()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>企業ナレッジから取り込む</button>
+          <button class="btn btn-outline" onclick="checkNow()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>変更チェック</button>
         </div>
       </div>
 
       <div class="card" id="alertsCard">
-        <div class="card-header"><div class="card-title">🚨 アラート履歴</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>アラート履歴</div></div>
         <div id="alertsList">
           <div class="empty-state"><p>アラートなし（正常です）</p></div>
         </div>
@@ -2045,7 +2045,7 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">📋 NAP情報（統一情報）</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>NAP情報（統一情報）</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:14px">全媒体で統一すべき店舗情報です。表記ゆれがあるとMEO評価が下がります。</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div>
@@ -2070,15 +2070,15 @@ body {
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:14px">
-          <button class="btn btn-primary" onclick="saveCitation()">💾 NAP情報を保存</button>
-          <button class="btn btn-outline" onclick="importNapFromKnowledge()">⚡ 企業ナレッジから取り込む</button>
-          <button class="btn btn-outline" onclick="copyNAP()">📋 NAP情報をコピー（登録用）</button>
+          <button class="btn btn-primary" onclick="saveCitation()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>NAP情報を保存</button>
+          <button class="btn btn-outline" onclick="importNapFromKnowledge()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>企業ナレッジから取り込む</button>
+          <button class="btn btn-outline" onclick="copyNAP()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>NAP情報をコピー（登録用）</button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">🌐 媒体別登録状況</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18 15 15 0 010-18"/></svg>媒体別登録状況</div>
           <span id="citationScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:16px">登録済みの媒体にチェックを入れてください。登録数が多いほどMEO評価が上がります。</p>
@@ -2087,15 +2087,15 @@ body {
       </div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
-        <div class="card-header"><div class="card-title">🤖 AI診断・やることリスト</div>
-          <button class="btn btn-primary btn-sm" onclick="citationAdvice()">⚡ 診断する</button>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 2h6"/><path d="M9 13v2M15 13v2"/></svg>AI診断・やることリスト</div>
+          <button class="btn btn-primary btn-sm" onclick="citationAdvice()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>診断する</button>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:8px">現在の媒体登録状況をAIが見て、優先して登録すべき媒体・次の一手を提案します。</p>
         <div id="citationAdvice" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)">「診断する」を押してください</div>
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">📊 サイテーション効果の目安</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>サイテーション効果の目安</div></div>
         <div style="font-size:13px;color:var(--text-sub);line-height:2">
           <div>✅ 5媒体以上: 基本的なサイテーション完成</div>
           <div>✅ 10媒体以上: 直接検索+89%、検索表示+91%（実績値）</div>
@@ -2115,7 +2115,7 @@ body {
       </div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
-        <div class="card-header"><div class="card-title">💡 AIO/LLMO/GEOとは？</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0012 2z"/></svg>AIO/LLMO/GEOとは？</div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px">
           <div style="background:var(--bg-3);border-radius:8px;padding:14px">
             <div style="font-weight:700;color:var(--accent);margin-bottom:6px">AIO</div>
@@ -2134,30 +2134,30 @@ body {
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">✅ 対策チェックリスト</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>対策チェックリスト</div>
           <span id="aioProgress" style="font-size:13px;color:var(--accent-2);font-weight:600"></span>
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:var(--bg-3);border-radius:var(--radius-sm)">
           <input id="aioDetectUrl" type="url" placeholder="公式サイトのURL（構造化データ/FAQ等を自動判定）" style="flex:1;min-width:220px;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary btn-sm" onclick="aioDetect()">⚡ HPを読んで自動判定</button>
+          <button class="btn btn-primary btn-sm" onclick="aioDetect()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>HPを読んで自動判定</button>
         </div>
         <div id="aioDetectStatus" style="font-size:12px;color:var(--text-sub);margin-bottom:8px"></div>
 
         <div id="aioChecklist"></div>
-        <button class="btn btn-primary" style="margin-top:16px" onclick="saveAio()">💾 チェック状況を保存</button>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="saveAio()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>チェック状況を保存</button>
       </div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
-        <div class="card-header"><div class="card-title">🤖 AI診断・やることリスト</div>
-          <button class="btn btn-primary btn-sm" onclick="aioAdvice()">⚡ 診断する</button>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 2h6"/><path d="M9 13v2M15 13v2"/></svg>AI診断・やることリスト</div>
+          <button class="btn btn-primary btn-sm" onclick="aioAdvice()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>診断する</button>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:8px">現在の対策状況をAIが見て、未対応で優先すべき項目・具体的なアクションを提案します。</p>
         <div id="aioAdvice" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)">「診断する」を押してください</div>
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">🤖 AIに引用されているか確認する方法</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 2h6"/><path d="M9 13v2M15 13v2"/></svg>AIに引用されているか確認する方法</div></div>
         <div style="font-size:13px;color:var(--text-sub);line-height:2">
           <p style="margin-bottom:12px">以下のプロンプトをChatGPT・Gemini・Perplexityに入力して、自店舗が回答に含まれるか確認しましょう。</p>
           <div id="aioTestPrompts" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -2165,7 +2165,7 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">📝 メモ・改善記録</div></div>
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>メモ・改善記録</div></div>
         <textarea id="aioNotes" placeholder="対策の進捗・気づきをメモしてください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:100px;font-family:inherit;line-height:1.6"></textarea>
         <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="saveAio()">メモを保存</button>
       </div>
@@ -2184,7 +2184,7 @@ body {
         <div class="post-form">
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
             <input id="postGenTopic" type="text" placeholder="投稿テーマ/指示（任意・例：週末ランチの告知）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            <button class="btn btn-primary btn-sm" onclick="generateNewPost()">✨ AIで文章生成</button>
+            <button class="btn btn-primary btn-sm" onclick="generateNewPost()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで文章生成</button>
           </div>
           <textarea id="postText" placeholder="投稿内容を入力（または「✨AIで文章生成」）" oninput="updatePostCount()"></textarea>
           <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google目安150〜300字／Instagram150〜250字）</div>
@@ -2193,7 +2193,7 @@ body {
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               投稿画像（Instagramは必須・Googleは任意）
               <button class="link-btn" onclick="showPanel('instagram')">＋ ライブラリで追加/生成</button>
-              <button class="link-btn" onclick="loadPostImages()">🔄 更新</button>
+              <button class="link-btn" onclick="loadPostImages()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
             </div>
             <div id="postImageList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
           </div>
@@ -2230,7 +2230,7 @@ body {
       <!-- 月間投稿プラン -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">📅 月間投稿プラン（下書き一括生成）</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>月間投稿プラン（下書き一括生成）</div>
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">AIが月5回分の投稿案を作成し、予約日付つきで下書き保存します。内容を確認・編集して「投稿する」で公開できます。</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
@@ -2240,7 +2240,7 @@ body {
             <option value="8">月8本</option>
           </select>
           <input id="planTheme" type="text" placeholder="今月のテーマ（任意・例：梅雨の特別メニュー）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary btn-sm" onclick="generateMonthlyPlan()">✨ 投稿案を一括生成</button>
+          <button class="btn btn-primary btn-sm" onclick="generateMonthlyPlan()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>投稿案を一括生成</button>
         </div>
         <div id="planList"></div>
       </div>
@@ -4247,7 +4247,7 @@ async function generateReport() {
   <h2>今月の実施施策</h2>${(window._actionLogs && window._actionLogs.length) ? '<table><tr><th style="width:90px">日付</th><th style="width:auto">内容</th></tr>' + window._actionLogs.slice(0, 30).map(l => `<tr><td>${l.date}</td><td>${escapeHtml(l.text)}</td></tr>`).join('') + '</table>' : '<p style="color:#888">記録がありません</p>'}
   <h2>改善アドバイス・次の施策</h2><div class="adv">${escapeHtml(advice) || '（ダッシュボードで診断を実行すると表示されます）'}</div>
   <div class="foot">本レポートは株式会社cantikのMEO管理ツールで自動生成しました。数値は取得時点のものです。</div>
-  <button class="noprint" onclick="window.print()" style="margin-top:20px;padding:10px 20px;background:#0e5fb5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">🖨 PDFで保存／印刷</button>
+  <button class="noprint" onclick="window.print()" style="margin-top:20px;padding:10px 20px;background:#0e5fb5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>PDFで保存／印刷</button>
   </body></html>`);
   w.document.close();
 }
@@ -4604,8 +4604,8 @@ function renderMedia() {
     <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
       <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="${m.isVideo ? `pickPhoto(${i})` : `genFromPhoto(${i})`}" title="${m.isVideo ? 'クリックで選択' : 'クリックでこの写真から画像生成'}">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
-      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1">🎨 生成</button>`}
-      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();postPhotoToGbp(${i})" title="Googleビジネスプロフィールに写真を追加" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;line-height:1">📍 Google</button>`}
+      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>生成</button>`}
+      ${m.isVideo ? '' : `<button onclick="event.stopPropagation();postPhotoToGbp(${i})" title="Googleビジネスプロフィールに写真を追加" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;line-height:1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Google</button>`}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
 }
@@ -5963,7 +5963,7 @@ function printStoreReport() {
     .bar{margin-bottom:16px}button{font-size:13px;padding:9px 16px;border-radius:8px;border:none;background:#2e8ff0;color:#fff;font-weight:700;cursor:pointer}
     @media print{.bar{display:none}body{padding:12px}}
   </style></head><body>
-  <div class="bar"><button onclick="window.print()">🖨 印刷 / PDFに保存</button></div>
+  <div class="bar"><button onclick="window.print()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>印刷 / PDFに保存</button></div>
   <h1>店舗レポート</h1><div class="sub">${esc(store)}${currentLocation?.company ? ' / ' + esc(currentLocation.company) : ''}　対象年月: ${esc(month)}</div>
   <h2>今月の口コミ獲得サマリー</h2>
   <div class="grid">
@@ -6392,8 +6392,8 @@ function renderReviews() {
           <button class="btn btn-outline btn-sm" onclick="toggleReplyEditor(${i})">
             ${r.reviewReply ? '返信を編集' : '返信する'}
           </button>
-          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})">✨ AI返信生成</button>
-          <button class="btn btn-outline btn-sm" onclick="diagnoseReview(${i})">🛡️ AIリスク診断</button>
+          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI返信生成</button>
+          <button class="btn btn-outline btn-sm" onclick="diagnoseReview(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>️ AIリスク診断</button>
         </div>
         <div id="risk-${i}" style="display:none;margin-top:10px"></div>
         <div class="reply-editor" id="re-${i}">
@@ -6585,8 +6585,8 @@ async function diagnoseReview(i) {
         ${reasons ? `<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sub)">理由</div><ul style="margin:4px 0 0 18px;font-size:13px;line-height:1.7">${reasons}</ul></div>` : ''}
         ${j.comment ? `<div style="font-size:12px;color:var(--text-sub);margin-top:6px">${escapeHtml(j.comment)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})">✨ AI返信作成</button>
-          ${canReport ? `<button class="btn btn-outline btn-sm" onclick="generateReport(${i}, ${JSON.stringify(j.reasons || []).replace(/"/g, '&quot;')})">📄 Google報告文を作成</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick="generateReply(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI返信作成</button>
+          ${canReport ? `<button class="btn btn-outline btn-sm" onclick="generateReport(${i}, ${JSON.stringify(j.reasons || []).replace(/"/g, '&quot;')})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Google報告文を作成</button>` : ''}
         </div>
         <div id="report-${i}" style="display:none;margin-top:10px"></div>
         <p style="font-size:11px;color:var(--text-sub);line-height:1.6;margin-top:10px">※これはGoogleポリシーに照らした<b>可能性</b>の分析です。削除を保証するものではなく、Googleの審査結果を保証するものでもありません。実際の削除可否はGoogleが判断します。</p>
@@ -6909,7 +6909,7 @@ async function loadClientStores() {
           }
         </div>
         <a href="/report.html?store=${s.storeId}" target="_blank" style="font-size:12px;color:var(--accent)">プレビュー</a>
-        <button class="btn btn-outline btn-sm" onclick="copyReviewRequest('${s.storeId}', ${JSON.stringify(s.storeName)})">📣 口コミ依頼URL</button>
+        <button class="btn btn-outline btn-sm" onclick="copyReviewRequest('${s.storeId}', ${JSON.stringify(s.storeName)})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 11l14-7v16L3 13z"/><path d="M17 8a4 4 0 010 8M7 13v4a2 2 0 004 0v-2"/></svg>口コミ依頼URL</button>
         <button class="btn btn-outline btn-sm" onclick="openRankingInput('${s.storeId}','${s.storeName}')">順位入力</button>
         <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red);border:none" onclick="deleteStore('${s.storeId}')">削除</button>
       </div>`).join('');
@@ -7005,7 +7005,7 @@ async function openRankingInput(storeId, storeName) {
       <input id="rank-${i}" type="number" min="1" max="100" value="${latest?.rankings[i] || ''}" placeholder="順位"
         style="width:70px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:13px;text-align:center">
       <span style="font-size:12px;color:var(--text-muted)">位</span>
-      <button class="btn btn-outline btn-sm" style="padding:5px 10px" onclick="fetchOneRank(${i})" title="この語で自動取得">⚡</button>
+      <button class="btn btn-outline btn-sm" style="padding:5px 10px" onclick="fetchOneRank(${i})" title="この語で自動取得"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></button>
     </div>`).join('');
 
   window._rankingKeywords = keywords;
@@ -7798,8 +7798,8 @@ async function loadDrafts() {
         <div style="font-size:12px;color:var(--text-sub);margin:6px 0 4px">画像（複数選択でカルーセル／動画＝リール）</div>
         <div id="draftimg-${d.id}" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="saveDraft('${d.id}')">💾 保存</button>
-          <button class="btn btn-success btn-sm" onclick="publishDraftNow('${d.id}')">📤 今すぐ投稿</button>
+          <button class="btn btn-outline btn-sm" onclick="saveDraft('${d.id}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>保存</button>
+          <button class="btn btn-success btn-sm" onclick="publishDraftNow('${d.id}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>今すぐ投稿</button>
         </div>
       </div>`).join('');
     drafts.forEach(d => renderDraftImages(d.id));
