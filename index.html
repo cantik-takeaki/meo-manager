@@ -715,13 +715,34 @@ body {
           <button class="btn btn-outline btn-sm" onclick="showClientList()">← 戻る</button>
           <span id="cdName" style="font-size:22px;font-weight:800"></span>
           <span class="badge badge-active">有効</span>
-          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="quickGo('gbpPickerCard')">＋ 店舗を追加/管理</button>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="editClientMeta()">✏️ 編集</button>
+            <button class="btn btn-primary btn-sm" onclick="quickGo('gbpPickerCard')">＋ 店舗を追加/管理</button>
+          </div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title">基本情報</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <!-- 表示モード -->
+          <div id="cdInfoView" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div><div style="font-size:12px;color:var(--text-sub)">メール</div><div id="cdEmail" style="font-size:14px;margin-top:3px">未設定</div></div>
             <div><div style="font-size:12px;color:var(--text-sub)">電話番号</div><div id="cdPhone" style="font-size:14px;margin-top:3px">未設定</div></div>
+          </div>
+          <!-- 編集モード -->
+          <div id="cdInfoEdit" style="display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">
+              <div>
+                <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">メール</div>
+                <input id="cdEmailInput" type="email" placeholder="client@example.com" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:14px;font-family:inherit">
+              </div>
+              <div>
+                <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">電話番号</div>
+                <input id="cdPhoneInput" type="tel" placeholder="例：03-0000-0000" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:14px;font-family:inherit">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="saveClientMeta()">保存する</button>
+              <button class="btn btn-outline btn-sm" onclick="cancelClientMeta()">キャンセル</button>
+            </div>
           </div>
         </div>
         <div class="card">
@@ -3755,8 +3776,18 @@ function _kwCountMap() {
   return m;
 }
 
+// 会社の連絡先メタ（メール・電話）マップを取得（会社名キー）
+async function loadClientMeta() {
+  try { const d = await fetch('/api/admin?action=client-meta').then(r => r.json()); window._clientMeta = d.meta || {}; }
+  catch (e) { window._clientMeta = window._clientMeta || {}; }
+}
+// 表示用メール：保存メタ最優先 → 店舗のclientEmail。電話は保存メタのみ（店舗のGBP電話は使わない）
+const _clientEmail = (c) => (window._clientMeta?.[c.name]?.email) || (c.stores.find(s => s.clientEmail)?.clientEmail) || '';
+const _clientPhone = (c) => (window._clientMeta?.[c.name]?.phone) || '';
+
 function loadClientList() {
   showClientList();
+  loadClientMeta().then(() => { if (window._clients) renderClientList(); });
   if (!window._clients) { loadLocations().then(renderClientList); return; }
   renderClientList();
 }
@@ -3773,8 +3804,8 @@ function renderClientList() {
     return;
   }
   body.innerHTML = filtered.map(c => {
-    // クライアントのメール（店舗のclientEmailがあれば拾う）
-    const email = (c.stores.find(s => s.clientEmail)?.clientEmail) || '';
+    // クライアントのメール（保存メタ→店舗のclientEmail）
+    const email = _clientEmail(c);
     return `<tr style="cursor:pointer" onclick="openClientDetail(${JSON.stringify(c.name).replace(/"/g, '&quot;')})">
       <td style="padding-left:16px"><div style="display:flex;align-items:center;gap:10px">
         <span style="width:30px;height:30px;border-radius:8px;background:rgba(46,143,240,0.12);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg></span>
@@ -3787,15 +3818,21 @@ function renderClientList() {
   }).join('');
 }
 
+let _currentClientName = null;
 function openClientDetail(name) {
   const client = (window._clients || []).find(c => c.name === name);
   if (!client) return;
+  _currentClientName = name;
   document.getElementById('clientListView').style.display = 'none';
   document.getElementById('clientDetailView').style.display = '';
+  // 編集モードは閉じた状態で開く
+  document.getElementById('cdInfoView').style.display = 'grid';
+  document.getElementById('cdInfoEdit').style.display = 'none';
   document.getElementById('cdName').textContent = client.name;
-  const email = client.stores.find(s => s.clientEmail)?.clientEmail || '';
+  // メール＝保存メタ→店舗email、電話＝保存メタのみ（店舗のGBP電話は会社の電話ではないので使わない）
+  const email = _clientEmail(client);
   document.getElementById('cdEmail').textContent = email || '未設定';
-  const phone = client.stores.find(s => s.phoneNumbers?.primaryPhone)?.phoneNumbers?.primaryPhone || '';
+  const phone = _clientPhone(client);
   document.getElementById('cdPhone').textContent = phone || '未設定';
   document.getElementById('cdStoreCount').textContent = `${client.stores.length}件`;
   const kwMap = _kwCountMap();
@@ -3820,6 +3857,39 @@ function showClientList() {
   const lv = document.getElementById('clientListView');
   if (dv) dv.style.display = 'none';
   if (lv) lv.style.display = '';
+}
+
+// クライアント基本情報の編集
+function editClientMeta() {
+  const meta = window._clientMeta?.[_currentClientName] || {};
+  const client = (window._clients || []).find(c => c.name === _currentClientName);
+  document.getElementById('cdEmailInput').value = meta.email || (client ? (client.stores.find(s => s.clientEmail)?.clientEmail || '') : '');
+  document.getElementById('cdPhoneInput').value = meta.phone || '';
+  document.getElementById('cdInfoView').style.display = 'none';
+  document.getElementById('cdInfoEdit').style.display = '';
+}
+function cancelClientMeta() {
+  document.getElementById('cdInfoView').style.display = 'grid';
+  document.getElementById('cdInfoEdit').style.display = 'none';
+}
+async function saveClientMeta() {
+  if (!_currentClientName) return;
+  const email = document.getElementById('cdEmailInput').value.trim();
+  const phone = document.getElementById('cdPhoneInput').value.trim();
+  try {
+    const res = await fetch('/api/admin?action=client-meta', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: _currentClientName, email, phone }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '保存に失敗しました', 'error');
+    window._clientMeta = d.meta || window._clientMeta;
+    document.getElementById('cdEmail').textContent = email || '未設定';
+    document.getElementById('cdPhone').textContent = phone || '未設定';
+    cancelClientMeta();
+    renderClientList(); // 一覧のメール表示も更新
+    showToast('基本情報を保存しました', 'success');
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 // クイックアクション: 店舗管理の該当カードへ遷移＋スクロール（任意でヒントToast）

@@ -142,6 +142,24 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── クライアント（会社）の連絡先メタ情報（メール・電話）。会社名キーの単一マップで保持 ──
+  // 店舗のGBP電話を会社の電話として誤表示していた問題への対応。会社ごとに手動で設定・修正できる。
+  if (action === 'client-meta') {
+    if (req.method === 'GET') return res.json({ meta: await kvGet('client_meta') || {} });
+    if (req.method === 'POST') {
+      const { company, email, phone } = req.body || {};
+      if (!company) return res.status(400).json({ error: 'company必須' });
+      const map = await kvGet('client_meta') || {};
+      map[String(company)] = {
+        email: String(email || '').slice(0, 120),
+        phone: String(phone || '').slice(0, 40),
+        updatedAt: new Date().toISOString(),
+      };
+      await kvSet('client_meta', map);
+      return res.json({ success: true, meta: map });
+    }
+  }
+
   // ── 一覧から非表示（重複・無関係なGBPリスティングを隠す。Google本体は一切変更しない） ──
   // hidden_locations に locId を貯め、ピッカーの既定表示から除外する。戻す(on:false)も可能。
   if (action === 'hidden') {
