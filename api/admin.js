@@ -525,7 +525,8 @@ export default async function handler(req, res) {
 
   // ── 順位保存 ──
   if (req.method === 'POST' && action === 'rankings') {
-    const { storeId, keywords, rankings, date } = req.body;
+    const { keywords, rankings, date } = req.body;
+    const storeId = req.query.storeId || req.body.storeId; // クエリ・body両対応
     if (!storeId) return res.status(400).json({ error: 'storeId必須' });
     const existing = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
     // 計測日は指定があればそれを使う（一括順位入力）。無ければ本日。
