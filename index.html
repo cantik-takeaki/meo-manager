@@ -598,13 +598,13 @@ body {
         <div id="summaryCount" style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:8px"></div>
       </div>
 
-      <!-- ▼▼ クイックアクション（追加） ▼▼ -->
+      <!-- ▼▼ クイックアクション（ぐるっと相当の4ボタン） ▼▼ -->
       <div class="card">
         <div class="card-header"><div class="card-title">⚡ クイックアクション</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="showPanel('clients')">＋ 店舗を追加/管理</button>
-          <button class="btn btn-outline btn-sm" onclick="showPanel('reviews')">口コミ管理へ</button>
-          <button class="btn btn-outline btn-sm" onclick="showPanel('posts')">投稿管理へ</button>
+          <button class="btn btn-primary btn-sm" onclick="quickGo('gbpPickerCard','店舗を管理対象に追加し、会社名を設定するとクライアントとして分類されます')">＋ クライアント追加</button>
+          <button class="btn btn-primary btn-sm" onclick="quickGo('registerStoreCard')">＋ 店舗登録</button>
+          <button class="btn btn-outline btn-sm" onclick="quickGo('gbpPickerCard')">店舗一覧</button>
           <button class="btn btn-outline btn-sm" onclick="generateReport()">レポート確認</button>
         </div>
       </div>
@@ -909,7 +909,7 @@ body {
       </div>
 
 
-      <div class="card">
+      <div class="card" id="registerStoreCard">
         <div class="card-header"><div class="card-title">➕ 新規店舗登録</div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div>
@@ -937,7 +937,7 @@ body {
       </div>
 
       <!-- Googleから取得した店舗（オーナー登録済み）→ 管理対象を選抜 -->
-      <div class="card">
+      <div class="card" id="gbpPickerCard">
         <div class="card-header">
           <div class="card-title">🔗 Googleから取得した店舗（オーナー/管理者登録済み）</div>
           <span id="gbpPickerCount" style="font-size:12px;color:var(--text-sub)"></span>
@@ -3684,6 +3684,15 @@ function jumpToStore(storeId) {
   const idx = (window._locations || []).findIndex(l => (l.storeId || (l.name || '').replace(/\//g, '_')) === storeId);
   if (idx >= 0) selectLocation(idx); // → 店舗管理の店舗ページへ遷移＋スクロール
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
+}
+
+// クイックアクション: 店舗管理の該当カードへ遷移＋スクロール（任意でヒントToast）
+function quickGo(cardId, hint) {
+  switchPanel('clients');
+  setTimeout(() => {
+    document.getElementById(cardId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (hint) showToast(hint, 'success');
+  }, 60);
 }
 
 // ─── AIコンサル（ダッシュボード・店舗を選んで健康診断/改善/優先アクション） ───
