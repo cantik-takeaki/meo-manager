@@ -267,8 +267,9 @@ body {
 /* ─── 店舗編集フォームの入力 ─── */
 .ed-in { display:block; width:100%; margin-top:5px; background:var(--bg-3); border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:9px; font-size:14px; font-family:inherit; }
 /* 「その他」ドロップダウン項目 */
-.more-item { display:block; width:100%; text-align:left; background:none; border:none; padding:11px 16px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; }
+.more-item { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none; padding:11px 16px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; }
 .more-item:hover { background:var(--bg-3); }
+.more-item .mi-ico { width:16px; height:16px; flex-shrink:0; color:var(--accent); }
 
 /* ─── カードタイトルのアイコンチップ（ぐるっと風・絵文字の格上げ） ─── */
 .ttl-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 9px; flex-shrink: 0; position: relative; top: -1px; }
@@ -797,16 +798,17 @@ body {
             <span id="storeDetailCompany" style="font-size:12px;color:var(--text-muted)"></span>
             <!-- 店舗ページのアクション（ぐるっと相当：店舗分析／一括順位入力／その他） -->
             <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:relative">
-              <button class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="document.getElementById('meoDiagCard')?.scrollIntoView({behavior:'smooth'})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/></svg>店舗分析</button>
+              <button class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="showStoreReport(window._qrIdx ?? currentLocation?._idx)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/></svg>店舗分析</button>
               <button class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="showBulkRank(window._qrIdx ?? currentLocation?._idx)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12l1.5 1.5L13 11M9 17h6"/></svg>一括順位入力</button>
               <button class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="toggleStoreMore(event)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>その他</button>
-              <div id="storeMoreMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:20;min-width:210px;overflow:hidden">
-                <button class="more-item" onclick="_moreGo('qr')">🔳 口コミQR管理</button>
-                <button class="more-item" onclick="_moreGo('pop')">🖨 口コミPOP作成</button>
-                <button class="more-item" onclick="_moreGo('result')">📈 口コミQR成果</button>
-                <button class="more-item" onclick="_moreGo('survey')">📋 アンケート回答履歴</button>
-                <button class="more-item" onclick="_moreGo('editsurvey')">✏️ アンケート編集</button>
-                <button class="more-item" onclick="_moreGo('edit')" style="border-top:1px solid var(--border)">🏢 店舗情報を編集</button>
+              <div id="storeMoreMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:20;min-width:220px;overflow:hidden">
+                <button class="more-item" onclick="_moreGo('qr')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01"/></svg>口コミQR管理</button>
+                <button class="more-item" onclick="_moreGo('pop')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>口コミPOP作成</button>
+                <button class="more-item" onclick="_moreGo('result')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 8l-5 5-3-3-4 4"/></svg>口コミQR成果</button>
+                <button class="more-item" onclick="_moreGo('survey')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12h6M9 16h4"/></svg>アンケート回答履歴</button>
+                <button class="more-item" onclick="_moreGo('editsurvey')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>アンケート編集</button>
+                <button class="more-item" onclick="_moreGo('competitor')" style="border-top:1px solid var(--border)"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l6-4v18M19 21V11l-8-6M9 9v.01M9 13v.01M9 17v.01"/></svg>競合店舗管理</button>
+                <button class="more-item" onclick="_moreGo('edit')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V8l6-5 6 5v13M10 21v-4h4v4"/></svg>店舗情報を編集</button>
               </div>
             </div>
           </div>
@@ -1325,6 +1327,85 @@ body {
           </div>
         </div>
         <p style="font-size:11px;color:var(--text-muted);line-height:1.8">・Enterで次のキーワードに移動します　・順位を入力しなかったキーワードは保存されません　・同じ日付・同じキーワードで既にデータがある場合は上書き保存されます</p>
+      </div>
+
+      <!-- ▼▼ 競合店舗管理ビュー ▼▼ -->
+      <div id="storeCompetitorView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <div style="flex:1"><div class="page-title" style="font-size:20px">競合店舗管理</div><div class="page-sub" id="compStoreName"></div></div>
+          <button class="btn btn-primary btn-sm" onclick="openCompetitorForm()">＋ 追加</button>
+        </div>
+        <div class="card" style="border-color:rgba(46,143,240,0.25);background:rgba(46,143,240,0.04)">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px">競合店舗の自動順位取得について</div>
+          <p style="font-size:12px;color:var(--text-sub);line-height:1.7">Google Place ID を設定すると、順位取得時に競合店舗の順位も同時に自動記録されます（対応後）。手入力の比較にも使えます。</p>
+        </div>
+        <!-- 追加/編集フォーム -->
+        <div id="competitorForm" class="card" style="display:none">
+          <div class="card-header"><div class="card-title" id="compFormTitle">競合店舗を追加</div></div>
+          <div style="display:grid;gap:12px">
+            <label style="font-size:12px;color:var(--text-sub)">店舗名 <span style="color:var(--red)">*</span><input id="comp-name" type="text" placeholder="例: 競合店 A" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">Google Place ID<input id="comp-placeId" type="text" placeholder="ChIJ..." class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">Google Maps URL<input id="comp-mapsUrl" type="url" placeholder="https://maps.google.com/..." class="ed-in"></label>
+            <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+              <label style="font-size:12px;color:var(--text-sub);flex:1;min-width:180px">エリア<input id="comp-area" type="text" placeholder="例: 渋谷区" class="ed-in"></label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:8px;padding-bottom:8px"><input id="comp-compare" type="checkbox" checked style="width:16px;height:16px">比較対象</label>
+            </div>
+            <label style="font-size:12px;color:var(--text-sub)">メモ<textarea id="comp-memo" rows="2" placeholder="競合の特徴など" class="ed-in" style="resize:vertical"></textarea></label>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('competitorForm').style.display='none'">キャンセル</button>
+            <button class="btn btn-primary btn-sm" onclick="saveCompetitor()">保存</button>
+          </div>
+        </div>
+        <div class="card"><div id="competitorList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div></div>
+      </div>
+
+      <!-- ▼▼ 店舗レポートビュー（店舗分析ボタンから） ▼▼ -->
+      <div id="storeReportView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreDetail()">← 店舗ページ</button>
+          <div style="flex:1"><div class="page-title" style="font-size:20px">店舗レポート</div><div class="page-sub" id="repStoreName"></div></div>
+          <button class="btn btn-primary btn-sm" onclick="printStoreReport()">📄 店舗レポートPDF</button>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <label style="font-size:12px;color:var(--text-sub)">対象年月 <input id="repMonth" type="month" onchange="loadStoreReport()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;margin-left:6px"></label>
+            <span id="repMeta" style="font-size:12px;color:var(--text-muted)"></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></span>今月の口コミ獲得サマリー</div></div>
+          <div class="kpi-agg-grid"><div class="kpi-agg-cell"><div class="k-l">QRスキャン数</div><div class="k-v" id="repScan">0</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">アンケート回答</div><div class="k-v" id="repSurvey">0</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">AI文章生成</div><div class="k-v" id="repAi">0</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">Google誘導</div><div class="k-v" id="repClick">0</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">LINE誘導</div><div class="k-v" id="repLine">0</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">平均満足度</div><div class="k-v" id="repSat">—</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">⭐ Google口コミ統計</div><span style="font-size:11px;color:var(--text-muted)">GBP同期済みデータ</span></div>
+          <div class="kpi-agg-grid" style="grid-template-columns:repeat(4,1fr)">
+            <div class="kpi-agg-cell"><div class="k-l">累積口コミ件数</div><div class="k-v" id="repRvTotal">—</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">平均評価</div><div class="k-v" id="repRvAvg">—</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">未返信(最新50)</div><div class="k-v" style="color:var(--red)" id="repRvUnrep">—</div></div>
+            <div class="kpi-agg-cell"><div class="k-l">返信済み(最新50)</div><div class="k-v" style="color:var(--accent-2)" id="repRvRep">—</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔑 キーワード別詳細</div></div>
+          <div style="overflow-x:auto"><table class="summary-table"><thead><tr><th style="text-align:left;padding-left:16px">キーワード</th><th>今回順位</th><th>前回</th><th>前月比</th></tr></thead><tbody id="repKwBody"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🥊 競合比較</div><button class="btn btn-outline btn-sm" onclick="_moreGo('competitor')">競合を管理</button></div>
+          <div id="repCompetitors"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">💬 担当者コメント（PDFに出力）</div></div>
+          <textarea id="repComment" rows="3" placeholder="例：今月は○○キーワードでTOP3を達成しました。引き続き…" class="ed-in" style="resize:vertical"></textarea>
+          <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="saveReportComment()">コメントを保存</button>
+        </div>
       </div>
     </div>
 
@@ -4114,7 +4195,7 @@ function jumpToStore(storeId) {
 
 // ─── 店舗管理の4ビュー切替（一覧 / 詳細 / 追加・管理 / 回答履歴） ───
 function _storeViews(show) {
-  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView'].forEach(id => {
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView', 'storeCompetitorView', 'storeReportView'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
   });
 }
@@ -4424,6 +4505,7 @@ function _moreGo(what) {
   else if (what === 'result') showStoreQrResult(idx);
   else if (what === 'survey') showStoreSurvey(idx);
   else if (what === 'edit') showStoreEdit(idx);
+  else if (what === 'competitor') showStoreCompetitors(idx);
   else if (what === 'editsurvey') { document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth' }); try { openSurveyEditor(); } catch (e) {} }
 }
 
@@ -4489,6 +4571,197 @@ async function saveBulkRank() {
     showToast(`${entered}件の順位を保存しました（${date}）`, 'success');
     loadDashboardSummary();
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+// ─── 競合店舗管理 ───
+async function showStoreCompetitors(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  window._qrIdx = idx; currentLocation = loc;
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
+  _storeViews('storeCompetitorView');
+  document.getElementById('compStoreName').textContent = loc.title || '';
+  document.getElementById('competitorForm').style.display = 'none';
+  renderCompetitorList();
+}
+function openCompetitorForm(c) {
+  const f = document.getElementById('competitorForm');
+  f.style.display = 'block';
+  document.getElementById('compFormTitle').textContent = c ? '競合店舗を編集' : '競合店舗を追加';
+  const v = (id, val) => { document.getElementById(id).value = val || ''; };
+  window._editCompId = c?.id || '';
+  v('comp-name', c?.name); v('comp-placeId', c?.placeId); v('comp-mapsUrl', c?.mapsUrl); v('comp-area', c?.area); v('comp-memo', c?.memo);
+  document.getElementById('comp-compare').checked = c ? c.compare !== false : true;
+  f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function renderCompetitorList() {
+  const box = document.getElementById('competitorList');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>読み込み中...</div>';
+  try {
+    const d = await fetch(`/api/admin?action=competitors&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    window._competitors = d.competitors || [];
+    if (!window._competitors.length) {
+      box.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center;color:var(--text-muted)"><p>競合店舗が登録されていません</p><p style="font-size:12px">「＋ 追加」ボタンから登録してください</p></div>';
+      return;
+    }
+    box.innerHTML = window._competitors.map(c => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 6px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px">${escapeHtml(c.name)}${c.compare === false ? ' <span class="st-badge nodata">比較対象外</span>' : ''}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(c.area || '')}${c.placeId ? ' ・Place ID設定済' : ''}</div>
+          ${c.memo ? `<div style="font-size:12px;color:var(--text-sub);margin-top:2px">${escapeHtml(c.memo)}</div>` : ''}
+        </div>
+        <button class="btn btn-outline btn-sm" onclick='openCompetitorForm(${JSON.stringify(c).replace(/'/g, "&#39;")})'>編集</button>
+        <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red);border:none" onclick="deleteCompetitor('${c.id}')">削除</button>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px">取得に失敗しました: ${escapeHtml(e.message)}</div>`; }
+}
+async function saveCompetitor() {
+  const name = document.getElementById('comp-name').value.trim();
+  if (!name) return showToast('店舗名を入力してください', 'error');
+  const body = {
+    id: window._editCompId || undefined, name,
+    placeId: document.getElementById('comp-placeId').value.trim(),
+    mapsUrl: document.getElementById('comp-mapsUrl').value.trim(),
+    area: document.getElementById('comp-area').value.trim(),
+    compare: document.getElementById('comp-compare').checked,
+    memo: document.getElementById('comp-memo').value.trim(),
+  };
+  try {
+    const res = await fetch(`/api/admin?action=competitors&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '保存に失敗しました', 'error');
+    showToast('競合店舗を保存しました', 'success');
+    document.getElementById('competitorForm').style.display = 'none';
+    window._competitors = d.competitors;
+    renderCompetitorList();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+async function deleteCompetitor(id) {
+  if (!confirm('この競合店舗を削除しますか？')) return;
+  try {
+    await fetch(`/api/admin?action=competitors&storeId=${encodeURIComponent(currentLocationId)}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    showToast('削除しました', 'success');
+    renderCompetitorList();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+// ─── 店舗レポート（店舗分析ボタン） ───
+async function showStoreReport(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  window._qrIdx = idx; currentLocation = loc;
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
+  _storeViews('storeReportView');
+  document.getElementById('repStoreName').textContent = `${loc.title || ''}${loc.company ? ' / ' + loc.company : ''}`;
+  document.getElementById('repMonth').value = new Date().toISOString().slice(0, 7);
+  // 保存済み担当者コメント
+  try { const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); document.getElementById('repComment').value = s.reportComment || ''; } catch (e) {}
+  loadStoreReport();
+}
+async function loadStoreReport() {
+  const sid = encodeURIComponent(currentLocationId);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  try {
+    const [kpi, rvData, rk, comp] = await Promise.all([
+      fetch(`/api/admin?action=kpi&storeId=${sid}`).then(r => r.json()).catch(() => ({})),
+      (currentLocation?.name ? fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({})),
+      fetch(`/api/admin?action=rankings&storeId=${sid}`).then(r => r.json()).catch(() => ({ keywords: [], history: [] })),
+      fetch(`/api/admin?action=competitors&storeId=${sid}`).then(r => r.json()).catch(() => ({ competitors: [] })),
+    ]);
+    window._report = { kpi, rv: rvData, rk, comp };
+    const c = kpi.current || {};
+    set('repScan', (c.scan || 0) + '回'); set('repSurvey', (c.survey || 0) + '件'); set('repAi', (c.ai || 0) + '回');
+    set('repClick', (c.click || 0) + '回'); set('repLine', (c.line || 0) + '回');
+    set('repSat', kpi.avgSatisfaction != null ? '★' + kpi.avgSatisfaction : '—');
+    // Google口コミ統計
+    const st = rvData.stats || {};
+    set('repRvTotal', rvData.totalReviewCount != null ? rvData.totalReviewCount + '件' : (st.totalCount != null ? st.totalCount + '件' : '—'));
+    set('repRvAvg', (rvData.averageRating || st.averageRating) ? '★' + (Math.round((rvData.averageRating || st.averageRating) * 10) / 10) : '—');
+    set('repRvUnrep', st.unrepliedCount != null ? st.unrepliedCount + '件' : '—');
+    set('repRvRep', st.totalCount != null ? (st.totalCount - (st.unrepliedCount || 0)) + '件' : '—');
+    // キーワード別詳細
+    const kws = (rk.keywords || []).filter(Boolean);
+    const hist = rk.history || [];
+    const last = hist[hist.length - 1]?.rankings || [];
+    const prev = hist[hist.length - 2]?.rankings || [];
+    document.getElementById('repMeta').textContent = `${kws.length}キーワード / ${hist.length}回の記録`;
+    document.getElementById('repKwBody').innerHTML = kws.length ? kws.map((kw, i) => {
+      const cur = parseInt(last[i], 10), pv = parseInt(prev[i], 10);
+      const mom = (Number.isFinite(cur) && Number.isFinite(pv)) ? pv - cur : null;
+      const momTxt = mom == null ? '—' : mom > 0 ? `<span style="color:var(--accent-2)">▲${mom}</span>` : mom < 0 ? `<span style="color:var(--red)">▼${-mom}</span>` : '±0';
+      return `<tr><td style="text-align:left;padding-left:16px">${escapeHtml(kw)}</td><td>${Number.isFinite(cur) ? cur + '位' : '圏外'}</td><td style="color:var(--text-sub)">${Number.isFinite(pv) ? pv + '位' : '—'}</td><td>${momTxt}</td></tr>`;
+    }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">キーワード未登録。「一括順位入力」または店舗ページで登録してください</td></tr>';
+    // 競合比較
+    const comps = comp.competitors || [];
+    document.getElementById('repCompetitors').innerHTML = comps.length ? comps.map(x => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid var(--border)">
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">${escapeHtml(x.name)}</div><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(x.area || '')}${x.memo ? ' ・' + escapeHtml(x.memo) : ''}</div></div>
+        <span class="st-badge ${x.compare === false ? 'nodata' : 'done'}">${x.compare === false ? '対象外' : '比較対象'}</span>
+      </div>`).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:14px">競合店舗が未登録です。「競合を管理」から追加できます。</div>';
+  } catch (e) { showToast('レポート取得に失敗: ' + e.message, 'error'); }
+}
+async function saveReportComment() {
+  if (!currentLocationId) return;
+  try {
+    await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportComment: document.getElementById('repComment').value }) });
+    showToast('担当者コメントを保存しました', 'success');
+  } catch (e) { showToast('保存に失敗しました', 'error'); }
+}
+// 店舗レポートを印刷用に開く（ブラウザの「PDFに保存」でPDF化）
+function printStoreReport() {
+  const r = window._report || {};
+  const kpi = r.kpi?.current || {};
+  const st = r.rv?.stats || {};
+  const kws = (r.rk?.keywords || []).filter(Boolean);
+  const last = (r.rk?.history || []).slice(-1)[0]?.rankings || [];
+  const comps = r.comp?.competitors || [];
+  const store = currentLocation?.title || '当店';
+  const month = document.getElementById('repMonth')?.value || '';
+  const comment = document.getElementById('repComment')?.value || '';
+  const esc = (s) => String(s == null ? '' : s).replace(/</g, '&lt;');
+  const kwRows = kws.map((k, i) => `<tr><td>${esc(k)}</td><td style="text-align:center">${Number.isFinite(parseInt(last[i],10)) ? last[i] + '位' : '圏外'}</td></tr>`).join('') || '<tr><td colspan="2" style="color:#888">キーワード未登録</td></tr>';
+  const compRows = comps.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.area)}</td><td>${c.compare === false ? '対象外' : '比較対象'}</td></tr>`).join('') || '<tr><td colspan="3" style="color:#888">競合未登録</td></tr>';
+  const w = window.open('', '_blank', 'width=800,height=1000');
+  if (!w) return showToast('ポップアップを許可してください', 'error');
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>店舗レポート ${esc(store)} ${esc(month)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans',sans-serif;color:#1a2330;padding:28px;font-size:13px;line-height:1.7}
+    h1{font-size:22px;margin-bottom:2px}.sub{color:#667;font-size:13px;margin-bottom:20px}
+    h2{font-size:15px;margin:22px 0 8px;padding-left:9px;border-left:4px solid #2e8ff0}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .cell{border:1px solid #dde6ee;border-radius:8px;padding:12px}.cell .l{font-size:11px;color:#667}.cell .v{font-size:20px;font-weight:800;margin-top:3px}
+    table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #dde6ee;padding:7px 10px;text-align:left;font-size:12px}th{background:#f4f7fb}
+    .note{white-space:pre-wrap;border:1px solid #dde6ee;border-radius:8px;padding:12px;margin-top:6px;background:#fafcff}
+    .bar{margin-bottom:16px}button{font-size:13px;padding:9px 16px;border-radius:8px;border:none;background:#2e8ff0;color:#fff;font-weight:700;cursor:pointer}
+    @media print{.bar{display:none}body{padding:12px}}
+  </style></head><body>
+  <div class="bar"><button onclick="window.print()">🖨 印刷 / PDFに保存</button></div>
+  <h1>店舗レポート</h1><div class="sub">${esc(store)}${currentLocation?.company ? ' / ' + esc(currentLocation.company) : ''}　対象年月: ${esc(month)}</div>
+  <h2>今月の口コミ獲得サマリー</h2>
+  <div class="grid">
+    <div class="cell"><div class="l">QRスキャン数</div><div class="v">${kpi.scan || 0}</div></div>
+    <div class="cell"><div class="l">アンケート回答</div><div class="v">${kpi.survey || 0}</div></div>
+    <div class="cell"><div class="l">AI文章生成</div><div class="v">${kpi.ai || 0}</div></div>
+    <div class="cell"><div class="l">Google誘導</div><div class="v">${kpi.click || 0}</div></div>
+    <div class="cell"><div class="l">LINE誘導</div><div class="v">${kpi.line || 0}</div></div>
+    <div class="cell"><div class="l">平均満足度</div><div class="v">${r.kpi?.avgSatisfaction != null ? '★' + r.kpi.avgSatisfaction : '—'}</div></div>
+  </div>
+  <h2>Google口コミ統計</h2>
+  <div class="grid">
+    <div class="cell"><div class="l">累積口コミ件数</div><div class="v">${r.rv?.totalReviewCount ?? st.totalCount ?? '—'}</div></div>
+    <div class="cell"><div class="l">平均評価</div><div class="v">${(r.rv?.averageRating || st.averageRating) ? '★' + (Math.round((r.rv?.averageRating || st.averageRating)*10)/10) : '—'}</div></div>
+    <div class="cell"><div class="l">未返信(最新50)</div><div class="v">${st.unrepliedCount ?? '—'}</div></div>
+  </div>
+  <h2>キーワード別 順位</h2>
+  <table><thead><tr><th>キーワード</th><th style="text-align:center;width:120px">今回順位</th></tr></thead><tbody>${kwRows}</tbody></table>
+  <h2>競合比較</h2>
+  <table><thead><tr><th>競合店舗</th><th style="width:120px">エリア</th><th style="width:100px">区分</th></tr></thead><tbody>${compRows}</tbody></table>
+  ${comment ? `<h2>担当者コメント</h2><div class="note">${esc(comment)}</div>` : ''}
+  <div style="margin-top:24px;color:#aab;font-size:11px">Generated by ラクラクMEO ・ ${esc(month)}</div>
+  </body></html>`);
+  w.document.close();
 }
 
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───

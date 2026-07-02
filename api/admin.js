@@ -194,6 +194,39 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 競合店舗管理（店舗ごと・PDF競合比較や順位比較に使う） ──
+  if (action === 'competitors') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `competitors_${storeId}`;
+    if (req.method === 'GET') return res.json({ competitors: await kvGet(key) || [] });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      if (!b.name) return res.status(400).json({ error: '店舗名必須' });
+      const list = await kvGet(key) || [];
+      const item = {
+        id: b.id || ('cmp' + Date.now().toString(36)),
+        name: String(b.name).slice(0, 120),
+        placeId: String(b.placeId || '').slice(0, 200),
+        mapsUrl: String(b.mapsUrl || '').slice(0, 400),
+        area: String(b.area || '').slice(0, 80),
+        compare: b.compare !== false,
+        memo: String(b.memo || '').slice(0, 500),
+        addedAt: new Date().toISOString(),
+      };
+      const idx = list.findIndex(c => c.id === item.id);
+      if (idx >= 0) list[idx] = { ...list[idx], ...item }; else list.push(item);
+      await kvSet(key, list);
+      return res.json({ success: true, competitors: list });
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(c => c.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, competitors: list });
+    }
+  }
+
   // ── 一覧から非表示（重複・無関係なGBPリスティングを隠す。Google本体は一切変更しない） ──
   // hidden_locations に locId を貯め、ピッカーの既定表示から除外する。戻す(on:false)も可能。
   if (action === 'hidden') {
@@ -276,7 +309,7 @@ export default async function handler(req, res) {
       const cur = { ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) };
       const b = req.body || {};
       const next = { ...cur };
-      ['title', 'intro', 'ratingQuestion', 'lowHeading', 'lowMsg', 'feedbackEmail', 'completionMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
+      ['title', 'intro', 'ratingQuestion', 'lowHeading', 'lowMsg', 'feedbackEmail', 'completionMsg', 'gateMode', 'googleUrl', 'lineUrl', 'reportComment'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
       if (b.qrEnabled !== undefined) next.qrEnabled = !!b.qrEnabled; // boolean（Stringで潰さない）
       if (Array.isArray(b.goodPoints)) next.goodPoints = b.goodPoints.map(s => String(s).slice(0, 30)).filter(Boolean).slice(0, 16);
       if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));
