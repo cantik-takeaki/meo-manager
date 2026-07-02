@@ -554,6 +554,24 @@ body {
         </div>
       </div>
 
+      <!-- ▼▼ AIコンサル（店舗を選んで健康診断・改善・優先アクション） ▼▼ -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🧠 AIコンサル</div></div>
+        <div id="consulIntro" style="text-align:center;padding:12px 0;color:var(--text-sub);font-size:13px;line-height:2">
+          AIコンサルは店舗ごとに分析を行います。<br>
+          対象店舗を選択すると、<br>
+          <b style="color:var(--text)">・MEO健康診断　・改善ポイント　・優先アクション</b><br>
+          を表示します。
+        </div>
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+          <select id="consulSelect" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 32px 9px 14px;border-radius:10px;font-size:13px;font-family:inherit;cursor:pointer;min-width:260px">
+            <option value="">対象店舗を選択してください</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="runAiConsul()">分析する</button>
+        </div>
+        <div id="consulResult" style="display:none;margin-top:16px"></div>
+      </div>
+
       <!-- ▼▼ 店舗別サマリー表（追加・順位軸の横断一覧） ▼▼ -->
       <div class="card">
         <div class="card-header" style="flex-wrap:wrap;gap:8px">
@@ -591,6 +609,85 @@ body {
         </div>
       </div>
 
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">🏢 全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
+        <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- Reviews -->
+    <div class="panel" id="panel-reviews">
+      <div class="page-header">
+        <div class="page-title">口コミ管理</div>
+        <div class="page-sub" id="reviewsSubtitle">店舗を選択してください</div>
+      </div>
+      <!-- ▼▼ 口コミサマリー（追加・ぐるっと風：総数/平均/返信状況/★分布） ▼▼ -->
+      <div class="card" id="reviewStatsCard" style="display:none">
+        <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+          <div style="text-align:center;min-width:120px">
+            <div style="font-size:40px;font-weight:900;line-height:1.1" id="rsAvg">—</div>
+            <div id="rsStars" style="color:var(--gold);font-size:16px;letter-spacing:2px">—</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:2px"><span id="rsTotal">—</span>件の口コミ</div>
+          </div>
+          <div style="flex:1;min-width:240px">
+            <div id="rsDist"></div>
+          </div>
+          <div style="display:flex;gap:12px;min-width:200px">
+            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">✅ 返信済み</div><div class="k-v" style="color:var(--accent-2)" id="rsReplied">—</div></div>
+            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">⏳ 未返信</div><div class="k-v" style="color:var(--gold)" id="rsUnreplied">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="filter-btn active" onclick="filterReviews('all', this)">すべて</button>
+        <button class="filter-btn" onclick="filterReviews('unreplied', this)">未返信</button>
+        <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
+        <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
+        <select id="reviewSort" onchange="renderReviews()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer">
+          <option value="newest">新しい順</option>
+          <option value="oldest">古い順</option>
+          <option value="lowest">評価の低い順</option>
+          <option value="unreplied">未返信を先に</option>
+        </select>
+        <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
+        <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()">📤 生成した返信を一括投稿</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。まず「返信生成」でドラフトを作り、内容を確認してから「一括投稿」でまとめてGoogleに反映できます（1件ずつ投稿も可）。</p>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.25)">
+        <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
+          <button class="btn btn-primary btn-sm" onclick="analyzeReviews()">分析する</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub)">口コミ全体をAIが分析し、褒められている点・改善点・傾向と、サービス/投稿への活かし方を抽出します。</p>
+        <div id="reviewAnalysis" style="font-size:13px;line-height:1.75;white-space:pre-wrap;margin-top:8px"></div>
+      </div>
+      <div id="reviewsList">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <p>左のサイドバーから店舗を選んでください</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clients -->
+    <div class="panel" id="panel-clients">
+      <div class="page-header">
+        <div class="page-title">店舗管理</div>
+        <div class="page-sub">クライアント店舗の登録・管理</div>
+      </div>
+
+      <!-- ▼▼ 店舗ページ（店舗を選択すると表示・店舗ごとの詳細情報） ▼▼ -->
+      <div id="storeDetail" style="display:none">
+        <div class="card" style="border-color:rgba(46,143,240,0.35);background:rgba(46,143,240,0.04)">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--accent)"></span>
+            <span id="storeDetailName" style="font-size:18px;font-weight:800"></span>
+            <span id="storeDetailCompany" style="font-size:12px;color:var(--text-muted)"></span>
+            <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="document.getElementById('storeDetail').style.display='none'">閉じる</button>
+          </div>
+        </div>
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">管理店舗数</div>
@@ -809,74 +906,8 @@ body {
         </div>
         <div id="actionLogList"></div>
       </div>
-
-      <div class="card">
-        <div class="card-header"><div class="card-title">🏢 全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
-        <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
-      </div>
-    </div>
-
-    <!-- Reviews -->
-    <div class="panel" id="panel-reviews">
-      <div class="page-header">
-        <div class="page-title">口コミ管理</div>
-        <div class="page-sub" id="reviewsSubtitle">店舗を選択してください</div>
-      </div>
-      <!-- ▼▼ 口コミサマリー（追加・ぐるっと風：総数/平均/返信状況/★分布） ▼▼ -->
-      <div class="card" id="reviewStatsCard" style="display:none">
-        <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
-          <div style="text-align:center;min-width:120px">
-            <div style="font-size:40px;font-weight:900;line-height:1.1" id="rsAvg">—</div>
-            <div id="rsStars" style="color:var(--gold);font-size:16px;letter-spacing:2px">—</div>
-            <div style="font-size:12px;color:var(--text-sub);margin-top:2px"><span id="rsTotal">—</span>件の口コミ</div>
-          </div>
-          <div style="flex:1;min-width:240px">
-            <div id="rsDist"></div>
-          </div>
-          <div style="display:flex;gap:12px;min-width:200px">
-            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">✅ 返信済み</div><div class="k-v" style="color:var(--accent-2)" id="rsReplied">—</div></div>
-            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">⏳ 未返信</div><div class="k-v" style="color:var(--gold)" id="rsUnreplied">—</div></div>
-          </div>
-        </div>
       </div>
 
-      <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <button class="filter-btn active" onclick="filterReviews('all', this)">すべて</button>
-        <button class="filter-btn" onclick="filterReviews('unreplied', this)">未返信</button>
-        <button class="filter-btn" onclick="filterReviews('low', this)">低評価（★1〜2）</button>
-        <button class="filter-btn" onclick="filterReviews('high', this)">高評価（★4〜5）</button>
-        <select id="reviewSort" onchange="renderReviews()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer">
-          <option value="newest">新しい順</option>
-          <option value="oldest">古い順</option>
-          <option value="lowest">評価の低い順</option>
-          <option value="unreplied">未返信を先に</option>
-        </select>
-        <button id="bulkReplyBtn" class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generateAllUnrepliedReplies()">✨ 未返信すべてに返信生成</button>
-        <button id="bulkPostBtn" class="btn btn-success btn-sm" onclick="postAllDraftedReplies()">📤 生成した返信を一括投稿</button>
-      </div>
-      <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 4px">古い口コミも含め、未返信はすべて返信するのがMEOで有利です。まず「返信生成」でドラフトを作り、内容を確認してから「一括投稿」でまとめてGoogleに反映できます（1件ずつ投稿も可）。</p>
-
-      <div class="card" style="border-color:rgba(79,125,243,0.25)">
-        <div class="card-header"><div class="card-title">📊 口コミ分析（AI）</div>
-          <button class="btn btn-primary btn-sm" onclick="analyzeReviews()">分析する</button>
-        </div>
-        <p style="font-size:12px;color:var(--text-sub)">口コミ全体をAIが分析し、褒められている点・改善点・傾向と、サービス/投稿への活かし方を抽出します。</p>
-        <div id="reviewAnalysis" style="font-size:13px;line-height:1.75;white-space:pre-wrap;margin-top:8px"></div>
-      </div>
-      <div id="reviewsList">
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-          <p>左のサイドバーから店舗を選んでください</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Clients -->
-    <div class="panel" id="panel-clients">
-      <div class="page-header">
-        <div class="page-title">店舗管理</div>
-        <div class="page-sub">クライアント店舗の登録・管理</div>
-      </div>
 
       <div class="card">
         <div class="card-header"><div class="card-title">➕ 新規店舗登録</div></div>
@@ -1920,6 +1951,7 @@ async function loadLocations() {
       `).join('');
       selectLocation(0, true); // 初期表示は店舗を選んでもパネルはダッシュボードのまま
     }
+    populateConsulSelect(); // AIコンサルの店舗セレクタを更新
 
     // 店舗管理（本体）：クライアントごとにカード → その中に店舗一覧
     document.getElementById('locationList').innerHTML = window._clients.map(cl => `
@@ -2044,10 +2076,19 @@ function selectLocation(idx, keepPanel) {
     if (el) el.textContent = title;
   });
 
-  // 店舗を切り替えたら常にダッシュボードへ（初期表示keepPanelもダッシュボードのまま）。
-  if (!keepPanel) switchPanel('dashboard');
-  // 全社サマリーも再取得（店舗別カードはこの後のloadで更新）
-  loadDashboardSummary();
+  // 店舗ページ（店舗管理内）を表示状態にしてヘッダーを更新
+  const sd = document.getElementById('storeDetail');
+  if (sd) sd.style.display = '';
+  const sdn = document.getElementById('storeDetailName');
+  if (sdn) sdn.textContent = title;
+  const sdc = document.getElementById('storeDetailCompany');
+  if (sdc) sdc.textContent = loc.company || loc.clientName || '';
+
+  // 店舗を切り替えたら店舗管理の店舗ページへ（ダッシュボードは全体管理専用）。初期表示keepPanelは移動しない。
+  if (!keepPanel) {
+    switchPanel('clients');
+    setTimeout(() => sd?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
 
   // データを全パネル分ロード
   loadReviews();
@@ -3641,8 +3682,120 @@ function renderSummaryTable() {
 // 店舗別サマリーの店舗名クリック → サイドバーの該当店舗を選択
 function jumpToStore(storeId) {
   const idx = (window._locations || []).findIndex(l => (l.storeId || (l.name || '').replace(/\//g, '_')) === storeId);
-  if (idx >= 0) selectLocation(idx);
+  if (idx >= 0) selectLocation(idx); // → 店舗管理の店舗ページへ遷移＋スクロール
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
+}
+
+// ─── AIコンサル（ダッシュボード・店舗を選んで健康診断/改善/優先アクション） ───
+function populateConsulSelect() {
+  const sel = document.getElementById('consulSelect');
+  if (!sel) return;
+  const cur = sel.value;
+  const locs = window._locations || [];
+  const groups = new Map();
+  locs.forEach((l, i) => {
+    const cn = l.company || l.clientName || '未分類';
+    if (!groups.has(cn)) groups.set(cn, []);
+    groups.get(cn).push({ i, title: l.title || '店舗' });
+  });
+  sel.innerHTML = '<option value="">対象店舗を選択してください</option>' + [...groups.entries()].map(([cn, items]) =>
+    `<optgroup label="${escapeHtml(cn)}">${items.map(it => `<option value="${it.i}">${escapeHtml(it.title)}</option>`).join('')}</optgroup>`
+  ).join('');
+  if (cur) sel.value = cur;
+}
+
+async function runAiConsul() {
+  const sel = document.getElementById('consulSelect');
+  const idx = parseInt(sel?.value, 10);
+  const loc = window._locations?.[Number.isFinite(idx) ? idx : -1];
+  if (!loc) return showToast('対象店舗を選択してください', 'error');
+  const locId = loc.storeId || (loc.name || '').replace(/\//g, '_');
+  const intro = document.getElementById('consulIntro');
+  if (intro) intro.style.display = 'none';
+  const box = document.getElementById('consulResult');
+  box.style.display = '';
+  box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-sub);font-size:13px">🧠 「${escapeHtml(loc.title || '')}」を分析中…（10秒ほどかかります）</div>`;
+  try {
+    // ① データ収集（ナレッジ・口コミ・順位を並行取得）
+    const gbpConnected = loc._type === 'gbp' || loc.gbpConnected;
+    const [k, rvData, rk] = await Promise.all([
+      fetch(`/api/knowledge?locationId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({})),
+      (gbpConnected && loc.name)
+        ? fetch(`/api/reviews?locationName=${encodeURIComponent(loc.name)}${loc.storeId ? '&storeId=' + loc.storeId : ''}`).then(r => r.json()).catch(() => ({}))
+        : Promise.resolve({}),
+      fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({ history: [], keywords: [] })),
+    ]);
+    const rv = (rvData && rvData.stats) || {};
+    const kw = (k.keywords || []).filter(Boolean);
+    // ② MEO健康診断（loadDiagnosisと同一の14項目・重み）
+    const items = [
+      { label: '店名', w: 6, ok: !!k.storeName },
+      { label: '業種カテゴリ', w: 6, ok: !!k.category },
+      { label: '住所', w: 6, ok: !!k.address },
+      { label: '電話番号', w: 6, ok: !!k.phone },
+      { label: '営業時間', w: 6, ok: !!k.businessHours },
+      { label: '店舗説明', w: 6, ok: !!k.description },
+      { label: '強み・特徴', w: 8, ok: !!k.strengths },
+      { label: '提供サービス', w: 8, ok: !!k.services },
+      { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
+      { label: 'キーワード設定', w: 8, ok: kw.length >= 3 },
+      { label: 'GBP連携', w: 10, ok: !!gbpConnected },
+      { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
+      { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
+      { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0 },
+    ];
+    const total = items.reduce((s, i) => s + i.w, 0);
+    const earned = items.reduce((s, i) => s + (i.ok ? i.w : 0), 0);
+    const score = Math.round((earned / total) * 100);
+    const lbl = score >= 80 ? '良好' : score >= 60 ? '改善の余地あり' : '要改善';
+    const col = score >= 80 ? 'var(--accent-2)' : score >= 60 ? 'var(--gold)' : 'var(--red)';
+    // 最新の順位（あれば）
+    const hist = rk.history || [];
+    const lastR = hist[hist.length - 1];
+    const rankings = kw.map((w, i) => ({ keyword: w, rank: lastR ? (parseInt(lastR.rankings?.[i], 10) || null) : null }));
+    // ③ AI助言（既存diagnosisタイプを再利用）
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId: locId, type: 'diagnosis',
+        diagnosis: {
+          score,
+          filled: items.filter(i => i.ok).map(i => i.label),
+          missing: items.filter(i => !i.ok).map(i => i.label),
+          reviewStats: rv, rankings,
+        },
+      }),
+    }).then(r => r.json()).catch(() => ({}));
+    // ④ 3セクションに整形（■優先課題/■やるべき施策 → 改善ポイント、■上位表示のための行動 → 優先アクション）
+    const txt = d.content || '';
+    const grab = (name) => {
+      const m = txt.match(new RegExp('■' + name + '([\\s\\S]*?)(?=■|$)'));
+      return m ? m[1].trim() : '';
+    };
+    const kaizen = [grab('優先課題'), grab('やるべき施策')].filter(Boolean).join('\n');
+    const action = grab('上位表示のための行動');
+    const missChips = items.filter(i => !i.ok).map(i => `<span style="font-size:11px;background:rgba(245,158,11,0.12);color:var(--gold);padding:2px 9px;border-radius:999px">${i.label}</span>`).join(' ');
+    const sec = (title, body) => body ? `
+      <div style="border:1px solid var(--border);border-radius:12px;padding:16px;flex:1;min-width:240px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">${title}</div>
+        <div style="font-size:13px;line-height:1.9;white-space:pre-wrap">${escapeHtml(body)}</div>
+      </div>` : '';
+    box.innerHTML = `
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">
+        <div style="border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;min-width:170px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">🩺 MEO健康診断</div>
+          <div style="font-size:42px;font-weight:900;color:${col};line-height:1.1">${score}</div>
+          <div style="font-size:12px;color:${col};font-weight:700">${lbl}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">達成 ${items.filter(i => i.ok).length}/${items.length}項目</div>
+        </div>
+        ${sec('💡 改善ポイント', kaizen || txt || '分析結果を取得できませんでした')}
+        ${sec('🚀 優先アクション', action)}
+      </div>
+      ${missChips ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:var(--text-sub)">未対応:</span>${missChips}</div>` : ''}
+      <div style="margin-top:12px;text-align:right"><button class="btn btn-outline btn-sm" onclick="selectLocation(${idx})">この店舗の詳細ページを開く →</button></div>`;
+  } catch (e) {
+    box.innerHTML = `<div style="text-align:center;padding:16px;color:var(--red);font-size:13px">分析に失敗しました: ${escapeHtml(e.message)}</div>`;
+  }
 }
 
 // 店舗管理から登録後にサイドバーを再読み込み
