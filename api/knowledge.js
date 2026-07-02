@@ -16,8 +16,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { access_token } = parseCookies(req);
-  if (!access_token) return res.status(401).json({ error: 'ログインが必要です' });
+  // 認証: Google連携(access_token) または メール＋パスワード(pw_session) のどちらでも可。
+  // 企業ナレッジはKVのみ使う（Googleトークン不要）なのでpw_sessionでも許可する。
+  const _c = parseCookies(req);
+  if (!_c.access_token && !_c.pw_session) return res.status(401).json({ error: 'ログインが必要です' });
 
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId必須' });
