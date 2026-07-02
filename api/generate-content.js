@@ -727,6 +727,39 @@ ${topText || 'データなし'}
 - 前置き不要。2見出しの箇条書きのみ`;
   }
 
+  // 場所・業種・サービスから、根拠のある対策キーワード候補をAI生成（分類＋優先度つき・JSON配列）
+  // ※ 知識タブの旧 keyword_suggest（パイプ形式）とは別物なので type を分ける
+  if (type === 'keyword_ideas') {
+    const area = req.body.area || knowledge.address || knowledge.region || '';
+    const genre = req.body.genre || knowledge.category || '';
+    const svc = req.body.services || services || '';
+    const existing = Array.isArray(req.body.existing) ? req.body.existing.filter(Boolean) : keywords;
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。次のお店の「対策キーワード（Googleマップ・ローカル検索で上位を狙う語）」の候補を作ってください。
+
+【店舗名】${storeName || ''}
+【エリア（市区町村・地域）】${area || '（不明）'}
+【業種・ジャンル】${genre || '（不明）'}
+【提供サービス・メニュー・強み】${svc || '（不明）'}
+【すでに登録済み（重複させない）】${existing.length ? existing.join('、') : 'なし'}
+
+【キーワードの考え方】
+- 実際に見込み客がGoogleマップ／検索で打ち込む語。基本は「地域名＋業種・サービス」の組み合わせ。
+- 3つの検索意図で分類する:
+  - 今すぐ客(今すぐ来店・利用したい層。地域×業種の王道語): 優先度A
+  - 悩み・目的(症状・目的・シーンで探す層): 優先度B
+  - 差別化(店名・独自メニュー・特徴で指名/認知を狙う語): 優先度C
+- エリアは市区・駅・地域名などバリエーションを持たせる。
+- 誇大・不自然な語や、実在しないサービスは作らない。
+
+【出力】JSON配列のみ。各要素は {"keyword","area","category","priority","reason"} の5キー。
+- keyword: 実際の検索語（例「新宿 ネパール料理」）
+- area: 計測地域（例「新宿区」。KWに地域が含まれていてもここは市区名等）
+- category: "今すぐ客" | "悩み・目的" | "差別化" のいずれか
+- priority: "A" | "B" | "C"（今すぐ客=A / 悩み・目的=B / 差別化=C を基本に）
+- reason: なぜ有効か（20〜40文字・断定しすぎない）
+8〜12件。説明文・前置き・コードフェンスは書かず、JSON配列だけを出力。`;
+  }
+
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
@@ -739,8 +772,8 @@ ${topText || 'データなし'}
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
-        temperature: 0.85,
+        max_tokens: type === 'keyword_ideas' ? 1800 : 500,
+        temperature: type === 'keyword_ideas' ? 0.55 : 0.85,
         top_p: 0.9,
       }),
     });

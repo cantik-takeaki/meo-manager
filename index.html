@@ -434,6 +434,29 @@ body {
 .rm-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
 .rm-legend .rm-leg { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-sub); }
 .rm-legend .rm-leg i { width:14px; height:3px; border-radius:2px; display:inline-block; }
+
+/* ─── 対策キーワード（カード＋モーダル） ─── */
+.rk-modal { position:fixed; inset:0; z-index:120; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:20px; }
+.rk-modal-box { background:var(--bg-2); border-radius:16px; width:100%; max-width:440px; max-height:90vh; overflow:auto; box-shadow:0 24px 60px rgba(15,23,42,0.3); }
+.rk-modal-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--border); font-size:18px; font-weight:800; }
+.rk-modal-x { background:none; border:none; font-size:24px; line-height:1; color:var(--text-muted); cursor:pointer; padding:0 2px; }
+.rk-modal-body { padding:20px 22px; }
+.rk-modal-foot { display:flex; gap:10px; justify-content:flex-end; padding:14px 22px 20px; }
+.rk-fl { display:block; font-size:13px; font-weight:600; color:var(--text); }
+.rk-fl .ed-in { margin-top:6px; font-weight:400; }
+.rk-hint { font-size:11px; color:var(--text-muted); margin-top:5px; }
+.kw-cat { display:inline-block; font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:999px; }
+.kw-cat-now { background:rgba(239,68,68,0.12); color:#dc2626; }
+.kw-cat-need { background:rgba(245,158,11,0.14); color:#d97706; }
+.kw-cat-diff { background:rgba(46,143,240,0.12); color:var(--accent-deep); }
+.kw-cat-none { background:var(--bg-3); color:var(--text-sub); }
+.kw-pri { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:12px; font-weight:800; color:#fff; }
+.kw-pri-A { background:#ef4444; } .kw-pri-B { background:#f59e0b; } .kw-pri-C { background:#64748b; } .kw-pri-none { background:#cbd5e1; color:#64748b; }
+.kw-act { background:none; border:1px solid var(--border); border-radius:7px; padding:4px 6px; cursor:pointer; color:var(--text-sub); line-height:0; }
+.kw-act:hover { border-color:var(--border-active); color:var(--text); }
+.ks-item { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:9px; margin-bottom:7px; cursor:pointer; }
+.ks-item:hover { border-color:var(--border-active); }
+.ks-item.on { background:rgba(46,143,240,0.06); border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -906,6 +929,31 @@ body {
       <div class="card" id="rankDashCard" style="display:none">
         <div class="card-header"><div class="card-title">🔍 キーワード順位</div><div class="card-sub" id="rankDashDate"></div></div>
         <div id="rankDashList"></div>
+      </div>
+
+      <!-- 対策キーワード（AI生成・分類/優先度・順位入力・AI順位取得） -->
+      <div class="card" id="kwMgrCard" style="display:none">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px;align-items:center">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            対策キーワード<span id="kwCountBadge" style="font-size:12px;color:var(--text-sub);font-weight:500"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">
+            <button class="btn btn-outline btn-sm" onclick="openKwSuggest()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>AIでキーワード候補</button>
+            <button class="btn btn-outline btn-sm" onclick="aiFetchRanks(event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>AIで順位取得</button>
+            <button class="btn btn-outline btn-sm" onclick="openRankInput()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>順位入力</button>
+            <button class="btn btn-primary btn-sm" onclick="openKwAdd()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 5v14M5 12h14"/></svg>キーワード追加</button>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">地域名＋業種・サービスの掛け合わせで対策語を管理します。順位は手入力、または「AIで順位取得」でGoogleマップから自動計測できます。</p>
+        <div style="overflow-x:auto">
+          <table class="summary-table">
+            <thead><tr>
+              <th style="text-align:left;padding-left:14px">キーワード</th><th>優先度</th><th>現在順位</th><th>前回比</th><th>状態</th><th>操作</th>
+            </tr></thead>
+            <tbody id="kwMgrBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card" id="assistantCard" style="display:none;border-color:rgba(56,224,200,0.3)">
@@ -2261,6 +2309,96 @@ body {
   </div>
 </div>
 
+<!-- ▼ キーワード追加/編集モーダル ▼ -->
+<div id="kwEditModal" class="rk-modal" style="display:none">
+  <div class="rk-modal-box">
+    <div class="rk-modal-head"><span id="kwEditTitle">キーワード追加</span><button class="rk-modal-x" onclick="closeKwEdit()">&times;</button></div>
+    <div class="rk-modal-body">
+      <input type="hidden" id="kwEditOld">
+      <label class="rk-fl">キーワード <span style="color:var(--red)">*</span>
+        <input id="kwEditKeyword" type="text" placeholder="例: 渋谷 整体" class="ed-in">
+      </label>
+      <div class="rk-hint">地域名＋業種・サービス名の組み合わせを推奨</div>
+      <label class="rk-fl" style="margin-top:14px">計測地域
+        <input id="kwEditArea" type="text" placeholder="例: 渋谷区" class="ed-in">
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+        <label class="rk-fl">分類
+          <select id="kwEditCategory" class="ed-in" onchange="kwSyncPriority()">
+            <option value="">未分類</option><option value="今すぐ客">今すぐ客</option>
+            <option value="悩み・目的">悩み・目的</option><option value="差別化">差別化</option>
+          </select>
+        </label>
+        <label class="rk-fl">優先度
+          <select id="kwEditPriority" class="ed-in">
+            <option value="">未設定</option><option value="A">A: 必ず追う</option>
+            <option value="B">B: 伸ばしたい</option><option value="C">C: 差別化</option>
+          </select>
+        </label>
+      </div>
+      <label class="rk-fl" style="margin-top:14px">メモ
+        <textarea id="kwEditMemo" rows="2" placeholder="例：競合店が弱いキーワード、GBP投稿に活用" class="ed-in" style="resize:vertical"></textarea>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;cursor:pointer">
+        <input id="kwEditEnabled" type="checkbox" checked style="width:16px;height:16px">有効（順位計測対象）
+      </label>
+    </div>
+    <div class="rk-modal-foot">
+      <button class="btn btn-outline" onclick="closeKwEdit()">キャンセル</button>
+      <button class="btn btn-primary" id="kwEditSubmit" onclick="saveKwEdit()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ▼ 順位入力モーダル ▼ -->
+<div id="rankInputModal" class="rk-modal" style="display:none">
+  <div class="rk-modal-box">
+    <div class="rk-modal-head"><span>順位入力</span><button class="rk-modal-x" onclick="closeRankInput()">&times;</button></div>
+    <div class="rk-modal-body">
+      <label class="rk-fl">キーワード <span style="color:var(--red)">*</span>
+        <select id="riKeyword" class="ed-in"></select>
+      </label>
+      <label class="rk-fl" style="margin-top:14px">計測日 <span style="color:var(--red)">*</span>
+        <input id="riDate" type="date" class="ed-in">
+      </label>
+      <label class="rk-fl" style="margin-top:14px">順位
+        <span style="display:flex;align-items:center;gap:8px"><input id="riRank" type="number" min="1" max="100" placeholder="1〜100 / 空欄＝圏外" class="ed-in" style="flex:1"><span style="color:var(--text-sub);font-size:13px">位</span></span>
+      </label>
+      <div class="rk-hint">圏外の場合は空欄のまま登録してください</div>
+      <label class="rk-fl" style="margin-top:14px">メモ
+        <textarea id="riMemo" rows="2" placeholder="任意のメモ" class="ed-in" style="resize:vertical"></textarea>
+      </label>
+    </div>
+    <div class="rk-modal-foot">
+      <button class="btn btn-outline" onclick="closeRankInput()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveRankInput()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ▼ AIキーワード候補モーダル ▼ -->
+<div id="kwSuggestModal" class="rk-modal" style="display:none">
+  <div class="rk-modal-box" style="max-width:560px">
+    <div class="rk-modal-head"><span>✨ AIでキーワード候補を作成</span><button class="rk-modal-x" onclick="closeKwSuggest()">&times;</button></div>
+    <div class="rk-modal-body">
+      <p style="font-size:12px;color:var(--text-sub);margin-bottom:12px">地域名・業種・実際のサービス内容をもとに、根拠のある対策キーワードを提案します。内容を確認し、追加したいものを選んで登録してください。</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label class="rk-fl">エリア（市区町村）<input id="ksArea" type="text" placeholder="例: 新宿区" class="ed-in"></label>
+        <label class="rk-fl">業種・ジャンル<input id="ksGenre" type="text" placeholder="例: ネパール料理店" class="ed-in"></label>
+      </div>
+      <label class="rk-fl" style="margin-top:12px">提供サービス・メニュー・強み<textarea id="ksServices" rows="2" placeholder="例: 本格スパイスカレー、ランチ650円、個室あり" class="ed-in" style="resize:vertical"></textarea></label>
+      <div style="text-align:right;margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="ksGenBtn" onclick="runKwSuggest()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>候補を生成</button>
+      </div>
+      <div id="ksResult" style="margin-top:8px"></div>
+    </div>
+    <div class="rk-modal-foot">
+      <button class="btn btn-outline" onclick="closeKwSuggest()">閉じる</button>
+      <button class="btn btn-primary" id="ksAddBtn" onclick="addSuggestedKws()" style="display:none">選択したキーワードを追加</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentLocation = null;
 let currentLocationId = null;
@@ -2810,6 +2948,7 @@ function selectLocation(idx, keepPanel) {
   _postImages = [];
   loadPostImages();
   loadDashboardRankings().then(loadDiagnosis);
+  loadKwMgr();
   gbpCheck();
   loadActionLog();
   const ac = document.getElementById('assistantCard'); if (ac) { ac.style.display = 'block'; document.getElementById('askAnswer').textContent = ''; }
@@ -3434,6 +3573,226 @@ function rrExportCsv() {
   downloadCsv(`順位レポート_${m.title}_${m.s}_${m.e}.csv`, [header, ...window._rrRows]);
 }
 
+// ══ 対策キーワード管理（AI生成・分類/優先度・順位入力・AI順位取得）══
+window._kwData = null;
+async function loadKwMgr() {
+  const card = document.getElementById('kwMgrCard');
+  if (!card) return;
+  if (!currentLocationId) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const body = document.getElementById('kwMgrBody');
+  if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-sub);padding:16px">読み込み中...</td></tr>';
+  try {
+    const d = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    window._kwData = { keywords: d.keywords || [], meta: d.meta || {}, history: d.history || [] };
+  } catch (e) { window._kwData = { keywords: [], meta: {}, history: [] }; }
+  renderKwMgr();
+}
+function _catClass(c) { return c === '今すぐ客' ? 'kw-cat-now' : c === '悩み・目的' ? 'kw-cat-need' : c === '差別化' ? 'kw-cat-diff' : 'kw-cat-none'; }
+function renderKwMgr() {
+  const D = window._kwData, body = document.getElementById('kwMgrBody'); if (!body || !D) return;
+  const entries = D.keywords.map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim());
+  const cb = document.getElementById('kwCountBadge'); if (cb) cb.textContent = entries.length ? `${entries.length}件 / 無制限` : '';
+  if (!entries.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:22px">まだ対策キーワードがありません。<br>「AIでキーワード候補」または「キーワード追加」で登録してください。</td></tr>'; return; }
+  const last = D.history.at(-1)?.rankings || [], prev = D.history.at(-2)?.rankings || [];
+  body.innerHTML = entries.map(en => {
+    const m = D.meta[en.k] || {};
+    const cur = parseInt(last[en.i], 10), pv = parseInt(prev[en.i], 10);
+    const curTxt = (Number.isFinite(cur) && cur >= 1) ? `<span style="color:${rankColorV(cur)};font-weight:700">${cur}位</span>` : '<span style="color:var(--text-muted)">−</span>';
+    let delta = '<span style="color:var(--text-muted)">—</span>';
+    if (Number.isFinite(cur) && Number.isFinite(pv)) { const d = pv - cur; delta = d > 0 ? `<span style="color:var(--accent-2)">▲${d}</span>` : d < 0 ? `<span style="color:var(--red)">▼${-d}</span>` : '<span style="color:var(--text-muted)">±0</span>'; }
+    const cat = m.category ? `<span class="kw-cat ${_catClass(m.category)}">${escapeHtml(m.category)}</span>` : '';
+    const pri = m.priority ? `<span class="kw-pri kw-pri-${escapeHtml(m.priority)}">${escapeHtml(m.priority)}</span>` : '<span class="kw-pri kw-pri-none">–</span>';
+    const enabled = m.enabled !== false;
+    return `<tr>
+      <td style="text-align:left;padding-left:14px">
+        <div style="font-weight:700">${escapeHtml(en.k)}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">${m.area ? `<span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:center;gap:2px"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(m.area)}</span>` : ''}${cat}</div>
+      </td>
+      <td>${pri}</td>
+      <td>${curTxt}</td>
+      <td>${delta}</td>
+      <td>${enabled ? '<span style="color:var(--accent-2);font-size:12px">有効</span>' : '<span style="color:var(--text-muted);font-size:12px">停止</span>'}</td>
+      <td><div style="display:inline-flex;gap:5px">
+        <button class="kw-act" title="順位入力" onclick="openRankInput(${en.i})"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+        <button class="kw-act" title="編集" onclick="openKwEdit(${en.i})"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="kw-act" title="削除" onclick="deleteKw(${en.i})"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m1 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+// キーワード追加/編集
+function openKwAdd() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  document.getElementById('kwEditTitle').textContent = 'キーワード追加';
+  document.getElementById('kwEditSubmit').textContent = '追加する';
+  document.getElementById('kwEditOld').value = '';
+  document.getElementById('kwEditKeyword').value = '';
+  const firstArea = window._kwData?.meta ? (Object.values(window._kwData.meta).find(m => m.area)?.area || '') : '';
+  document.getElementById('kwEditArea').value = firstArea;
+  document.getElementById('kwEditCategory').value = '';
+  document.getElementById('kwEditPriority').value = '';
+  document.getElementById('kwEditMemo').value = '';
+  document.getElementById('kwEditEnabled').checked = true;
+  document.getElementById('kwEditModal').style.display = 'flex';
+}
+function openKwEdit(idx) {
+  const D = window._kwData, kw = D?.keywords?.[idx]; if (kw == null) return;
+  const m = D.meta[kw] || {};
+  document.getElementById('kwEditTitle').textContent = 'キーワード編集';
+  document.getElementById('kwEditSubmit').textContent = '更新する';
+  document.getElementById('kwEditOld').value = kw;
+  document.getElementById('kwEditKeyword').value = kw;
+  document.getElementById('kwEditArea').value = m.area || '';
+  document.getElementById('kwEditCategory').value = m.category || '';
+  document.getElementById('kwEditPriority').value = m.priority || '';
+  document.getElementById('kwEditMemo').value = m.memo || '';
+  document.getElementById('kwEditEnabled').checked = m.enabled !== false;
+  document.getElementById('kwEditModal').style.display = 'flex';
+}
+function closeKwEdit() { document.getElementById('kwEditModal').style.display = 'none'; }
+function kwSyncPriority() {
+  const cat = document.getElementById('kwEditCategory').value, pri = document.getElementById('kwEditPriority');
+  const map = { '今すぐ客': 'A', '悩み・目的': 'B', '差別化': 'C' };
+  if (map[cat] && !pri.value) pri.value = map[cat];
+}
+async function saveKwEdit() {
+  const kw = document.getElementById('kwEditKeyword').value.trim();
+  if (!kw) return showToast('キーワードを入力してください', 'error');
+  const old = document.getElementById('kwEditOld').value;
+  const payload = {
+    storeId: currentLocationId, keyword: kw, oldKeyword: old,
+    area: document.getElementById('kwEditArea').value.trim(),
+    category: document.getElementById('kwEditCategory').value,
+    priority: document.getElementById('kwEditPriority').value,
+    memo: document.getElementById('kwEditMemo').value.trim(),
+    enabled: document.getElementById('kwEditEnabled').checked,
+  };
+  const action = old ? 'kw-edit' : 'kw-add';
+  try {
+    const d = await fetch(`/api/admin?action=${action}&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+    if (!d.success) throw new Error(d.error || '保存失敗');
+    closeKwEdit(); showToast(old ? '更新しました' : '追加しました', 'success'); await loadKwMgr();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+async function deleteKw(idx) {
+  const kw = window._kwData?.keywords?.[idx]; if (kw == null) return;
+  if (!confirm(`「${kw}」を削除しますか？（このキーワードの順位履歴も削除されます）`)) return;
+  try {
+    await fetch(`/api/admin?action=kw-del&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: kw }) });
+    showToast('削除しました', 'success'); await loadKwMgr();
+  } catch (e) { showToast('削除に失敗しました', 'error'); }
+}
+// 順位入力（単一キーワード）
+function openRankInput(idx) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const D = window._kwData, entries = (D?.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim());
+  const sel = document.getElementById('riKeyword');
+  sel.innerHTML = entries.length ? entries.map(e => `<option value="${e.i}">${escapeHtml(e.k)}${D.meta[e.k]?.area ? ' (' + escapeHtml(D.meta[e.k].area) + ')' : ''}</option>`).join('') : '<option value="">-- キーワードを追加してください --</option>';
+  if (idx != null) sel.value = String(idx);
+  document.getElementById('riDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('riRank').value = ''; document.getElementById('riMemo').value = '';
+  document.getElementById('rankInputModal').style.display = 'flex';
+}
+function closeRankInput() { document.getElementById('rankInputModal').style.display = 'none'; }
+async function saveRankInput() {
+  const sel = document.getElementById('riKeyword'), idx = parseInt(sel.value, 10);
+  const kw = window._kwData?.keywords?.[idx];
+  if (kw == null) return showToast('キーワードを選択してください', 'error');
+  const date = document.getElementById('riDate').value; if (!date) return showToast('計測日を入力してください', 'error');
+  const rankRaw = document.getElementById('riRank').value.trim();
+  try {
+    await fetch(`/api/admin?action=rank-input&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: kw, date, rank: rankRaw === '' ? null : rankRaw }) });
+    closeRankInput(); showToast('順位を登録しました', 'success'); await loadKwMgr();
+  } catch (e) { showToast('登録に失敗しました', 'error'); }
+}
+// AIキーワード候補
+function openKwSuggest() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const firstArea = window._kwData?.meta ? (Object.values(window._kwData.meta).find(m => m.area)?.area || '') : '';
+  document.getElementById('ksArea').value = firstArea || storeAreaOf(currentLocation) || '';
+  document.getElementById('ksGenre').value = currentLocation?.category || '';
+  document.getElementById('ksServices').value = '';
+  document.getElementById('ksResult').innerHTML = '';
+  document.getElementById('ksAddBtn').style.display = 'none';
+  document.getElementById('kwSuggestModal').style.display = 'flex';
+  fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()).then(k => {
+    if (!k) return;
+    const g = document.getElementById('ksGenre'), a = document.getElementById('ksArea'), s = document.getElementById('ksServices');
+    if (!g.value) g.value = k.category || '';
+    if (!a.value) a.value = k.region || k.address || '';
+    if (!s.value) s.value = [k.services, k.strengths].filter(Boolean).join('、');
+  }).catch(() => {});
+}
+function closeKwSuggest() { document.getElementById('kwSuggestModal').style.display = 'none'; }
+async function runKwSuggest() {
+  const btn = document.getElementById('ksGenBtn'), res = document.getElementById('ksResult');
+  btn.disabled = true; btn.textContent = '生成中...';
+  res.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">AIがキーワードを考えています…</div>';
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'keyword_ideas', area: document.getElementById('ksArea').value.trim(), genre: document.getElementById('ksGenre').value.trim(), services: document.getElementById('ksServices').value.trim(), existing: window._kwData?.keywords || [] }) }).then(r => r.json());
+    let arr = [];
+    try { arr = JSON.parse((d.content || '').replace(/```json|```/g, '').trim()); } catch (e) { const mm = (d.content || '').match(/\[[\s\S]*\]/); if (mm) arr = JSON.parse(mm[0]); }
+    if (!Array.isArray(arr) || !arr.length) throw new Error(d.error || '候補を生成できませんでした');
+    window._ksCandidates = arr;
+    res.innerHTML = arr.map((c, i) => `<div class="ks-item on" onclick="this.classList.toggle('on');const cb=this.querySelector('input');cb.checked=this.classList.contains('on')">
+      <input type="checkbox" checked onclick="event.stopPropagation();this.closest('.ks-item').classList.toggle('on',this.checked)" style="margin-top:2px;width:15px;height:15px">
+      <div style="flex:1"><div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">${escapeHtml(c.keyword || '')}${c.priority ? `<span class="kw-pri kw-pri-${escapeHtml(c.priority)}" style="width:18px;height:18px;font-size:10px">${escapeHtml(c.priority)}</span>` : ''}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${c.area ? '<span>📍' + escapeHtml(c.area) + '</span>' : ''}${c.category ? `<span class="kw-cat ${_catClass(c.category)}">${escapeHtml(c.category)}</span>` : ''}<span>${escapeHtml(c.reason || '')}</span></div></div>
+    </div>`).join('');
+    document.getElementById('ksAddBtn').style.display = '';
+  } catch (e) { res.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">${escapeHtml(e.message)}</div>`; }
+  btn.disabled = false; btn.textContent = '候補を生成';
+}
+async function addSuggestedKws() {
+  const cand = window._ksCandidates || [], items = [...document.querySelectorAll('#ksResult .ks-item')];
+  const chosen = items.map((el, i) => el.classList.contains('on') ? cand[i] : null).filter(Boolean);
+  if (!chosen.length) return showToast('追加するキーワードを選んでください', 'error');
+  const btn = document.getElementById('ksAddBtn'); btn.disabled = true; btn.textContent = '追加中...';
+  try {
+    for (const c of chosen) {
+      await fetch(`/api/admin?action=kw-add&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: c.keyword, area: c.area || '', category: c.category || '', priority: c.priority || '', memo: c.reason || '', enabled: true }) });
+    }
+    closeKwSuggest(); showToast(`${chosen.length}件のキーワードを追加しました`, 'success'); await loadKwMgr();
+  } catch (e) { showToast('追加に失敗しました: ' + e.message, 'error'); }
+  btn.disabled = false; btn.textContent = '選択したキーワードを追加';
+}
+// AIで順位取得（SerpApi・有効キーワードのみ）
+async function aiFetchRanks(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (window._aiFetching) return showToast('順位取得を実行中です', 'error'); // 多重実行ガード（SerpApi枠の二重消費・KV競合を防ぐ）
+  const D = window._kwData, entries = (D?.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim() && (D.meta[e.k]?.enabled !== false));
+  if (!entries.length) return showToast('有効なキーワードがありません', 'error');
+  if (!confirm(`${entries.length}件のキーワードの順位をGoogleマップから取得します。よろしいですか？\n（月間の自動取得回数には上限があります）`)) return;
+  window._aiFetching = true;
+  const btn = ev?.currentTarget; const btnHtml = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '取得中…'; }
+  // 都道府県は店舗の実所在地から解決（東京固定にしない）。取れなければ area 単体で送り、
+  // SerpApiが不正地点なら backend が地点なしで自動リトライする（KWの地域語で取得可能）。
+  const pref = currentLocation?.storefrontAddress?.administrativeArea || '';
+  const store = currentLocation?.title || '';
+  const today = new Date().toISOString().slice(0, 10);
+  let ok = 0, fail = 0, firstErr = '';
+  showToast('順位を取得中…しばらくお待ちください', 'success');
+  try {
+    for (const en of entries) {
+      const m = D.meta[en.k] || {};
+      const loc = m.area ? (pref ? `${m.area},${pref},Japan` : `${m.area},Japan`) : '';
+      try {
+        const r = await fetch(`/api/admin?action=fetch-rank&keyword=${encodeURIComponent(en.k)}&store=${encodeURIComponent(store)}&location=${encodeURIComponent(loc)}`).then(x => x.json());
+        if (r.error) { fail++; if (!firstErr) firstErr = r.error; if (r.overLimit) break; continue; }
+        await fetch(`/api/admin?action=rank-input&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: en.k, date: today, rank: r.rank }) });
+        ok++;
+      } catch (e) { fail++; if (!firstErr) firstErr = e.message; }
+    }
+  } finally {
+    window._aiFetching = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
+  }
+  await loadKwMgr();
+  if (ok) showToast(`${ok}件の順位を取得しました${fail ? `（${fail}件失敗）` : ''}`, 'success');
+  else showToast('順位を取得できませんでした: ' + (firstErr || '不明なエラー'), 'error');
+}
+
 // ── アンケート編集 ──
 // アンケート編集を個別ページで開く
 async function showSurveyEdit(idx) {
@@ -3671,7 +4030,8 @@ async function loadDashboardRankings() {
         <span style="width:42px;text-align:right;flex-shrink:0">${badge}</span>
         <b style="color:${color};font-size:15px;width:48px;text-align:right;flex-shrink:0">${r.rank ? r.rank + '位' : '圏外'}</b></div>`;
     }).join('');
-    card.style.display = 'block';
+    // 旧「キーワード順位」カードは新「対策キーワード」カード(kwMgrCard)に置き換え。_dashRankingsは診断用に計算のみ維持。
+    if (card) card.style.display = 'none';
   } catch (e) { if (card) card.style.display = 'none'; }
 }
 

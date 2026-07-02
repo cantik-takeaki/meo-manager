@@ -590,5 +590,88 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
+  // ── キーワード追加（メタ付き：計測地域/分類/優先度/メモ/有効） ──
+  // 対策キーワードのメタは rankings_ オブジェクト内 meta{ keyword: {...} } に保持。
+  // 順位履歴(history[].rankings[]) は keywords[] に index対応するモデルを維持する。
+  if (req.method === 'POST' && action === 'kw-add') {
+    const storeId = req.query.storeId || req.body.storeId;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const { keyword, area, category, priority, memo, enabled } = req.body;
+    const kw = String(keyword || '').trim();
+    if (!kw) return res.status(400).json({ error: 'keyword必須' });
+    const ex = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
+    ex.keywords = ex.keywords || []; ex.meta = ex.meta || {};
+    const exists = ex.keywords.includes(kw);
+    if (!exists) ex.keywords.push(kw);
+    // 既存キーワードの場合は手動設定(area/category/priority/memo/enabled)を勝手に潰さない
+    if (!exists || !ex.meta[kw]) {
+      ex.meta[kw] = { area: area || '', category: category || '', priority: priority || '', memo: memo || '', enabled: enabled !== false };
+    }
+    await kvSet(`rankings_${storeId}`, ex);
+    return res.json({ success: true, duplicated: exists });
+  }
+
+  // ── キーワード編集（改名しても同indexを保持し順位履歴の整合を維持） ──
+  if (req.method === 'POST' && action === 'kw-edit') {
+    const storeId = req.query.storeId || req.body.storeId;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const { oldKeyword, keyword, area, category, priority, memo, enabled } = req.body;
+    const oldk = String(oldKeyword || '').trim(), newk = String(keyword || '').trim();
+    if (!newk) return res.status(400).json({ error: 'keyword必須' });
+    const ex = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
+    ex.keywords = ex.keywords || []; ex.meta = ex.meta || {};
+    // 別indexに既存の名前へ改名するとkeywordsが重複しindex対応が崩れる→拒否
+    if (newk !== oldk && ex.keywords.some((k, ix) => k === newk && ix !== ex.keywords.indexOf(oldk))) {
+      return res.status(409).json({ error: 'そのキーワードは既に登録されています' });
+    }
+    const i = ex.keywords.indexOf(oldk);
+    if (i >= 0) ex.keywords[i] = newk;
+    else if (!ex.keywords.includes(newk)) ex.keywords.push(newk);
+    if (oldk && oldk !== newk && ex.meta[oldk]) delete ex.meta[oldk];
+    ex.meta[newk] = { area: area || '', category: category || '', priority: priority || '', memo: memo || '', enabled: enabled !== false };
+    await kvSet(`rankings_${storeId}`, ex);
+    return res.json({ success: true });
+  }
+
+  // ── キーワード削除（keywords＋全履歴の同indexを除去して整合を保つ） ──
+  if (req.method === 'POST' && action === 'kw-del') {
+    const storeId = req.query.storeId || req.body.storeId;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const kw = String(req.body.keyword || '').trim();
+    const ex = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
+    const i = (ex.keywords || []).indexOf(kw);
+    if (i >= 0) {
+      ex.keywords.splice(i, 1);
+      (ex.history || []).forEach(h => { if (Array.isArray(h.rankings)) h.rankings.splice(i, 1); });
+    }
+    if (ex.meta && ex.meta[kw]) delete ex.meta[kw];
+    await kvSet(`rankings_${storeId}`, ex);
+    return res.json({ success: true });
+  }
+
+  // ── 単一キーワードの順位入力（その日付エントリの該当indexだけ更新） ──
+  if (req.method === 'POST' && action === 'rank-input') {
+    const storeId = req.query.storeId || req.body.storeId;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const { keyword, date, rank } = req.body;
+    const kw = String(keyword || '').trim();
+    if (!kw) return res.status(400).json({ error: 'keyword必須' });
+    const ex = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
+    ex.keywords = ex.keywords || [];
+    let i = ex.keywords.indexOf(kw);
+    if (i < 0) { ex.keywords.push(kw); i = ex.keywords.length - 1; }
+    const useDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? date : new Date().toISOString().split('T')[0];
+    let entry = ex.history.find(h => h.date === useDate);
+    if (!entry) { entry = { date: useDate, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
+    entry.rankings = entry.rankings || [];
+    const v = parseInt(rank, 10);
+    entry.rankings[i] = (Number.isFinite(v) && v >= 1) ? v : null; // 空欄/非数値＝圏外＝null
+    entry.recordedAt = new Date().toISOString();
+    ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    if (ex.history.length > 60) ex.history = ex.history.slice(-60);
+    await kvSet(`rankings_${storeId}`, ex);
+    return res.json({ success: true });
+  }
+
   return res.status(405).end();
 }
