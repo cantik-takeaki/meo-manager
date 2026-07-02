@@ -390,6 +390,11 @@ export default async function handler(req, res) {
       // 投稿公開（2段階：media コンテナ作成 → media_publish）
       // ※会社ルール：実公開は社長承認後にこのエンドポイントを叩く設計（自動全公開はしない）
       if (req.method === 'POST' && sub === 'publish') {
+        // 安全対策：この店舗のInstagramが未連携（店舗固有トークンなし）なら公開しない。
+        // 共通アカウント(@cantik.ink / 環境変数トークン)への意図しない投稿を防ぐ。
+        if (!igConn?.token) {
+          return res.status(400).json({ error: 'この店舗のInstagramが未連携です。投稿するには、まず店舗のInstagramを連携してください。（未連携のまま共通アカウントへは投稿しません）', notConnected: true });
+        }
         const { imageUrl, imageUrls, videoUrl, caption, mediaType } = req.body || {};
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
         const waitFinished = async (cid) => {

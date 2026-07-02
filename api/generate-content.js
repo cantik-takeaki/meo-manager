@@ -79,6 +79,18 @@ export default async function handler(req, res) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY未設定' });
 
+  // ── 対策キーワード（rankings_ の meta）を各生成に自然に織り込むための共通ブロック ──
+  // MEOはGBPに「キーワード欄」が無いため、選んだ語を説明文/サービス/投稿/Q&A/HP等へ自然に盛り込む。
+  const _rankData = await kvGet(`rankings_${locationId}`) || {};
+  const _rankMeta = _rankData.meta || {};
+  const _prOrder = { A: 0, B: 1, C: 2 };
+  const seoKws = (_rankData.keywords || [])
+    .filter(k => k && (_rankMeta[k]?.enabled !== false))
+    .sort((a, b) => (_prOrder[_rankMeta[a]?.priority] ?? 3) - (_prOrder[_rankMeta[b]?.priority] ?? 3));
+  const seoWeave = seoKws.length
+    ? `\n\n【MEO対策キーワード（Googleに専門性を伝えるため文章に自然に織り込む語・優先度順）】\n${seoKws.slice(0, 12).map(k => `・${k}${_rankMeta[k]?.category ? `（${_rankMeta[k].category}）` : ''}`).join('\n')}\n→ 上位の2〜4語を、意味が通る範囲で自然に本文へ織り込む。羅列・詰め込み・不自然な繰り返しは禁止。日本語の読みやすさを最優先し、対策語が"結果的に含まれている"状態を目指す。地域名は文脈に合う形で1回程度添える。実在しないサービスや誇大表現は作らない。`
+    : '';
+
   // ── URLから店舗情報を自動抽出（HP/ぐるなび等のWebページ） ──
   if (type === 'autofill') {
     const url = req.body.url;
@@ -216,7 +228,7 @@ JSON以外は出力しない。`;
 【現在のターゲット】${cur.targetCustomer || ''}
 【現在の説明】${cur.description || ''}
 【現在のキーワード】${curKw.join('、') || 'なし'}
-
+${req.body.gbpContext ? `\n【Googleの情報（GBPカテゴリ・平均評価・実際の口コミ抜粋）】\n${req.body.gbpContext}\n→ 上記のGoogle口コミで実際に褒められている点・利用シーンを、strengths/services に事実の範囲で反映する（口コミの表現をヒントに具体化）。ただし口コミ本文の丸写しや、書かれていない実績の捏造はしない。\n` : ''}
 【強化ルール】
 - keywords: 「地域名×業種」「地域名×業種×ニーズ/メニュー」「地域名×悩み」「隣接エリア×業種」など実際に検索される語を10〜15個。ビッグKWからロングテールまで幅広く、読点区切り
 - strengths: 検索意図と差別化を意識し、具体的な特徴を3〜5文でしっかり書く（地域名・サービス名・専門性・実績・こだわりを自然に含む。MEOで効くよう情報量を厚めに。ただし架空の数値や実績は作らない）
@@ -228,7 +240,7 @@ JSON以外は出力しない。`;
 
 【出力JSON】（tipsは改行区切りの文字列、他は文字列）
 {"keywords":"","strengths":"","services":"","description":"","targetCustomer":"","nearbyLandmarks":"","tips":""}
-JSON以外は一切出力しない。`;
+JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対策キーワードは特に strengths / services / description に自然に反映する。' : ''}`;
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -759,6 +771,84 @@ ${topText || 'データなし'}
 - reason: なぜ有効か（20〜40文字・断定しすぎない）
 8〜12件。説明文・前置き・コードフェンスは書かず、JSON配列だけを出力。`;
   }
+
+  // GBP 商品・サービス登録用の説明文（対策キーワードを自然に含める）
+  if (type === 'product_desc') {
+    const name = req.body.productName || req.body.itemName || '';
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。Googleビジネスプロフィールの「商品・サービス」登録に載せる紹介文を書いてください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【商品・サービス名】${name || '（店の主要な商品・サービスから代表的なものを選ぶ）'}
+【店の強み】${strengths}
+【提供サービス・メニュー】${services}
+
+【ルール】
+- 1つの商品・サービスにつき、名称＋60〜120字の説明文。魅力と特徴が具体的に伝わるように。
+- 検索されやすい語（地域名・業種・用途）を自然に含める。誇大表現・効果断定・架空実績はしない。
+- ${name ? 'この商品・サービス1件について書く。' : '代表的な商品・サービスを3件、それぞれ「■名称」の見出しで書く。'}
+- 前置き・説明・コードフェンスは書かず、本文のみ。`;
+  }
+
+  // GBP よくある質問（Q&A）を業種に合わせて自動生成
+  if (type === 'qa_generate') {
+    const n = Math.min(Math.max(parseInt(req.body.count) || 5, 1), 8);
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。Googleビジネスプロフィールの「よくある質問（Q&A）」を、この店に来店・利用を検討する人が実際に知りたい内容で作ってください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【営業時間】${knowledge.businessHours || ''}
+【定休日】${knowledge.closedDays || ''}
+【駐車場】${knowledge.parking || ''}
+【アクセス】${knowledge.nearbyLandmarks || ''}
+【強み】${strengths}
+【サービス】${services}
+
+【ルール】
+- 質問と回答のペアを${n}個。回答は事実ベース（不明な項目は一般的で無難な範囲にとどめ、架空の断定はしない）。
+- 予約・支払い・アクセス・所要時間・初めての利用・こだわり など、来店前の不安を解消する実用的な内容。
+- 検索されやすい語（地域名・業種・サービス名）を質問文に自然に含める。
+- 出力形式は各ペアを「Q. 〜」「A. 〜」の2行、ペア間は1行空ける。前置き不要。`;
+  }
+
+  // ホームページ用のコンテンツ（見出し＋本文）を生成
+  if (type === 'hp_content') {
+    const section = req.body.section || 'トップの紹介文';
+    prompt = `あなたは集客に強いWebライターです。${storeName}のホームページに載せる「${section}」の文章を書いてください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【地域/住所】${knowledge.address || ''}
+【強み】${strengths}
+【サービス】${services}
+【ターゲット】${knowledge.targetCustomer || ''}
+
+【ルール】
+- 見出し（20字前後）＋本文（250〜400字）。読み手の来店・問い合わせにつながる自然な紹介。
+- 地域名・業種・サービス名を検索を意識して自然に含める（SEO/MEOに効くが、詰め込みは禁止）。
+- 誇大表現・効果断定・架空実績は書かない。実際のスタッフが書いたような等身大の文章。
+- 前置き・説明は書かず、見出しと本文のみ。`;
+  }
+
+  // 写真の説明文（GBP写真・SNS用の短いキャプション）
+  if (type === 'photo_caption') {
+    const note = req.body.photoNote || sourceText || '';
+    prompt = `あなたは${storeName}のSNS・GBP運用担当です。掲載する写真に添える短い説明文（キャプション）を書いてください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【写真の内容・伝えたいこと】${note || '（店の魅力が伝わる写真）'}
+【強み】${strengths}
+
+【ルール】
+- 40〜80字の自然な説明文。写真の内容に触れ、地域名・業種・サービス名のいずれかを自然に含める。
+- 誇大表現・効果断定はしない。絵文字は使っても1個まで。
+- 前置き不要、説明文のみ。`;
+  }
+
+  // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
+  const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption'];
+  if (seoWeave && _seoTypes.includes(type)) prompt += seoWeave;
 
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
