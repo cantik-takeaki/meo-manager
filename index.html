@@ -394,6 +394,23 @@ body {
 }
 .filter-btn.active { background: rgba(79,125,243,0.2); border-color: var(--accent); color: var(--accent); }
 .filter-btn:hover { border-color: var(--border-active); color: var(--text); }
+
+/* ─── 口コミPOP作成 ─── */
+.pop-tab { flex:1; padding:9px 6px; border:none; background:none; color:var(--text-sub); font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; font-family:inherit; transition:all .15s; }
+.pop-tab-on { background:var(--accent); color:#fff; box-shadow:0 1px 4px rgba(46,143,240,.35); }
+.pop-tpl, .pop-paper { padding:12px 8px; border:1.5px solid var(--border); background:var(--bg-2); color:var(--text); font-size:12.5px; font-weight:600; border-radius:9px; cursor:pointer; font-family:inherit; transition:all .15s; text-align:center; }
+.pop-paper { text-align:left; padding:11px 14px; }
+.pop-tpl:hover, .pop-paper:hover { border-color:var(--border-active); }
+.pop-tpl-on, .pop-paper-on { border-color:var(--accent); color:var(--accent); background:rgba(46,143,240,.06); box-shadow:0 0 0 1px var(--accent) inset; }
+.pop-fld { font-size:12px; color:var(--text-sub); display:block; }
+.pop-slider { display:flex; flex-direction:column; gap:6px; }
+.pop-slider .pop-slabel { display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--text); }
+.pop-slider .pop-sval { color:var(--accent); font-weight:700; font-size:13px; }
+.pop-slider input[type=range] { width:100%; accent-color:var(--accent); height:4px; }
+.pop-color-row { display:flex; align-items:center; gap:12px; }
+.pop-color-row .pop-clabel { font-size:13px; color:var(--text); width:88px; flex-shrink:0; }
+.pop-color-row input[type=color] { width:46px; height:38px; border:1px solid var(--border); border-radius:8px; background:none; cursor:pointer; padding:2px; }
+.pop-color-row .pop-chex { font-size:12.5px; color:var(--text-muted); font-family:ui-monospace,monospace; }
 </style>
 </head>
 <body>
@@ -897,7 +914,7 @@ body {
             </div>
             <div id="reviewGoogleBanner" style="margin-top:8px"></div>
             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
-              <button class="btn btn-outline btn-sm" onclick="openReviewPop()">🖨 POPを作る</button>
+              <button class="btn btn-outline btn-sm" onclick="openReviewPop()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>POPを作る</button>
               <a id="qrDownloadLink" download="口コミ依頼QR.png" class="btn btn-outline btn-sm" href="#">QR画像を保存</a>
               <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:6px;margin-left:auto"><input type="checkbox" id="qrEnabledToggle" onchange="toggleQrEnabled(this.checked)"> 口コミ受付を有効にする</label>
             </div>
@@ -1125,7 +1142,7 @@ body {
         </div>
         <div class="filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
           <button class="btn btn-outline btn-sm" onclick="openSurveyEditorFromQr()">✏️ アンケート編集</button>
-          <button class="btn btn-outline btn-sm" onclick="openReviewPop()">🖨 口コミPOP作成</button>
+          <button class="btn btn-outline btn-sm" onclick="openReviewPop()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>口コミPOP作成</button>
           <button class="btn btn-primary btn-sm">QR機能</button>
         </div>
 
@@ -1411,6 +1428,123 @@ body {
               <button class="btn btn-outline btn-sm" onclick="storeBack()">閉じる</button>
             </div>
             <p style="font-size:11px;color:var(--text-sub);line-height:1.6">※「満足度で分岐」は、低評価のお客様をGoogleでなく店内フィードバックへ誘導します。評価を守れますが、Googleは恣意的な口コミ選別（レビューゲーティング）を推奨していません。公平に運用したい場合は「全員Googleへ誘導」を選んでください。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▼▼ 口コミPOP作成ビュー（個別ページ・4タブ＋ライブプレビュー） ▼▼ -->
+      <div id="storePopView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="storeBack()">← 前のページへ</button>
+          <div style="flex:1;min-width:180px">
+            <div class="page-title" style="font-size:20px">口コミPOP作成</div>
+            <div class="page-sub">QRアンケート用POP — 編集してそのまま印刷</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="popReset()">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>初期状態に戻す
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="popPrint()">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>印刷 / PDFダウンロード
+          </button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:18px;align-items:start">
+          <!-- 左：編集パネル -->
+          <div>
+            <!-- タブ -->
+            <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;margin-bottom:14px">
+              <button class="pop-tab pop-tab-on" data-tab="basic" onclick="popTab('basic')">基本</button>
+              <button class="pop-tab" data-tab="text" onclick="popTab('text')">テキスト</button>
+              <button class="pop-tab" data-tab="color" onclick="popTab('color')">カラー</button>
+              <button class="pop-tab" data-tab="image" onclick="popTab('image')">画像・QR</button>
+            </div>
+
+            <!-- 基本 -->
+            <div class="pop-panel" data-panel="basic">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">テンプレート</div></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                  <button class="pop-tpl pop-tpl-on" data-tpl="clean" onclick="popSetTpl('clean')">シンプル清潔</button>
+                  <button class="pop-tpl" data-tpl="luxe" onclick="popSetTpl('luxe')">高級感</button>
+                  <button class="pop-tpl" data-tpl="pop" onclick="popSetTpl('pop')">やさしいポップ</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">用紙サイズ</div></div>
+                <div style="display:grid;gap:8px">
+                  <button class="pop-paper pop-paper-on" data-paper="tent" onclick="popSetPaper('tent')">卓上POP (90×150mm)</button>
+                  <button class="pop-paper" data-paper="a5" onclick="popSetPaper('a5')">A5縦 (148×210mm)</button>
+                  <button class="pop-paper" data-paper="a4" onclick="popSetPaper('a4')">A4縦 (210×297mm)</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">テキスト内容</div></div>
+                <div style="display:grid;gap:11px">
+                  <label class="pop-fld">店舗名<input id="pop-store" type="text" class="ed-in" oninput="popBind('store',this.value)"></label>
+                  <label class="pop-fld">キャッチコピー<input id="pop-catch" type="text" class="ed-in" oninput="popBind('catch',this.value)"></label>
+                  <label class="pop-fld">タイトル<input id="pop-title" type="text" class="ed-in" oninput="popBind('title',this.value)"></label>
+                  <label class="pop-fld">説明文<input id="pop-desc" type="text" class="ed-in" oninput="popBind('desc',this.value)"></label>
+                  <label class="pop-fld">メッセージ（任意）<input id="pop-message" type="text" class="ed-in" oninput="popBind('message',this.value)"></label>
+                </div>
+              </div>
+            </div>
+
+            <!-- テキスト（文字サイズ） -->
+            <div class="pop-panel" data-panel="text" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">文字サイズ (PT)</div></div>
+                <div style="display:grid;gap:16px" id="popFsWrap"></div>
+                <div style="text-align:right;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="popResetFs()">デフォルトに戻す</button></div>
+              </div>
+            </div>
+
+            <!-- カラー -->
+            <div class="pop-panel" data-panel="color" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">カラー設定</div></div>
+                <div style="display:grid;gap:14px" id="popColorWrap"></div>
+              </div>
+            </div>
+
+            <!-- 画像・QR -->
+            <div class="pop-panel" data-panel="image" style="display:none">
+              <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                  <div class="card-title" style="font-size:13px">ロゴ・画像</div>
+                  <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:6px;cursor:pointer"><input id="pop-logoShow" type="checkbox" checked onchange="popBind('logoShow',this.checked)" style="width:15px;height:15px">表示</label>
+                </div>
+                <label id="pop-logoDrop" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--border-active);border-radius:10px;padding:22px;cursor:pointer;color:var(--text-sub);font-size:13px">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+                  <span id="pop-logoLabel">画像をアップロード</span>
+                  <input type="file" accept="image/*" style="display:none" onchange="popLogoUpload(this)">
+                </label>
+                <div id="pop-logoActions" style="display:none;margin-top:8px;text-align:right"><button class="btn btn-outline btn-sm" onclick="popClearLogo()">画像を削除</button></div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">QRコード</div></div>
+                <div style="display:grid;gap:16px" id="popQrWrap"></div>
+                <label class="pop-fld" style="margin-top:12px">QR下テキスト<textarea id="pop-qrText" rows="2" class="ed-in" style="resize:vertical" oninput="popBindQr('text',this.value)"></textarea></label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右：プレビュー -->
+          <div style="min-width:0">
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="font-size:13px" id="popPreviewLabel">卓上POP (90×150mm) プレビュー</div></div>
+              <div style="display:flex;justify-content:center;padding:12px 4px;background:var(--bg-3);border-radius:10px;overflow:auto">
+                <div id="popPreviewBox"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="font-size:13px">印刷のポイント</div></div>
+              <ul style="font-size:12px;color:var(--text-sub);line-height:2;padding-left:18px;margin:0">
+                <li>印刷ダイアログで「余白：なし」を選択してください</li>
+                <li>用紙サイズ：<span id="popTipPaper">卓上POP (90×150mm)</span>に合わせてください</li>
+                <li>カラー印刷推奨（白黒でも使用可）</li>
+                <li>「PDFとして保存」でPDFファイルも作成できます</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -2737,61 +2871,193 @@ async function toggleQrEnabled(on) {
   } catch (e) { showToast('切替失敗: ' + e.message, 'error'); }
 }
 
-// ── 印刷用POP（テンプレ＋用紙サイズ＋QR）──
-async function openReviewPop() {
+// ── 口コミPOP作成（個別ページ・4タブ＋ライブプレビュー）──
+const POP_PAPERS = {
+  tent: { w: 90,  h: 150, label: '卓上POP (90×150mm)' },
+  a5:   { w: 148, h: 210, label: 'A5縦 (148×210mm)' },
+  a4:   { w: 210, h: 297, label: 'A4縦 (210×297mm)' },
+};
+const POP_TPLS = {
+  clean: { bg: '#ffffff', card: '#f1f5f9', text: '#1e293b', accent: '#2563eb' },
+  luxe:  { bg: '#0c1424', card: '#16213a', text: '#f3e9d6', accent: '#c9a86a' },
+  pop:   { bg: '#fff7ed', card: '#ffedd5', text: '#7c2d12', accent: '#f97316' },
+};
+const POP_FS_FIELDS = [
+  { k: 'catch', label: 'キャッチコピー' }, { k: 'title', label: 'タイトル' },
+  { k: 'store', label: '店舗名' }, { k: 'desc', label: '説明文' },
+  { k: 'message', label: 'メッセージ' }, { k: 'qr', label: 'QR下テキスト' },
+];
+const POP_FS_DEFAULT = { catch: 10, title: 20, store: 9, desc: 10, message: 9, qr: 8 };
+function popDefaultState() {
+  return {
+    template: 'clean', paper: 'tent',
+    store: '', catch: '30秒でかんたんアンケート',
+    title: 'お客様の声をお聞かせください',
+    desc: 'サービス向上のため、ぜひご意見をお聞かせください。', message: '',
+    fs: { ...POP_FS_DEFAULT }, color: { ...POP_TPLS.clean },
+    logoShow: true, logoData: '',
+    qr: { size: 52, margin: 4, text: 'スマートフォンのカメラで\nQRコードを読み取ってください' },
+  };
+}
+window._popState = window._popState || popDefaultState();
+
+// 旧呼び出し互換（storeDetail・QR管理の「POPを作る」ボタン → 個別ページへ）
+async function openReviewPop() { return showStorePop(window._qrIdx); }
+
+async function showStorePop(idx) {
+  const loc = window._locations?.[idx];
+  if (loc) { window._qrIdx = idx; currentLocation = loc; currentLocationId = loc.storeId || loc.name.replace(/\//g, '_'); }
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
-  if (!_surveyCache) { try { _surveyCache = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {} }
+  _storeViews('storePopView');
+  try { const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); _surveyCache = { ...s, _forStore: currentLocationId }; } catch (e) {}
+  const st = window._popState;
+  st.store = currentLocation?.title || '当店';
+  if (_surveyCache?.popTitle) st.title = _surveyCache.popTitle;
+  if (_surveyCache?.popDesc) st.desc = _surveyCache.popDesc;
+  popSyncTplPaperButtons();
+  popSyncInputs();
+  popBuildControls();
+  popTab('basic');
+  renderPop();
+}
+
+function popTab(name) {
+  document.querySelectorAll('#storePopView .pop-tab').forEach(b => b.classList.toggle('pop-tab-on', b.dataset.tab === name));
+  document.querySelectorAll('#storePopView .pop-panel').forEach(p => p.style.display = (p.dataset.panel === name) ? '' : 'none');
+}
+function popSyncTplPaperButtons() {
+  const st = window._popState;
+  document.querySelectorAll('#storePopView .pop-tpl').forEach(b => b.classList.toggle('pop-tpl-on', b.dataset.tpl === st.template));
+  document.querySelectorAll('#storePopView .pop-paper').forEach(b => b.classList.toggle('pop-paper-on', b.dataset.paper === st.paper));
+}
+function popSetTpl(t) {
+  const st = window._popState; st.template = t; st.color = { ...POP_TPLS[t] };
+  popSyncTplPaperButtons(); popBuildControls(); renderPop();
+}
+function popSetPaper(p) {
+  window._popState.paper = p; popSyncTplPaperButtons(); renderPop();
+}
+function popBind(key, val) { window._popState[key] = val; renderPop(); }
+function popBindQr(key, val) { window._popState.qr[key] = val; renderPop(); }
+function popSetFs(k, v) { window._popState.fs[k] = +v; const e = document.getElementById('popfsv-' + k); if (e) e.textContent = v + 'pt'; renderPop(); }
+function popSetColor(k, v) { window._popState.color[k] = v; const e = document.getElementById('popchex-' + k); if (e) e.textContent = v; renderPop(); }
+function popSetQr(k, v, suf) { window._popState.qr[k] = +v; const e = document.getElementById('popqrv-' + k); if (e) e.textContent = v + suf; renderPop(); }
+
+function popSyncInputs() {
+  const st = window._popState;
+  const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = val; };
+  set('pop-store', st.store); set('pop-catch', st.catch); set('pop-title', st.title);
+  set('pop-desc', st.desc); set('pop-message', st.message); set('pop-qrText', st.qr.text);
+  const ls = document.getElementById('pop-logoShow'); if (ls) ls.checked = st.logoShow;
+  popRefreshLogoUi();
+}
+function popRefreshLogoUi() {
+  const st = window._popState;
+  const lbl = document.getElementById('pop-logoLabel'), act = document.getElementById('pop-logoActions');
+  if (st.logoData) { if (lbl) lbl.textContent = '画像を変更'; if (act) act.style.display = 'block'; }
+  else { if (lbl) lbl.textContent = '画像をアップロード'; if (act) act.style.display = 'none'; }
+}
+function popBuildControls() {
+  const st = window._popState;
+  const fw = document.getElementById('popFsWrap');
+  if (fw) fw.innerHTML = POP_FS_FIELDS.map(f => `
+    <div class="pop-slider">
+      <div class="pop-slabel"><span>${f.label}</span><span class="pop-sval" id="popfsv-${f.k}">${st.fs[f.k]}pt</span></div>
+      <input type="range" min="6" max="48" step="1" value="${st.fs[f.k]}" oninput="popSetFs('${f.k}',this.value)">
+    </div>`).join('');
+  const cw = document.getElementById('popColorWrap');
+  const crows = [['bg', '背景色'], ['card', 'カード背景色'], ['text', '文字色'], ['accent', 'アクセント色']];
+  if (cw) cw.innerHTML = crows.map(([k, l]) => `
+    <div class="pop-color-row">
+      <span class="pop-clabel">${l}</span>
+      <input type="color" value="${st.color[k]}" oninput="popSetColor('${k}',this.value)">
+      <span class="pop-chex" id="popchex-${k}">${st.color[k]}</span>
+    </div>`).join('');
+  const qw = document.getElementById('popQrWrap');
+  if (qw) qw.innerHTML = `
+    <div class="pop-slider">
+      <div class="pop-slabel"><span>QRサイズ</span><span class="pop-sval" id="popqrv-size">${st.qr.size}%</span></div>
+      <input type="range" min="30" max="80" step="1" value="${st.qr.size}" oninput="popSetQr('size',this.value,'%')">
+    </div>
+    <div class="pop-slider">
+      <div class="pop-slabel"><span>余白</span><span class="pop-sval" id="popqrv-margin">${st.qr.margin}mm</span></div>
+      <input type="range" min="0" max="12" step="1" value="${st.qr.margin}" oninput="popSetQr('margin',this.value,'mm')">
+    </div>`;
+}
+function popLogoUpload(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (f.size > 2 * 1024 * 1024) return showToast('画像は2MB以下にしてください', 'error');
+  const r = new FileReader();
+  r.onload = e => { const st = window._popState; st.logoData = e.target.result; st.logoShow = true; const ls = document.getElementById('pop-logoShow'); if (ls) ls.checked = true; popRefreshLogoUi(); renderPop(); };
+  r.readAsDataURL(f);
+}
+function popClearLogo() { window._popState.logoData = ''; popRefreshLogoUi(); renderPop(); }
+function popReset() {
+  const store = window._popState.store;
+  window._popState = popDefaultState(); window._popState.store = store;
+  popSyncTplPaperButtons(); popSyncInputs(); popBuildControls(); renderPop();
+  showToast('初期状態に戻しました', 'success');
+}
+function popResetFs() { window._popState.fs = { ...POP_FS_DEFAULT }; popBuildControls(); renderPop(); }
+
+function _popEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function _popNl2br(s) { return _popEsc(s).replace(/\n/g, '<br>'); }
+// L=長さ関数（プレビュー:px / 印刷:mm）, F=フォント関数（プレビュー:px / 印刷:pt）
+function popInnerHtml(L, F) {
+  const st = window._popState, c = st.color, paper = POP_PAPERS[st.paper];
   const url = reviewPageUrl();
-  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=' + encodeURIComponent(url);
-  const store = currentLocation?.title || '当店';
-  const noGoogle = !((_surveyCache && _surveyCache.googleUrl) || localStorage.getItem('reviewUrl_' + currentLocationId));
-  const w = window.open('', '_blank', 'width=720,height=900');
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=' + st.qr.margin + '&data=' + encodeURIComponent(url);
+  const logo = (st.logoShow && st.logoData) ? `<img src="${st.logoData}" style="max-width:${L(paper.w * 0.42)};max-height:${L(18)};object-fit:contain;margin:0 auto ${L(3)};display:block">` : '';
+  const msg = st.message ? `<div style="font-size:${F(st.fs.message)};color:${c.text};opacity:.72;margin-top:${L(3)};line-height:1.5">${_popNl2br(st.message)}</div>` : '';
+  const qrW = paper.w * st.qr.size / 100;
+  return `
+   <div style="background:${c.bg};color:${c.text};width:100%;height:100%;padding:${L(9)} ${L(7)};text-align:center;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
+     <div style="display:inline-block;align-self:center;background:${c.accent};color:#fff;font-size:${F(st.fs.catch)};font-weight:700;padding:${L(1.4)} ${L(5)};border-radius:999px;margin-bottom:${L(4)}">${_popEsc(st.catch)}</div>
+     ${logo}
+     <div style="font-size:${F(st.fs.title)};font-weight:800;line-height:1.35;margin-bottom:${L(2)}">${_popNl2br(st.title)}</div>
+     <div style="font-size:${F(st.fs.store)};color:${c.text};opacity:.6;margin-bottom:${L(5)}">${_popEsc(st.store)}</div>
+     <div style="background:${c.card};border-radius:${L(4)};padding:${L(6)} ${L(4)};margin:0 auto;width:100%;box-sizing:border-box">
+       <div style="height:${L(0.8)};width:${L(14)};background:${c.accent};border-radius:99px;margin:0 auto ${L(3)}"></div>
+       <img src="${qrImg}" alt="QR" style="width:${L(qrW)};height:${L(qrW)};display:block;margin:0 auto;border-radius:${L(1.5)};background:#fff">
+       <div style="font-size:${F(st.fs.qr)};color:${c.text};opacity:.72;margin-top:${L(2.5)};line-height:1.5">${_popNl2br(st.qr.text)}</div>
+       <div style="height:${L(0.8)};width:${L(14)};background:${c.accent};border-radius:99px;margin:${L(3)} auto 0"></div>
+     </div>
+     <div style="font-size:${F(st.fs.desc)};color:${c.text};opacity:.72;margin-top:${L(4)};line-height:1.5">${_popNl2br(st.desc)}</div>
+     ${msg}
+   </div>`;
+}
+function renderPop() {
+  const st = window._popState, paper = POP_PAPERS[st.paper];
+  const box = document.getElementById('popPreviewBox'); if (!box) return;
+  const pxPerMm = Math.min(320 / paper.w, 460 / paper.h);
+  const L = mm => (mm * pxPerMm).toFixed(1) + 'px';
+  const F = pt => (pt * 0.3528 * pxPerMm).toFixed(1) + 'px';
+  box.style.width = (paper.w * pxPerMm).toFixed(0) + 'px';
+  box.style.height = (paper.h * pxPerMm).toFixed(0) + 'px';
+  box.style.boxShadow = '0 6px 24px rgba(0,0,0,.14)';
+  box.style.borderRadius = '6px';
+  box.style.overflow = 'hidden';
+  box.innerHTML = popInnerHtml(L, F);
+  const lab = paper.label;
+  const pl = document.getElementById('popPreviewLabel'); if (pl) pl.textContent = lab + ' プレビュー';
+  const tp = document.getElementById('popTipPaper'); if (tp) tp.textContent = lab;
+}
+function popPrint() {
+  const st = window._popState, paper = POP_PAPERS[st.paper];
+  const inner = popInnerHtml(mm => mm + 'mm', pt => pt + 'pt');
+  const w = window.open('', '_blank', 'width=800,height=1000');
   if (!w) return showToast('ポップアップを許可してください', 'error');
-  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>口コミ依頼POP</title>
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>口コミPOP</title>
   <style>
+    @page { size:${paper.w}mm ${paper.h}mm; margin:0; }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Hiragino Sans',sans-serif;background:#eef2f5;color:#1a2330;padding:18px}
-    .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-    select,button{font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-family:inherit}
-    button.pri{background:#007cba;color:#fff;border-color:#007cba;font-weight:700}
-    .pop{background:#fff;margin:0 auto;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.12);text-align:center;padding:34px 26px}
-    .pop.size-tent{width:340px}.pop.size-a5{width:420px}.pop.size-a4{width:520px}
-    .tpl-clean .badge{background:#007cba}.tpl-clean h1{color:#0a2540}
-    .tpl-luxe{background:#0c1424;color:#f3e9d6}.tpl-luxe .badge{background:#c9a86a;color:#1a1207}.tpl-luxe h1{color:#f3e9d6}.tpl-luxe .sub,.tpl-luxe .foot{color:#cbb88f}
-    .tpl-pop .badge{background:#ff7a59}.tpl-pop h1{color:#e8553a}
-    .badge{display:inline-block;color:#fff;font-size:13px;font-weight:700;padding:5px 16px;border-radius:999px;margin-bottom:14px}
-    h1{font-size:26px;line-height:1.4;margin-bottom:6px}
-    .store{font-size:13px;color:#64748b;margin-bottom:18px}
-    .qr{width:230px;height:230px;border-radius:10px;margin:0 auto;display:block}
-    .sub{font-size:13px;color:#475569;margin-top:14px;line-height:1.6}
-    .foot{font-size:12px;color:#94a3b8;margin-top:10px}
-    .warn{color:#c0392b;font-size:12px;margin-top:14px}
-    @media print{ body{background:#fff;padding:0} .bar{display:none} .pop{box-shadow:none;margin:0 auto} }
+    html,body{width:${paper.w}mm;height:${paper.h}mm}
+    body{background:#e5e9ee;display:flex;align-items:center;justify-content:center}
+    .sheet{width:${paper.w}mm;height:${paper.h}mm;background:#fff;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+    @media print{ body{background:#fff}.sheet{box-shadow:none} }
   </style></head><body>
-  <div class="bar">
-    <label>テンプレ <select id="tpl" onchange="rp()"><option value="clean">シンプル清潔</option><option value="luxe">高級感</option><option value="pop">やさしいポップ</option></select></label>
-    <label>用紙 <select id="size" onchange="rp()"><option value="tent">卓上POP(90×150)</option><option value="a5">A5縦</option><option value="a4">A4縦</option></select></label>
-    <label>キャッチ <input id="cat" value="30秒でかんたんアンケート" style="font-size:13px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;width:200px" oninput="rp()"></label>
-    <button class="pri" onclick="window.print()">🖨 印刷 / PDF保存</button>
-    <button onclick="navigator.clipboard.writeText('${url}');this.textContent='コピー済'">リンクをコピー</button>
-  </div>
-  <div id="pop"></div>
-  <script>
-    var STORE=${JSON.stringify(store)}, QR=${JSON.stringify(qr)}, NOG=${noGoogle ? 'true' : 'false'};
-    function rp(){
-      var tpl=document.getElementById('tpl').value, size=document.getElementById('size').value, cat=document.getElementById('cat').value;
-      document.getElementById('pop').innerHTML='<div class="pop tpl-'+tpl+' size-'+size+'">'
-        +'<div class="badge">'+cat+'</div>'
-        +'<h1>お客様の声を<br>お聞かせください</h1>'
-        +'<div class="store">'+STORE+'</div>'
-        +'<img class="qr" src="'+QR+'" alt="QR">'
-        +'<div class="sub">スマートフォンのカメラで<br>QRコードを読み取ってください</div>'
-        +'<div class="foot">サービス向上のため、ぜひご意見をお聞かせください。</div>'
-        +(NOG?'<div class="warn">※Google口コミURL未設定。アンケート編集で設定すると投稿画面まで進めます。</div>':'')
-        +'</div>';
-    }
-    rp();
-  <\/script>
+  <div class="sheet">${inner}</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>
   </body></html>`);
   w.document.close();
 }
@@ -4224,6 +4490,7 @@ const _storeViewShow = {
   storeCompetitorView: () => showStoreCompetitors(window._qrIdx),
   storeReportView: () => showStoreReport(window._qrIdx),
   storeSurveyEditView: () => showSurveyEdit(window._qrIdx),
+  storePopView: () => showStorePop(window._qrIdx),
 };
 function _storeViews(show) {
   // 履歴管理：戻る操作でなければ、直前のビューを積む
@@ -4233,7 +4500,7 @@ function _storeViews(show) {
     if (window._storeNav.length > 40) window._storeNav.shift();
   }
   window._storeCurView = show;
-  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView', 'storeCompetitorView', 'storeReportView', 'storeSurveyEditView'].forEach(id => {
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView', 'storeQrView', 'storeQrResultView', 'storeEditView', 'storeBulkRankView', 'storeCompetitorView', 'storeReportView', 'storeSurveyEditView', 'storePopView'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
   });
 }
