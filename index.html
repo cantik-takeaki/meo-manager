@@ -1105,6 +1105,31 @@ body {
         <p style="font-size:11px;color:var(--text-muted);margin-top:10px">※自動取得はSerpApi経由。地点は「市区,都道府県,Japan」形式（英語）が確実です。</p>
       </div>
       </div><!-- /storeAddView -->
+
+      <!-- ▼▼ アンケート回答履歴ビュー（回答履歴ボタンから・ぐるっと相当） ▼▼ -->
+      <div id="storeSurveyView" style="display:none">
+        <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showStoreList()">← 店舗一覧</button>
+          <div class="page-title" style="font-size:20px">アンケート回答履歴</div>
+          <span id="svHistStore" style="font-size:13px;color:var(--text-muted)"></span>
+        </div>
+        <div class="stats-grid-5" style="grid-template-columns:repeat(4,1fr)">
+          <div class="mini-card"><div class="mc-value" id="svhScan">0</div><div class="mc-label" style="margin-top:4px">QRスキャン数</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhSurvey">0</div><div class="mc-label" style="margin-top:4px">合計回答数</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhAvg">—</div><div class="mc-label" style="margin-top:4px">平均満足度</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhAi">0</div><div class="mc-label" style="margin-top:4px">AI生成数</div></div>
+        </div>
+        <div class="stats-grid-5" style="grid-template-columns:repeat(4,1fr)">
+          <div class="mini-card"><div class="mc-value" id="svhClick">0</div><div class="mc-label" style="margin-top:4px">Googleリンククリック</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhLine">0</div><div class="mc-label" style="margin-top:4px">LINE誘導クリック</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhMail">0</div><div class="mc-label" style="margin-top:4px">メール取得数</div></div>
+          <div class="mini-card"><div class="mc-value" id="svhLow">0</div><div class="mc-label" style="margin-top:4px">低評価の声</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">回答履歴</div><span id="svHistCount" style="font-size:12px;color:var(--text-sub)"></span></div>
+          <div id="svHistList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- Knowledge -->
@@ -3843,24 +3868,76 @@ function jumpToStore(storeId) {
   else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
 }
 
-// ─── 店舗管理の3ビュー切替（一覧 / 詳細 / 追加・管理） ───
-function showStoreList() {
-  document.getElementById('storeListView').style.display = '';
-  document.getElementById('storeDetail').style.display = 'none';
-  document.getElementById('storeAddView').style.display = 'none';
-  loadStoreList();
+// ─── 店舗管理の4ビュー切替（一覧 / 詳細 / 追加・管理 / 回答履歴） ───
+function _storeViews(show) {
+  ['storeListView', 'storeDetail', 'storeAddView', 'storeSurveyView'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = (id === show) ? '' : 'none';
+  });
 }
-function showStoreDetail() {
-  document.getElementById('storeListView').style.display = 'none';
-  document.getElementById('storeAddView').style.display = 'none';
-  document.getElementById('storeDetail').style.display = '';
-}
+function showStoreList() { _storeViews('storeListView'); loadStoreList(); }
+function showStoreDetail() { _storeViews('storeDetail'); }
 function showStoreAdd() {
-  document.getElementById('storeListView').style.display = 'none';
-  document.getElementById('storeDetail').style.display = 'none';
-  document.getElementById('storeAddView').style.display = '';
+  _storeViews('storeAddView');
   loadClientStores();   // 手動登録店舗一覧
   renderGbpPicker();    // GBPピッカー
+}
+// アンケート回答履歴ビュー（回答履歴ボタンから）
+async function showStoreSurvey(idx) {
+  const loc = window._locations?.[idx];
+  if (!loc) return;
+  currentLocation = loc;
+  currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
+  _storeViews('storeSurveyView');
+  document.getElementById('svHistStore').textContent = loc.title || '';
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const list = document.getElementById('svHistList');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div>読み込み中...</div>';
+  try {
+    const sid = encodeURIComponent(currentLocationId);
+    const [kpi, fb, leads] = await Promise.all([
+      fetch(`/api/admin?action=kpi&storeId=${sid}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/admin?action=feedback&storeId=${sid}`).then(r => r.json()).catch(() => ({ feedback: [] })),
+      fetch(`/api/admin?action=leads&storeId=${sid}`).then(r => r.json()).catch(() => ({ leads: [] })),
+    ]);
+    const c = kpi.current || {};
+    set('svhScan', (c.scan || 0) + '回');
+    set('svhSurvey', (c.survey || 0) + '件');
+    set('svhAvg', kpi.avgSatisfaction != null ? '★' + kpi.avgSatisfaction : '—');
+    set('svhAi', (c.ai || 0) + '回');
+    set('svhClick', (c.click || 0) + '回');
+    set('svhLine', (c.line || 0) + '回');
+    const leadArr = leads.leads || [];
+    set('svhMail', leadArr.length + '件');
+    const fbArr = fb.feedback || [];
+    set('svhLow', fbArr.length + '件');
+    // 回答一覧＝低評価の声＋メール登録を時系列で
+    const rows = [
+      ...fbArr.map(f => ({ at: f.at, type: 'low', rating: f.rating, text: f.text, contact: f.contact })),
+      ...leadArr.map(l => ({ at: l.at, type: 'mail', rating: l.rating, text: l.email })),
+    ].filter(x => x.at).sort((a, b) => new Date(b.at) - new Date(a.at));
+    const cnt = document.getElementById('svHistCount');
+    if (cnt) cnt.textContent = rows.length ? `${rows.length}件` : '';
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:40px 20px;text-align:center;color:var(--text-muted)">まだアンケート回答がありません</div>';
+    } else {
+      list.innerHTML = rows.map(r => {
+        const d = new Date(r.at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        if (r.type === 'low') {
+          return `<div style="padding:12px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="st-badge" style="background:rgba(239,68,68,0.1);color:var(--red)">低評価の声 ★${r.rating || '-'}</span><span style="font-size:11px;color:var(--text-muted)">${d}</span></div>
+            <div style="font-size:13px;margin-top:6px">${escapeHtml(r.text || '')}</div>
+            ${r.contact ? `<div style="font-size:11px;color:var(--text-sub);margin-top:4px">連絡先: ${escapeHtml(r.contact)}</div>` : ''}
+          </div>`;
+        }
+        return `<div style="padding:12px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="st-badge done">メール登録${r.rating ? ' ★' + r.rating : ''}</span><span style="font-size:11px;color:var(--text-muted)">${d}</span></div>
+          <div style="font-size:13px;margin-top:6px">${escapeHtml(r.text || '')}</div>
+        </div>`;
+      }).join('');
+    }
+  } catch (e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px">読み込みに失敗しました: ${escapeHtml(e.message)}</div>`;
+  }
 }
 
 // 店舗一覧テーブル（ぐるっと風：店舗名/クライアント/住所/キーワード/状態/口コミ）
@@ -3907,17 +3984,12 @@ function renderStoreTable() {
   }).join('');
 }
 
-// 口コミ列アクション: 店舗詳細を開き、該当セクションへ
+// 口コミ列アクション: QR管理→店舗詳細のQR/依頼欄へ、回答履歴→アンケート回答履歴ビューへ
 function storeReviewAction(idx, kind) {
+  if (kind === 'log') { showStoreSurvey(idx); return; }
+  // QR管理: 店舗詳細を開いて口コミ依頼(QR)セクションへスクロール
   selectLocation(idx);
-  setTimeout(() => {
-    if (kind === 'qr') {
-      document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      try { loadFeedback(); } catch (e) {}
-      document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, 120);
+  setTimeout(() => document.getElementById('kpiCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 }
 
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───
