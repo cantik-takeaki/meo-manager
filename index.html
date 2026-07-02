@@ -1874,6 +1874,10 @@ body {
                       <button class="btn btn-outline btn-sm" onclick="aiSubText()" title="AIで生成"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI</button>
                     </div>
                   </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">店名（画像に載せる表記・空欄で非表示）</label>
+                    <input id="genStoreName" type="text" maxlength="30" placeholder="例：麺屋cantik 相模原店" oninput="renderGenImage()" style="width:100%;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                  </div>
                 </div>
               </div>
               <div class="card">
@@ -1974,10 +1978,14 @@ body {
           <!-- 右：ライブプレビュー -->
           <div style="min-width:0">
             <div class="card">
-              <div class="card-header"><div class="card-title" style="font-size:13px">ライブプレビュー</div></div>
-              <div style="display:flex;justify-content:center;padding:14px 6px;background:var(--bg-3);border-radius:10px">
-                <canvas id="genCanvas" width="1080" height="1350" style="width:min(440px,100%);height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14)"></canvas>
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                <div class="card-title" style="font-size:13px">ライブプレビュー</div>
+                <button class="btn btn-outline btn-sm" onclick="genResetOffsets()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>配置をリセット</button>
               </div>
+              <div style="display:flex;justify-content:center;padding:14px 6px;background:var(--bg-3);border-radius:10px">
+                <canvas id="genCanvas" width="1080" height="1350" style="width:min(440px,100%);height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.14);touch-action:none" onpointerdown="genDragStart(event)" onpointermove="genDragMove(event)" onpointerup="genDragEnd(event)" onpointercancel="genDragEnd(event)"></canvas>
+              </div>
+              <p style="font-size:11px;color:var(--text-sub);margin-top:8px">プレビュー上の文字（見出し・英字・サブ・店名）はドラッグで位置を調整できます。テンプレートを変えると配置はリセットされます。</p>
             </div>
             <div class="card">
               <div class="card-header"><div class="card-title" style="font-size:13px">使い方のポイント</div></div>
@@ -4930,6 +4938,9 @@ function openImageGen() {
   if (!panel || !view) return;
   const st = document.getElementById('igGenStatus');
   if (st) st.textContent = ''; // 前回の保存結果を持ち越さない
+  const sn = document.getElementById('genStoreName');
+  if (sn && sn.dataset.forStore !== currentLocationId) { sn.value = currentLocation?.title || ''; sn.dataset.forStore = currentLocationId; }
+  _genOffClear();
   panel.classList.add('gen-open');
   view.style.display = 'block';
   igGenTab('basic');
@@ -4937,6 +4948,49 @@ function openImageGen() {
   renderGenBgPicker();
   renderGenImage();
   view.scrollIntoView({ block: 'start' });
+}
+
+// ── ライブプレビュー上のドラッグ配置（要素ごとのオフセットをcanvas座標で保持） ──
+let _genOff = {};
+let _genHitBoxes = []; // renderGenImageが毎回更新 {p,x,y,w,h}
+let _genDrag = null;
+function _genOffClear() { _genOff = { Head: { x: 0, y: 0 }, En: { x: 0, y: 0 }, Sub: { x: 0, y: 0 }, Store: { x: 0, y: 0 } }; }
+_genOffClear();
+function genResetOffsets() { _genOffClear(); renderGenImage(); }
+function _genCanvasPos(ev) {
+  const c = document.getElementById('genCanvas');
+  const r = c.getBoundingClientRect();
+  return { x: (ev.clientX - r.left) * c.width / r.width, y: (ev.clientY - r.top) * c.height / r.height };
+}
+function _genHitAt(pos) {
+  const PAD = 24; // つかみやすさの余白（canvas px）
+  for (let i = _genHitBoxes.length - 1; i >= 0; i--) { // 後に描いた要素を優先
+    const b = _genHitBoxes[i];
+    if (pos.x >= b.x - PAD && pos.x <= b.x + b.w + PAD && pos.y >= b.y - PAD && pos.y <= b.y + b.h + PAD) return b;
+  }
+  return null;
+}
+function genDragStart(ev) {
+  const pos = _genCanvasPos(ev);
+  const b = _genHitAt(pos);
+  if (!b) return;
+  const o = _genOff[b.p] || { x: 0, y: 0 };
+  _genDrag = { p: b.p, sx: pos.x, sy: pos.y, ox: o.x, oy: o.y };
+  try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
+  ev.preventDefault();
+  ev.target.style.cursor = 'grabbing';
+}
+function genDragMove(ev) {
+  const c = ev.target;
+  if (!_genDrag) { c.style.cursor = _genHitAt(_genCanvasPos(ev)) ? 'grab' : 'default'; return; }
+  const pos = _genCanvasPos(ev);
+  _genOff[_genDrag.p] = { x: _genDrag.ox + pos.x - _genDrag.sx, y: _genDrag.oy + pos.y - _genDrag.sy };
+  renderGenImage();
+}
+function genDragEnd(ev) {
+  if (!_genDrag) return;
+  _genDrag = null;
+  ev.target.style.cursor = 'grab';
 }
 function closeImageGen() {
   const view = document.getElementById('igGenView');
@@ -5047,6 +5101,7 @@ function onGenTemplate() {
   else if (t === 'bold') { tc.value = 'white'; vt.checked = true; }
   else if (t === 'magazine') { tc.value = 'gold'; vt.checked = false; }
   else { tc.value = 'white'; vt.checked = false; }
+  _genOffClear(); // テンプレでレイアウトが変わるためドラッグ配置はリセット
   renderGenImage();
 }
 
@@ -5078,7 +5133,8 @@ function renderGenImage() {
   const headline = document.getElementById('genHeadline').value || '';
   const enHead = (document.getElementById('genEnHead')?.value || '').trim();
   const sub = document.getElementById('genSub').value || '';
-  const store = currentLocation?.title || '';
+  const snEl = document.getElementById('genStoreName');
+  const store = snEl ? snEl.value.trim() : (currentLocation?.title || '');
   const M = 90;
   ctx.clearRect(0, 0, W, H);
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
@@ -5109,8 +5165,13 @@ function renderGenImage() {
   const fitEn = (text, maxW, start, weight) => { let fs = start; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; while (ctx.measureText(text).width > maxW && fs > 40) { fs -= 6; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; } return fs; };
   // 要素ごとの文字サイズ倍率・色（自動色ならテンプレの既定色 def を使う）。0%は「表示しない」として有効
   const _es = (p, def) => { const raw = parseFloat(document.getElementById('gen' + p + 'Size')?.value); const sz = Number.isFinite(raw) ? raw : 1; const auto = document.getElementById('gen' + p + 'Auto')?.checked !== false; return { sz, col: auto ? def : (document.getElementById('gen' + p + 'Color')?.value || def) }; };
+  // ── ドラッグ配置: 要素の描画を _genOff のオフセット付きで包み、ヒット領域を登録 ──
+  _genHitBoxes = [];
+  const _off = p => _genOff[p] || { x: 0, y: 0 };
+  const eDraw = (p, fn) => { const o = _off(p); ctx.save(); ctx.translate(o.x, o.y); fn(); ctx.restore(); };
+  const _hit = (p, x, y, w, h) => { const o = _off(p); if (w > 0 && h > 0) _genHitBoxes.push({ p, x: x + o.x, y: y + o.y, w, h }); };
 
-  // ══ テンプレート別描画（要素ごとの倍率 _es().sz と色 _es().col を適用）══
+  // ══ テンプレート別描画（要素ごとの倍率 _es().sz・色 _es().col・オフセット eDraw を適用）══
   if (tmpl === 'standard') {
     const eH = _es('Head', tcol), eS = _es('Sub', _genBg ? tcol : pal.accent), eST = _es('Store', 'rgba(255,255,255,0.92)');
     let fs = Math.round(W / 10.4 * eH.sz); ctx.font = `900 ${fs}px ${jpFont}`;
@@ -5119,60 +5180,157 @@ function renderGenImage() {
     const lh = fs * 1.3, subFs = Math.round(fs * 0.46 * eS.sz);
     const blockH = lines.length * lh + (sub ? subFs + 26 : 0);
     let topY = layout === 'center' ? H / 2 - blockH / 2 + fs : H - Math.round(H * 0.11) - blockH + fs;
-    ctx.fillStyle = pal.accent; ctx.fillRect(M, topY - fs - 34, 80, 10);
-    ctx.fillStyle = eH.col; shadow(true, false);
-    let y = topY; lines.forEach(l => { ctx.fillText(l, M, y); y += lh; });
-    shadow(false);
-    if (sub) { ctx.fillStyle = eS.col; ctx.font = `700 ${subFs}px ${jpFont}`; shadow(true, false); ctx.fillText(sub, M, y + 6); shadow(false); y += subFs + 18; }
-    if (store) { ctx.fillStyle = eST.col; ctx.font = `700 ${Math.round(fs * 0.38 * eST.sz)}px ${jpFont}`; ctx.fillText(store, M, layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05))); }
+    const headW = Math.max(80, ...lines.map(l => ctx.measureText(l).width));
+    eDraw('Head', () => {
+      ctx.font = `900 ${fs}px ${jpFont}`;
+      ctx.fillStyle = pal.accent; ctx.fillRect(M, topY - fs - 34, 80, 10);
+      ctx.fillStyle = eH.col; shadow(true, false);
+      let yy = topY; lines.forEach(l => { ctx.fillText(l, M, yy); yy += lh; });
+      shadow(false);
+    });
+    _hit('Head', M, topY - fs - 34, headW, 34 + lines.length * lh);
+    let y = topY + lines.length * lh;
+    if (sub) {
+      ctx.font = `700 ${subFs}px ${jpFont}`;
+      const subW = ctx.measureText(sub).width;
+      const subY = y + 6;
+      eDraw('Sub', () => { ctx.fillStyle = eS.col; ctx.font = `700 ${subFs}px ${jpFont}`; shadow(true, false); ctx.fillText(sub, M, subY); shadow(false); });
+      _hit('Sub', M, subY - subFs, subW, subFs * 1.3);
+      y += subFs + 18;
+    }
+    if (store) {
+      const stFs = Math.round(fs * 0.38 * eST.sz);
+      ctx.font = `700 ${stFs}px ${jpFont}`;
+      const stW = ctx.measureText(store).width;
+      const stY = layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05));
+      eDraw('Store', () => { ctx.fillStyle = eST.col; ctx.font = `700 ${stFs}px ${jpFont}`; ctx.fillText(store, M, stY); });
+      _hit('Store', M, stY - stFs, stW, stFs * 1.3);
+    }
 
   } else if (tmpl === 'elegant') {
     const eE = _es('En', tcol), eH = _es('Head', tcol), eS = _es('Sub', tcol);
-    if (enHead) { const fs = fitEn(enHead, W - 120, Math.round(W / 5.5 * eE.sz), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.textAlign = 'center'; shadow(true, true); ctx.fillText(enHead, W / 2, H * 0.36); shadow(false); ctx.textAlign = 'left'; }
-    if (headline) {
-      const cs = Math.round(W / 7.5 * eH.sz); ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true);
-      if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.62, cs, cs * 1.25);
-      else { let y = H - Math.round(H * 0.14); _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
-      shadow(false);
+    if (enHead) {
+      const fs = fitEn(enHead, W - 120, Math.round(W / 5.5 * eE.sz), '500');
+      ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`;
+      const w = ctx.measureText(enHead).width;
+      eDraw('En', () => { ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.textAlign = 'center'; shadow(true, true); ctx.fillText(enHead, W / 2, H * 0.36); shadow(false); ctx.textAlign = 'left'; });
+      _hit('En', W / 2 - w / 2, H * 0.36 - fs, w, fs * 1.2);
     }
-    if (sub || store) { ctx.font = `600 ${Math.round(W / 26 * eS.sz)}px ${jpFont}`; ctx.fillStyle = eS.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(sub || store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
+    if (headline) {
+      const cs = Math.round(W / 7.5 * eH.sz); ctx.font = `700 ${cs}px ${jpFont}`;
+      if (vertical) {
+        let dim;
+        eDraw('Head', () => { ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true); dim = _drawVertical(ctx, headline, M + cs * 0.2, H * 0.62, cs, cs * 1.25); shadow(false); });
+        if (dim) _hit('Head', M + cs * 0.2 - dim.width + cs * 1.25, H * 0.62 - cs, dim.width, dim.height);
+      } else {
+        const lines2 = _wrapText(ctx, headline, W - M * 2);
+        const w2 = Math.max(1, ...lines2.map(l => ctx.measureText(l).width));
+        const y0 = H - Math.round(H * 0.14);
+        eDraw('Head', () => { ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true); let yy = y0; lines2.forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.2; }); shadow(false); });
+        _hit('Head', M, y0 - cs, w2, lines2.length * cs * 1.2);
+      }
+    }
+    if (sub || store) {
+      const fs2 = Math.round(W / 26 * eS.sz); ctx.font = `600 ${fs2}px ${jpFont}`;
+      const t = sub || store; const w = ctx.measureText(t).width;
+      eDraw('Sub', () => { ctx.font = `600 ${fs2}px ${jpFont}`; ctx.fillStyle = eS.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(t, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); });
+      _hit('Sub', W - M - w, H - Math.round(H * 0.05) - fs2, w, fs2 * 1.3);
+    }
 
   } else if (tmpl === 'magazine') {
     const eE = _es('En', tcol), eH = _es('Head', '#ffffff'), eST = _es('Store', '#ffffff'), eS = _es('Sub', tcol);
     let y = H * 0.09;
     const label = (sub || 'TOKYO GOURMET').toUpperCase();
-    ctx.font = `600 ${Math.round(W / 34 * eS.sz)}px ${GEN_EN_SANS}`; ctx.fillStyle = eS.col; shadow(true, false);
-    ctx.save(); ctx.letterSpacing = '4px'; try { ctx.fillText(label.slice(0, 26), M, y); } catch (e) { ctx.fillText(label.slice(0, 26), M, y); } ctx.restore();
+    const lFs = Math.round(W / 34 * eS.sz);
+    ctx.font = `600 ${lFs}px ${GEN_EN_SANS}`;
+    const lW = ctx.measureText(label.slice(0, 26)).width + 104; // letterSpacing 4px×26字ぶんの余裕
+    const yL = y;
+    eDraw('Sub', () => { ctx.font = `600 ${lFs}px ${GEN_EN_SANS}`; ctx.fillStyle = eS.col; shadow(true, false); ctx.save(); ctx.letterSpacing = '4px'; try { ctx.fillText(label.slice(0, 26), M, yL); } catch (e) { ctx.fillText(label.slice(0, 26), M, yL); } ctx.restore(); });
+    _hit('Sub', M, yL - lFs, lW, lFs * 1.4);
     y += Math.round(W / 20);
-    if (enHead) { const fs = fitEn(enHead, W - M * 1.2, Math.round(W / 4.2 * eE.sz), '600'); ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.fillText(enHead, M - 4, y + fs * 0.75); y += fs * 0.95; }
-    if (headline) { const cs = Math.round(W / 8.2 * eH.sz); ctx.font = `800 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true); let yy = y + cs * 0.9; _wrapText(ctx, headline, W - M * 2).slice(0, 2).forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.15; }); shadow(false); }
+    if (enHead) {
+      const fs = fitEn(enHead, W - M * 1.2, Math.round(W / 4.2 * eE.sz), '600');
+      ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`;
+      const w = ctx.measureText(enHead).width;
+      const yE = y;
+      eDraw('En', () => { ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.fillText(enHead, M - 4, yE + fs * 0.75); shadow(false); });
+      _hit('En', M - 4, yE + fs * 0.75 - fs, w, fs * 1.2);
+      y += fs * 0.95;
+    }
+    if (headline) {
+      const cs = Math.round(W / 8.2 * eH.sz); ctx.font = `800 ${cs}px ${jpFont}`;
+      const lines2 = _wrapText(ctx, headline, W - M * 2).slice(0, 2);
+      const w2 = Math.max(1, ...lines2.map(l => ctx.measureText(l).width));
+      const yH = y;
+      eDraw('Head', () => { ctx.font = `800 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true); let yy = yH + cs * 0.9; lines2.forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.15; }); shadow(false); });
+      _hit('Head', M, yH + cs * 0.9 - cs, w2, lines2.length * cs * 1.15);
+    }
     if (store) {
       const bx = M, by = H - Math.round(H * 0.17), bw = Math.round(W / 5.2), bh = Math.round(W / 5.2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; shadow(true, false); ctx.strokeRect(bx, by, bw, bh); shadow(false);
-      ctx.fillStyle = eST.col; ctx.font = `700 ${Math.round(W / 32 * eST.sz)}px ${jpFont}`; ctx.textAlign = 'center';
-      _wrapText(ctx, store, bw - 16).slice(0, 3).forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + bh / 2 - 6 + i * Math.round(W / 26)));
-      ctx.textAlign = 'left';
+      eDraw('Store', () => {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; shadow(true, false); ctx.strokeRect(bx, by, bw, bh); shadow(false);
+        ctx.fillStyle = eST.col; ctx.font = `700 ${Math.round(W / 32 * eST.sz)}px ${jpFont}`; ctx.textAlign = 'center';
+        _wrapText(ctx, store, bw - 16).slice(0, 3).forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + bh / 2 - 6 + i * Math.round(W / 26)));
+        ctx.textAlign = 'left';
+      });
+      _hit('Store', bx, by, bw, bh);
     }
 
   } else if (tmpl === 'mincho') {
     const eE = _es('En', tcol), eH = _es('Head', tcol), eS = _es('Sub', tcol);
-    if (enHead) { const fs = fitEn(enHead, W - M * 1.4, Math.round(W / 4.6 * eE.sz), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 8; ctx.fillText(enHead, M - 2, H * 0.16); shadow(false); }
-    if (headline) { const cs = Math.round(W / 7.2 * eH.sz); ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eH.col; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8;
-      if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.28, cs, cs * 1.28);
-      else { let y = H * 0.3; _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
-      shadow(false); }
-    if (sub) { ctx.font = `500 ${Math.round(W / 28 * eS.sz)}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eS.col; ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 6; ctx.fillText(sub, M, H - Math.round(H * 0.06)); shadow(false); }
+    if (enHead) {
+      const fs = fitEn(enHead, W - M * 1.4, Math.round(W / 4.6 * eE.sz), '500');
+      ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`;
+      const w = ctx.measureText(enHead).width;
+      eDraw('En', () => { ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 8; ctx.fillText(enHead, M - 2, H * 0.16); shadow(false); });
+      _hit('En', M - 2, H * 0.16 - fs, w, fs * 1.2);
+    }
+    if (headline) {
+      const cs = Math.round(W / 7.2 * eH.sz); ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`;
+      if (vertical) {
+        let dim;
+        eDraw('Head', () => { ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eH.col; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8; dim = _drawVertical(ctx, headline, M + cs * 0.2, H * 0.28, cs, cs * 1.28); shadow(false); });
+        if (dim) _hit('Head', M + cs * 0.2 - dim.width + cs * 1.28, H * 0.28 - cs, dim.width, dim.height);
+      } else {
+        const lines2 = _wrapText(ctx, headline, W - M * 2);
+        const w2 = Math.max(1, ...lines2.map(l => ctx.measureText(l).width));
+        eDraw('Head', () => { ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eH.col; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8; let yy = H * 0.3; lines2.forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.2; }); shadow(false); });
+        _hit('Head', M, H * 0.3 - cs, w2, lines2.length * cs * 1.2);
+      }
+    }
+    if (sub) {
+      const fs2 = Math.round(W / 28 * eS.sz); ctx.font = `500 ${fs2}px ${GEN_FONTS.mincho}`;
+      const w = ctx.measureText(sub).width;
+      eDraw('Sub', () => { ctx.font = `500 ${fs2}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eS.col; ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 6; ctx.fillText(sub, M, H - Math.round(H * 0.06)); shadow(false); });
+      _hit('Sub', M, H - Math.round(H * 0.06) - fs2, w, fs2 * 1.3);
+    }
 
   } else if (tmpl === 'bold') {
     const eH = _es('Head', tcol), eE = _es('En', tcol), eST = _es('Store', tcol);
     if (headline) {
-      const cs = Math.round(W / 6.4 * eH.sz); ctx.font = `900 ${cs}px ${jpFont}`;
-      ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = cs * 0.12;
-      let cx = M + cs * 0.25, cy = H * 0.2;
-      for (const ch of headline) { if (ch === '\n') { cx -= cs * 1.3; cy = H * 0.2; continue; } ctx.strokeText(ch, cx, cy); ctx.fillStyle = eH.col; ctx.fillText(ch, cx, cy); cy += cs * 1.04; }
+      const cs = Math.round(W / 6.4 * eH.sz);
+      const nCols = headline.split('\n').length;
+      const maxRows = Math.max(1, ...headline.split('\n').map(s => s.length));
+      eDraw('Head', () => {
+        ctx.font = `900 ${cs}px ${jpFont}`;
+        ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = cs * 0.12;
+        let cx = M + cs * 0.25, cy = H * 0.2;
+        for (const ch of headline) { if (ch === '\n') { cx -= cs * 1.3; cy = H * 0.2; continue; } ctx.strokeText(ch, cx, cy); ctx.fillStyle = eH.col; ctx.fillText(ch, cx, cy); cy += cs * 1.04; }
+      });
+      _hit('Head', M + cs * 0.25 - (nCols - 1) * cs * 1.3, H * 0.2 - cs, Math.max(cs * 1.1, nCols * cs * 1.3), maxRows * cs * 1.04);
     }
-    if (enHead || sub) { ctx.font = `800 ${Math.round(W / 20 * eE.sz)}px ${GEN_EN_SANS}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.textAlign = 'right'; ctx.fillText(enHead || sub, W - M, H - Math.round(H * 0.08)); ctx.textAlign = 'left'; shadow(false); }
-    if (store) { ctx.font = `700 ${Math.round(W / 30 * eST.sz)}px ${jpFont}`; ctx.fillStyle = eST.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
+    if (enHead || sub) {
+      const fs2 = Math.round(W / 20 * eE.sz); ctx.font = `800 ${fs2}px ${GEN_EN_SANS}`;
+      const t = enHead || sub; const w = ctx.measureText(t).width;
+      eDraw('En', () => { ctx.font = `800 ${fs2}px ${GEN_EN_SANS}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.textAlign = 'right'; ctx.fillText(t, W - M, H - Math.round(H * 0.08)); ctx.textAlign = 'left'; shadow(false); });
+      _hit('En', W - M - w, H - Math.round(H * 0.08) - fs2, w, fs2 * 1.3);
+    }
+    if (store) {
+      const fs3 = Math.round(W / 30 * eST.sz); ctx.font = `700 ${fs3}px ${jpFont}`;
+      const w = ctx.measureText(store).width;
+      eDraw('Store', () => { ctx.font = `700 ${fs3}px ${jpFont}`; ctx.fillStyle = eST.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); });
+      _hit('Store', W - M - w, H - Math.round(H * 0.05) - fs3, w, fs3 * 1.3);
+    }
   }
   shadow(false);
 }
