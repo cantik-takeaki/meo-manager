@@ -55,7 +55,7 @@
   <!-- STEP0: 満足度 -->
   <div class="card" id="step0">
     <div class="step">STEP 1</div>
-    <h2>本日の満足度はいかがでしたか？</h2>
+    <h2 id="ratingQuestion">本日の満足度はいかがでしたか？</h2>
     <div class="stars" id="starRow"></div>
     <div class="ratelabel" id="rateLabel">星をタップしてください</div>
   </div>
@@ -156,6 +156,7 @@ async function loadSurvey(){
   }
   if (SURVEY.title) document.getElementById('headTitle').textContent = SURVEY.title;
   if (SURVEY.intro) document.getElementById('headIntro').textContent = SURVEY.intro;
+  if (SURVEY.ratingQuestion) document.getElementById('ratingQuestion').textContent = SURVEY.ratingQuestion;
   // 良かった点チップ
   const presets = (SURVEY.goodPoints && SURVEY.goodPoints.length) ? SURVEY.goodPoints
     : ['スタッフが丁寧','雰囲気が良い','また来たい','説明が分かりやすい','清潔感がある','対応が早い','コスパが良い','おすすめしたい'];

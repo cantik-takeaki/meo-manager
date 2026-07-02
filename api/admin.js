@@ -32,6 +32,7 @@ export default async function handler(req, res) {
   const DEFAULT_SURVEY = {
     title: '本日はありがとうございました',
     intro: 'よろしければ、ご感想をお聞かせください。30秒で終わります。',
+    ratingQuestion: '本日の満足度はいかがでしたか？',
     completionMsg: '貴重なご意見をいただき、ありがとうございました。',
     lowMsg: '貴重なご意見をありがとうございます。いただいたお声は改善に活かします。差し支えなければ、もう少し詳しくお聞かせください。',
     goodPoints: ['スタッフが丁寧', '雰囲気が良い', 'また来たい', '説明が分かりやすい', '清潔感がある', '対応が早い', 'コスパが良い', 'おすすめしたい'],
@@ -199,7 +200,7 @@ export default async function handler(req, res) {
       const cur = { ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) };
       const b = req.body || {};
       const next = { ...cur };
-      ['title', 'intro', 'completionMsg', 'lowMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
+      ['title', 'intro', 'ratingQuestion', 'completionMsg', 'lowMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
       if (b.qrEnabled !== undefined) next.qrEnabled = !!b.qrEnabled; // boolean（Stringで潰さない）
       if (Array.isArray(b.goodPoints)) next.goodPoints = b.goodPoints.map(s => String(s).slice(0, 30)).filter(Boolean).slice(0, 16);
       if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));
