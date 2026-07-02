@@ -1914,10 +1914,10 @@ body {
               <div class="card">
                 <div class="card-header"><div class="card-title" style="font-size:13px">文字サイズ（要素ごと）</div></div>
                 <div style="display:grid;gap:16px">
-                  <div class="pop-slider"><div class="pop-slabel"><span>見出し</span><span class="pop-sval" id="genFsValHead">100%</span></div><input type="range" id="genHeadSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Head',this.value)"></div>
-                  <div class="pop-slider"><div class="pop-slabel"><span>英字見出し</span><span class="pop-sval" id="genFsValEn">100%</span></div><input type="range" id="genEnSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('En',this.value)"></div>
-                  <div class="pop-slider"><div class="pop-slabel"><span>サブテキスト</span><span class="pop-sval" id="genFsValSub">100%</span></div><input type="range" id="genSubSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Sub',this.value)"></div>
-                  <div class="pop-slider"><div class="pop-slabel"><span>店名</span><span class="pop-sval" id="genFsValStore">100%</span></div><input type="range" id="genStoreSize" min="0.6" max="1.7" step="0.05" value="1" oninput="igGenFs('Store',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>見出し</span><span class="pop-sval" id="genFsValHead">100%</span></div><input type="range" id="genHeadSize" min="0" max="2" step="0.05" value="1" oninput="igGenFs('Head',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>英字見出し</span><span class="pop-sval" id="genFsValEn">100%</span></div><input type="range" id="genEnSize" min="0" max="2" step="0.05" value="1" oninput="igGenFs('En',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>サブテキスト</span><span class="pop-sval" id="genFsValSub">100%</span></div><input type="range" id="genSubSize" min="0" max="2" step="0.05" value="1" oninput="igGenFs('Sub',this.value)"></div>
+                  <div class="pop-slider"><div class="pop-slabel"><span>店名</span><span class="pop-sval" id="genFsValStore">100%</span></div><input type="range" id="genStoreSize" min="0" max="2" step="0.05" value="1" oninput="igGenFs('Store',this.value)"></div>
                 </div>
                 <div style="text-align:right;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="igGenResetFs()">デフォルトに戻す</button></div>
               </div>
@@ -5107,8 +5107,8 @@ function renderGenImage() {
 
   const shadow = (on, strong) => { if (on) { ctx.shadowColor = strong ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.4)'; ctx.shadowBlur = strong ? 22 : 14; ctx.shadowOffsetY = 3; } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; } };
   const fitEn = (text, maxW, start, weight) => { let fs = start; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; while (ctx.measureText(text).width > maxW && fs > 40) { fs -= 6; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; } return fs; };
-  // 要素ごとの文字サイズ倍率・色（自動色ならテンプレの既定色 def を使う）
-  const _es = (p, def) => { const sz = parseFloat(document.getElementById('gen' + p + 'Size')?.value) || 1; const auto = document.getElementById('gen' + p + 'Auto')?.checked !== false; return { sz, col: auto ? def : (document.getElementById('gen' + p + 'Color')?.value || def) }; };
+  // 要素ごとの文字サイズ倍率・色（自動色ならテンプレの既定色 def を使う）。0%は「表示しない」として有効
+  const _es = (p, def) => { const raw = parseFloat(document.getElementById('gen' + p + 'Size')?.value); const sz = Number.isFinite(raw) ? raw : 1; const auto = document.getElementById('gen' + p + 'Auto')?.checked !== false; return { sz, col: auto ? def : (document.getElementById('gen' + p + 'Color')?.value || def) }; };
 
   // ══ テンプレート別描画（要素ごとの倍率 _es().sz と色 _es().col を適用）══
   if (tmpl === 'standard') {
