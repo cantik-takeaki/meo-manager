@@ -1099,11 +1099,13 @@ body {
       <div class="card" id="competitorCard">
         <div class="card-header"><div class="card-title">🥊 競合分析</div></div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <input id="compKeyword" type="text" placeholder="キーワード（例：相模原 美容室）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           <input id="compLocation" type="text" placeholder="検索地点（任意・空欄でOK／英語例：Sagamihara,Kanagawa,Japan）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <button class="btn btn-outline btn-sm" onclick="suggestCompKeywords(event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで候補</button>
           <button class="btn btn-primary btn-sm" onclick="runCompetitorAnalysis()">分析する</button>
         </div>
+        <div id="compKwChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div id="compResult"></div>
       </div>
 
@@ -4313,6 +4315,36 @@ function gbpCheck() {
     items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`).join('') + '</div>';
 }
 
+// 競合分析のキーワード候補をAIで提示（まず登録済み対策KW→無ければAI生成）。チップで入力欄に反映。
+function pickCompKw(kw, area) {
+  const k = document.getElementById('compKeyword'); if (k) k.value = kw;
+  const l = document.getElementById('compLocation'); if (l && area && !l.value) l.value = area;
+}
+async function suggestCompKeywords(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('compKwChips'); if (!box) return;
+  const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '候補取得中…'; }
+  box.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">候補を取得中…</span>';
+  const chip = (kw, area) => `<button class="btn btn-outline btn-sm" style="padding:4px 10px" onclick="pickCompKw('${String(kw).replace(/'/g, "&#39;")}','${String(area || '').replace(/'/g, "&#39;")}')">${escapeHtml(kw)}${area ? `<span style="color:var(--text-muted);font-size:11px;margin-left:4px">${escapeHtml(area)}</span>` : ''}</button>`;
+  try {
+    // ① 登録済みの対策キーワード（メタ付き・すでに厳選済み）
+    let items = [];
+    try {
+      const d = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+      items = (d.keywords || []).filter(Boolean).map(k => ({ kw: k, area: (d.meta || {})[k]?.area || '' }));
+    } catch (e) {}
+    // ② 無ければAIで生成
+    if (!items.length) {
+      const g = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'keyword_ideas', existing: [] }) }).then(r => r.json());
+      let arr = []; try { arr = JSON.parse((g.content || '').replace(/```json|```/g, '').trim()); } catch (e) { const m = (g.content || '').match(/\[[\s\S]*\]/); if (m) arr = JSON.parse(m[0]); }
+      items = (arr || []).map(c => ({ kw: c.keyword, area: c.area || '' }));
+    }
+    if (!items.length) { box.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">候補を取得できませんでした。対策キーワードを登録するか、手入力してください。</span>'; }
+    else box.innerHTML = `<span style="font-size:11px;color:var(--text-sub);width:100%;margin-bottom:2px">クリックで入力欄に反映：</span>` + items.slice(0, 12).map(it => chip(it.kw, it.area)).join('');
+  } catch (e) { box.innerHTML = '<span style="font-size:12px;color:var(--red)">候補の取得に失敗しました</span>'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = bh; }
+}
+
 // ─── ダッシュボード：競合分析（SerpApiの上位店舗を比較） ───
 async function runCompetitorAnalysis() {
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
@@ -4346,7 +4378,8 @@ async function runCompetitorAnalysis() {
         <span style="font-size:12px;color:var(--text-sub)">口コミ${t.reviews || '—'}</span>
       </div>`;
     }).join('') + `<div id="compAdvice" style="margin-top:12px;font-size:13px;line-height:1.7;white-space:pre-wrap"></div>`;
-    // AI助言
+    // AI助言（自店の実数値も渡して、既に勝っている項目を課題にしない）
+    const meEntry = d.matched ? top.find(t => t.title === d.matched) : null;
     const adv = document.getElementById('compAdvice');
     adv.textContent = '勝ち筋を分析中…';
     try {
@@ -4354,7 +4387,11 @@ async function runCompetitorAnalysis() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           locationId: currentLocationId, type: 'competitor_advice',
-          competitor: { keyword: kw, myRank, top: top3.map(t => ({ title: t.title, rating: t.rating, reviews: t.reviews })) },
+          competitor: {
+            keyword: kw, myRank, location: loc,
+            self: { rating: meEntry?.rating ?? null, reviews: meEntry?.reviews ?? null },
+            top: top3.map(t => ({ title: t.title, rating: t.rating, reviews: t.reviews })),
+          },
         }),
       }).then(r => r.json());
       adv.textContent = ad.content || '';
