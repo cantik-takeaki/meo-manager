@@ -232,7 +232,40 @@ body {
 .stat-value.green { color: var(--accent-2); }
 .stat-value.blue { color: var(--accent); }
 .stat-value.gold { color: var(--gold); }
+.stat-value.red { color: var(--red); }
 .stat-change { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* ─── 全社サマリー（5列カード帯・アイコン付き） ─── */
+.stats-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 1023px) { .stats-grid-5 { grid-template-columns: repeat(2, 1fr); } .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+.mini-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.mini-card .mc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mini-card .mc-label { font-size: 12px; color: var(--text-sub); }
+.mini-card .mc-ico { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; }
+.mini-card .mc-ico svg { width: 16px; height: 16px; }
+.mini-card .mc-value { font-size: 24px; font-weight: 800; line-height: 1.1; }
+.mini-card .mc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ─── 口コミ獲得KPI 全店舗合計 ─── */
+.kpi-agg-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.kpi-agg-rate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+@media (max-width: 1023px) { .kpi-agg-grid { grid-template-columns: repeat(3, 1fr); } .kpi-agg-rate { grid-template-columns: repeat(2, 1fr); } }
+.kpi-agg-cell { border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: left; }
+.kpi-agg-cell .k-l { font-size: 11px; color: var(--text-sub); display: flex; align-items: center; gap: 5px; }
+.kpi-agg-cell .k-v { font-size: 22px; font-weight: 800; margin-top: 4px; }
+
+/* ─── 店舗別サマリー表 ─── */
+.summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.summary-table th { text-align: left; font-size: 11px; color: var(--text-sub); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.summary-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.summary-table tr:hover td { background: var(--bg-3); }
+.summary-table .st-name { font-weight: 600; color: var(--accent); cursor: pointer; }
+.summary-table .st-client { font-size: 11px; color: var(--text-muted); }
+.st-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.st-badge.done { background: rgba(16,185,129,0.12); color: var(--accent-2); }
+.st-badge.pending { background: rgba(245,158,11,0.14); color: var(--gold); }
+.st-badge.nodata { background: var(--bg-3); color: var(--text-muted); }
+.st-badge.nokw { background: var(--bg-3); color: var(--text-muted); }
 
 /* ─── Review Card ─── */
 .review-card {
@@ -477,8 +510,85 @@ body {
           <div class="page-title">ダッシュボード</div>
           <div class="page-sub">全店舗の概況</div>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="generateReport()">📄 月次レポート（PDF）</button>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="dashUpdated" style="font-size:12px;color:var(--text-muted)"></span>
+          <button class="btn btn-outline btn-sm" onclick="loadDashboardSummary()">🔄 更新</button>
+          <button class="btn btn-outline btn-sm" onclick="generateReport()">📄 月次レポート（PDF）</button>
+        </div>
       </div>
+
+      <!-- ▼▼ 全社サマリー（追加・全店舗横断の順位ロールアップ） ▼▼ -->
+      <div class="stats-grid-5">
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">クライアント</span><span class="mc-ico" style="background:rgba(46,143,240,0.12);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg></span></div><div class="mc-value" id="sumClients">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">登録店舗</span><span class="mc-ico" style="background:rgba(46,143,240,0.12);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg></span></div><div class="mc-value" id="sumStores">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">管理キーワード</span><span class="mc-ico" style="background:rgba(139,92,246,0.12);color:#8b5cf6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1" fill="currentColor"/></svg></span></div><div class="mc-value" id="sumKw">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">TOP3圏内</span><span class="mc-ico" style="background:rgba(245,158,11,0.14);color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0012 0V2z"/></svg></span></div><div class="mc-value gold" id="sumTop3">—</div><div class="mc-sub" id="sumTop3Pct"></div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">TOP10圏内</span><span class="mc-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span></div><div class="mc-value green" id="sumTop10">—</div><div class="mc-sub" id="sumTop10Pct"></div></div>
+      </div>
+      <div class="stats-grid-5">
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">圏外</span><span class="mc-ico" style="background:rgba(239,68,68,0.10);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg></span></div><div class="mc-value" id="sumOut">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">前月比 UP</span><span class="mc-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span></div><div class="mc-value green" id="sumUp">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">前月比 DOWN</span><span class="mc-ico" style="background:rgba(239,68,68,0.10);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></svg></span></div><div class="mc-value red" id="sumDown">—</div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">入力済み</span><span class="mc-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span></div><div class="mc-value" id="sumFilled">—</div><div class="mc-sub" id="sumFilledOf"></div></div>
+        <div class="mini-card"><div class="mc-top"><span class="mc-label">未入力</span><span class="mc-ico" style="background:rgba(245,158,11,0.14);color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span></div><div class="mc-value gold" id="sumUnfilled">—</div></div>
+      </div>
+
+      <!-- ▼▼ 口コミ獲得KPI 全店舗合計（追加） ▼▼ -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🎯 口コミ獲得KPI（全店舗合計・今月）</div></div>
+        <div class="kpi-agg-grid">
+          <div class="kpi-agg-cell"><div class="k-l">📱 QRスキャン</div><div class="k-v" id="aggScan">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l">💬 アンケート回答</div><div class="k-v" id="aggSurvey">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l">✨ AI生成</div><div class="k-v" id="aggAi">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l">🔗 Googleクリック</div><div class="k-v" id="aggClick">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l">📣 LINE誘導</div><div class="k-v" id="aggLine">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l">📩 メール取得</div><div class="k-v" id="aggMail">—</div></div>
+        </div>
+        <div class="kpi-agg-rate">
+          <div class="kpi-agg-cell"><div class="k-l">回答率</div><div class="k-v" id="rateSurvey">—</div><div class="mc-sub" id="rateSurveySub"></div></div>
+          <div class="kpi-agg-cell"><div class="k-l">AI生成率</div><div class="k-v" id="rateAi">—</div><div class="mc-sub" id="rateAiSub"></div></div>
+          <div class="kpi-agg-cell"><div class="k-l">Google誘導率</div><div class="k-v" id="rateClick">—</div><div class="mc-sub" id="rateClickSub"></div></div>
+          <div class="kpi-agg-cell"><div class="k-l">LINE誘導率</div><div class="k-v" id="rateLine">—</div><div class="mc-sub" id="rateLineSub"></div></div>
+        </div>
+      </div>
+
+      <!-- ▼▼ 店舗別サマリー表（追加・順位軸の横断一覧） ▼▼ -->
+      <div class="card">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
+          <div class="card-title">🏢 店舗別サマリー</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+            <input id="summarySearch" type="text" placeholder="店舗名・会社名で絞り込み" oninput="renderSummaryTable()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;width:200px;font-family:inherit">
+            <select id="summaryFilter" onchange="renderSummaryTable()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:12px;font-family:inherit">
+              <option value="all">すべて</option>
+              <option value="入力済み">入力済み</option>
+              <option value="未入力">未入力</option>
+              <option value="データなし">データなし</option>
+              <option value="KW未登録">KW未登録</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="summary-table">
+            <thead><tr>
+              <th>店舗名</th><th>ステータス</th><th>KW数</th><th>TOP3</th><th>TOP10</th><th>圏外</th><th>平均順位</th><th>前月比</th><th>最終入力</th>
+            </tr></thead>
+            <tbody id="summaryTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">読み込み中...</td></tr></tbody>
+          </table>
+        </div>
+        <div id="summaryCount" style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:8px"></div>
+      </div>
+
+      <!-- ▼▼ クイックアクション（追加） ▼▼ -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">⚡ クイックアクション</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="showPanel('clients')">＋ 店舗を追加/管理</button>
+          <button class="btn btn-outline btn-sm" onclick="showPanel('reviews')">口コミ管理へ</button>
+          <button class="btn btn-outline btn-sm" onclick="showPanel('posts')">投稿管理へ</button>
+          <button class="btn btn-outline btn-sm" onclick="generateReport()">レポート確認</button>
+        </div>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">管理店舗数</div>
@@ -1551,6 +1661,7 @@ async function init() {
     }
 
     loadLocations();
+    loadDashboardSummary(); // 全社サマリー（順位ロールアップ＋KPI合計＋店舗別表）
   } catch {
     showLogin();
   }
@@ -3400,6 +3511,90 @@ function renderLowAlerts(stats) {
     </div>`).join('');
 }
 function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ─── 全社サマリー（追加・ダッシュボード最上部） ───
+async function loadDashboardSummary() {
+  try {
+    const res = await fetch('/api/admin?action=dashboard&_cb=' + Date.now());
+    if (!res.ok) return;
+    const d = await res.json();
+    window._dashSummary = d;
+    const t = d.totals || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('sumClients', t.clients ?? 0);
+    set('sumStores', t.stores ?? 0);
+    set('sumKw', t.keywords ?? 0);
+    set('sumTop3', t.top3 ?? 0);
+    set('sumTop3Pct', t.keywords ? `全体の ${t.top3Pct}%` : '');
+    set('sumTop10', t.top10 ?? 0);
+    set('sumTop10Pct', t.keywords ? `全体の ${t.top10Pct}%` : '');
+    set('sumOut', t.outRange ?? 0);
+    set('sumUp', t.upCount ?? 0);
+    set('sumDown', t.downCount ?? 0);
+    set('sumFilled', t.filled ?? 0);
+    set('sumFilledOf', `/ ${t.stores ?? 0}店舗`);
+    set('sumUnfilled', t.unfilled ?? 0);
+
+    // 口コミ獲得KPI 全店舗合計
+    const k = d.kpi || {};
+    set('aggScan', k.scan ?? 0); set('aggSurvey', k.survey ?? 0); set('aggAi', k.ai ?? 0);
+    set('aggClick', k.click ?? 0); set('aggLine', k.line ?? 0); set('aggMail', k.mail ?? 0);
+    const pct = (num, den) => den ? Math.round((num / den) * 100) + '%' : '—';
+    set('rateSurvey', pct(k.survey, k.scan)); set('rateSurveySub', `${k.survey || 0} / ${k.scan || 0}`);
+    set('rateAi', pct(k.ai, k.survey)); set('rateAiSub', `${k.ai || 0} / ${k.survey || 0}`);
+    set('rateClick', pct(k.click, k.survey)); set('rateClickSub', `${k.click || 0} / ${k.survey || 0}`);
+    set('rateLine', pct(k.line, k.survey)); set('rateLineSub', `${k.line || 0} / ${k.survey || 0}`);
+
+    const upd = document.getElementById('dashUpdated');
+    if (upd) upd.textContent = '最終更新: ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+    renderSummaryTable();
+  } catch (e) { /* 集計失敗は無視（既存カードには影響しない） */ }
+}
+
+function renderSummaryTable() {
+  const body = document.getElementById('summaryTableBody');
+  if (!body) return;
+  const rows = (window._dashSummary?.perStore) || [];
+  const q = (document.getElementById('summarySearch')?.value || '').trim().toLowerCase();
+  const f = document.getElementById('summaryFilter')?.value || 'all';
+  let filtered = rows.filter(r =>
+    (f === 'all' || r.status === f) &&
+    (!q || (r.name || '').toLowerCase().includes(q) || (r.company || '').toLowerCase().includes(q))
+  );
+  if (!filtered.length) {
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">該当する店舗がありません</td></tr>';
+  } else {
+    const badgeClass = { '入力済み': 'done', '未入力': 'pending', 'データなし': 'nodata', 'KW未登録': 'nokw' };
+    const momCell = (m) => {
+      if (m == null) return '<span style="color:var(--text-muted)">—</span>';
+      if (m > 0) return `<span style="color:var(--accent-2)">▲ ${m}</span>`;
+      if (m < 0) return `<span style="color:var(--red)">▼ ${Math.abs(m)}</span>`;
+      return '<span style="color:var(--text-muted)">±0</span>';
+    };
+    body.innerHTML = filtered.map(r => `
+      <tr>
+        <td><div class="st-name" onclick="jumpToStore('${r.storeId}')">${escapeHtml(r.name)}</div><div class="st-client">${escapeHtml(r.company || '')}</div></td>
+        <td><span class="st-badge ${badgeClass[r.status] || 'nodata'}">${r.status}</span></td>
+        <td>${r.kwCount}</td>
+        <td>${r.top3 ? `<span style="color:var(--gold);font-weight:700">${r.top3}</span>` : '0'}</td>
+        <td>${r.top10 ? `<span style="color:var(--accent-2);font-weight:700">${r.top10}</span>` : '0'}</td>
+        <td>${r.out || 0}</td>
+        <td>${r.avgRank != null ? r.avgRank : '—'}</td>
+        <td>${momCell(r.mom)}</td>
+        <td style="color:var(--text-muted);font-size:12px">${r.lastInput || 'なし'}</td>
+      </tr>`).join('');
+  }
+  const cnt = document.getElementById('summaryCount');
+  if (cnt) cnt.textContent = `${filtered.length}件表示（全${rows.length}件）`;
+}
+
+// 店舗別サマリーの店舗名クリック → サイドバーの該当店舗を選択
+function jumpToStore(storeId) {
+  const idx = (window._locations || []).findIndex(l => (l.storeId || (l.name || '').replace(/\//g, '_')) === storeId);
+  if (idx >= 0) selectLocation(idx);
+  else showToast('この店舗はサイドバー未表示です。店舗管理で管理対象に追加してください', 'error');
+}
 
 // 店舗管理から登録後にサイドバーを再読み込み
 async function refreshStores() {

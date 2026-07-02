@@ -343,6 +343,98 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── ダッシュボード全社集計（順位ロールアップ＋口コミ獲得KPI合計＋店舗別サマリー） ──
+  // 競合ぐるっとMEOのダッシュボード相当。managed_locations＋手動store を横断集計。既存データのみ使用。
+  if (req.method === 'GET' && action === 'dashboard') {
+    const ym = new Date().toISOString().slice(0, 7);
+    const managed = await kvGet('managed_locations') || [];
+    const manual = await kvGet('admin_stores') || [];
+    // 集計対象の店舗リスト（managed GBP ＋ 手動登録）。storeIdはrankings/kpiのキーに合わせる。
+    const stores = [];
+    const seen = new Set();
+    for (const m of managed) {
+      const sid = String(m.locId || '').replace(/\//g, '_');
+      if (!sid || seen.has(sid)) continue; seen.add(sid);
+      stores.push({ storeId: sid, name: m.title || '店舗', company: m.company || m.title || m.clientName || '未分類' });
+    }
+    for (const s of manual) {
+      const sid = s.storeId;
+      if (!sid || seen.has(sid)) continue; seen.add(sid);
+      stores.push({ storeId: sid, name: s.storeName || '店舗', company: s.storeName || '手動登録' });
+    }
+
+    let totalKw = 0, top3 = 0, top10 = 0, outRange = 0, upCount = 0, downCount = 0, filled = 0;
+    const kpiSum = { scan: 0, survey: 0, ai: 0, click: 0, line: 0, mail: 0 };
+    const perStore = [];
+    const clients = new Set();
+
+    for (const st of stores) {
+      clients.add(st.company);
+      const rk = await kvGet(`rankings_${st.storeId}`) || { history: [], keywords: [] };
+      const kws = (rk.keywords || []).filter(Boolean);
+      const hist = rk.history || [];
+      const last = hist[hist.length - 1] || null;
+      const ranksArr = last ? (last.rankings || []) : [];
+      // この店のTOP3/TOP10/圏外/平均
+      let s3 = 0, s10 = 0, sOut = 0, sum = 0, cnt = 0;
+      kws.forEach((_, i) => {
+        const r = parseInt(ranksArr[i], 10);
+        if (Number.isFinite(r) && r >= 1) {
+          if (r <= 3) s3++;
+          if (r <= 10) s10++;
+          if (r > 20) sOut++;
+          sum += r; cnt++;
+        } else if (last) {
+          sOut++; // 計測済みだが順位なし＝圏外
+        }
+      });
+      const avg = cnt ? Math.round((sum / cnt) * 10) / 10 : null;
+      totalKw += kws.length; top3 += s3; top10 += s10; outRange += sOut;
+
+      // 前月比（当月最新平均 vs 前月最新平均）
+      const monthLast = (m) => { const hs = hist.filter(h => (h.date || '').slice(0, 7) === m); return hs[hs.length - 1] || null; };
+      const avgOf = (entry) => { if (!entry) return null; const rs = (entry.rankings || []).map(x => parseInt(x, 10)).filter(x => Number.isFinite(x) && x >= 1); return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null; };
+      const prevYm = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7);
+      const curAvg = avgOf(monthLast(ym)), prevAvg = avgOf(monthLast(prevYm));
+      let mom = null;
+      if (curAvg != null && prevAvg != null) { mom = Math.round((prevAvg - curAvg) * 10) / 10; if (mom > 0) upCount++; else if (mom < 0) downCount++; }
+
+      // 当月に入力があるか
+      const inputThisMonth = hist.some(h => (h.date || '').slice(0, 7) === ym);
+      if (inputThisMonth) filled++;
+
+      // ステータス
+      let status = 'KW未登録';
+      if (kws.length > 0) status = hist.length === 0 ? 'データなし' : (inputThisMonth ? '入力済み' : '未入力');
+
+      // 口コミ獲得KPI（当月）
+      const kpi = await kvGet(`kpi_${st.storeId}_${ym}`) || {};
+      kpiSum.scan += kpi.scan || 0; kpiSum.survey += kpi.survey || 0; kpiSum.ai += kpi.ai || 0;
+      kpiSum.click += kpi.click || 0; kpiSum.line += kpi.line || 0;
+      const leads = await kvGet(`leads_${st.storeId}`) || [];
+      kpiSum.mail += leads.filter(l => String(l.at || '').slice(0, 7) === ym).length;
+
+      perStore.push({
+        storeId: st.storeId, name: st.name, company: st.company, status,
+        kwCount: kws.length, top3: s3, top10: s10, out: sOut, avgRank: avg,
+        mom, lastInput: last ? last.date : null,
+      });
+    }
+
+    return res.json({
+      month: ym,
+      totals: {
+        clients: clients.size, stores: stores.length, keywords: totalKw,
+        top3, top10, outRange, upCount, downCount,
+        filled, unfilled: stores.length - filled,
+        top3Pct: totalKw ? Math.round((top3 / totalKw) * 100) : 0,
+        top10Pct: totalKw ? Math.round((top10 / totalKw) * 100) : 0,
+      },
+      kpi: kpiSum,
+      perStore,
+    });
+  }
+
   // ── 順位取得 ──
   if (req.method === 'GET' && action === 'rankings') {
     const { storeId } = req.query;
