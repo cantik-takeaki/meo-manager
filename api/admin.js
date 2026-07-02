@@ -223,6 +223,21 @@ export default async function handler(req, res) {
     return res.json({ month: ym, current: cur, previous: last, avgSatisfaction: avg(cur), avgSatisfactionPrev: avg(last) });
   }
 
+  // ── 口コミ獲得KPI 手動修正・リセット（管理側・当月）──
+  // スタッフのテストスキャン等で膨らんだ数値を手で正す/ゼロに戻す。
+  if (action === 'kpi-set' && req.method === 'POST') {
+    const { storeId, values, reset } = req.body || {};
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const ym = new Date().toISOString().slice(0, 7);
+    const key = `kpi_${storeId}_${ym}`;
+    if (reset) { await kvSet(key, { ...KPI_ZERO }); return res.json({ success: true, current: { ...KPI_ZERO } }); }
+    const cur = { ...KPI_ZERO, ...(await kvGet(key) || {}) };
+    const fields = ['scan', 'rate', 'survey', 'ai', 'click', 'line', 'lowfb'];
+    fields.forEach(f => { if (values && values[f] !== undefined) { const n = parseInt(values[f], 10); cur[f] = Number.isFinite(n) && n >= 0 ? n : 0; } });
+    await kvSet(key, cur);
+    return res.json({ success: true, current: cur });
+  }
+
   // ── 口コミQR成果：直近6ヶ月のKPI履歴（月別推移テーブル・ファネル用）──
   if (action === 'kpi-history' && req.method === 'GET') {
     const { storeId } = req.query;

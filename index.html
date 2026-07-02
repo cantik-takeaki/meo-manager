@@ -797,9 +797,9 @@ body {
             <span id="storeDetailCompany" style="font-size:12px;color:var(--text-muted)"></span>
             <!-- 店舗ページのアクション（ぐるっと相当：店舗分析／一括順位入力／その他） -->
             <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:relative">
-              <button class="btn btn-primary btn-sm" onclick="document.getElementById('meoDiagCard')?.scrollIntoView({behavior:'smooth'})">📊 店舗分析</button>
-              <button class="btn btn-outline btn-sm" onclick="showBulkRank(window._qrIdx ?? currentLocation?._idx)">📋 一括順位入力</button>
-              <button class="btn btn-outline btn-sm" onclick="toggleStoreMore(event)">⋯ その他 ▾</button>
+              <button class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="document.getElementById('meoDiagCard')?.scrollIntoView({behavior:'smooth'})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/></svg>店舗分析</button>
+              <button class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="showBulkRank(window._qrIdx ?? currentLocation?._idx)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12l1.5 1.5L13 11M9 17h6"/></svg>一括順位入力</button>
+              <button class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="toggleStoreMore(event)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>その他</button>
               <div id="storeMoreMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:20;min-width:210px;overflow:hidden">
                 <button class="more-item" onclick="_moreGo('qr')">🔳 口コミQR管理</button>
                 <button class="more-item" onclick="_moreGo('pop')">🖨 口コミPOP作成</button>
@@ -926,6 +926,28 @@ body {
           <span style="font-size:12px;color:var(--text-sub)">読み込み中…</span>
         </div>
         <div id="kpiFunnel" style="margin-top:14px"></div>
+
+        <!-- 導線ファネルの数値を手動修正・リセット -->
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-outline btn-sm" onclick="toggleKpiEdit()">🔧 数値を修正</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="resetKpi()">↺ 今月をリセット</button>
+        </div>
+        <div id="kpiEditBox" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg-3)">
+          <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px">テスト読み取り等で膨らんだ今月の数値を手で正せます。空欄は0扱い。</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">
+            <label style="font-size:12px;color:var(--text-sub)">スキャン<input id="kpi-scan" type="number" min="0" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">評価回答<input id="kpi-rate" type="number" min="0" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">AI下書き<input id="kpi-ai" type="number" min="0" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">Googleクリック<input id="kpi-click" type="number" min="0" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">LINE誘導<input id="kpi-line" type="number" min="0" class="ed-in"></label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価の声<input id="kpi-lowfb" type="number" min="0" class="ed-in"></label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="saveKpiEdit()">保存する</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleKpiEdit()">キャンセル</button>
+          </div>
+        </div>
+
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-outline btn-sm" onclick="openSurveyEditor()">✏️ アンケートを編集</button>
           <button class="btn btn-outline btn-sm" onclick="loadFeedback()">💬 低評価フィードバック<span id="fbBadge"></span></button>
@@ -2521,6 +2543,52 @@ async function loadKpi() {
     const badge = document.getElementById('leadBadge');
     if (badge) badge.textContent = n ? `（${n}）` : '';
   } catch (e) {}
+}
+
+// ── 導線ファネルの数値を手動修正・リセット ──
+function toggleKpiEdit() {
+  const box = document.getElementById('kpiEditBox');
+  if (!box) return;
+  const opening = box.style.display === 'none';
+  box.style.display = opening ? 'block' : 'none';
+  if (opening) { // 現在値を取得してプリフィル
+    fetch(`/api/admin?action=kpi&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()).then(d => {
+      const c = d.current || {};
+      ['scan', 'rate', 'ai', 'click', 'line', 'lowfb'].forEach(f => { const el = document.getElementById('kpi-' + f); if (el) el.value = c[f] || 0; });
+    }).catch(() => {});
+  }
+}
+async function saveKpiEdit() {
+  if (!currentLocationId) return;
+  const values = {};
+  ['scan', 'rate', 'ai', 'click', 'line', 'lowfb'].forEach(f => { values[f] = parseInt(document.getElementById('kpi-' + f)?.value, 10) || 0; });
+  try {
+    const res = await fetch('/api/admin?action=kpi-set', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId: currentLocationId, values }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || '保存に失敗しました', 'error');
+    showToast('導線の数値を更新しました', 'success');
+    toggleKpiEdit();
+    loadKpi();
+    loadDashboardSummary();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+async function resetKpi() {
+  if (!currentLocationId) return;
+  if (!confirm('今月の口コミ獲得KPI（スキャン・評価回答・AI・クリック・LINE・低評価）を全て0にリセットします。よろしいですか？')) return;
+  try {
+    const res = await fetch('/api/admin?action=kpi-set', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId: currentLocationId, reset: true }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.success) return showToast(d.error || 'リセットに失敗しました', 'error');
+    showToast('今月のKPIをリセットしました', 'success');
+    loadKpi();
+    loadDashboardSummary();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 // 店舗の口コミ依頼ページURL（Google URLはアンケート設定 or localStorage）
