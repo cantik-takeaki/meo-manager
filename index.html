@@ -256,11 +256,17 @@ body {
 
 /* ─── 店舗別サマリー表 ─── */
 .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.summary-table th { text-align: left; font-size: 11px; color: var(--text-sub); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-.summary-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.summary-table th { text-align: center; font-size: 11px; color: var(--text-sub); font-weight: 600; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.summary-table td { padding: 12px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; text-align: center; }
+/* 1列目(店舗名)だけ左寄せ・広め。数値列は中央寄せで項目の真下に揃える */
+.summary-table th:first-child, .summary-table td:first-child { text-align: left; padding-left: 14px; width: 26%; min-width: 200px; }
 .summary-table tr:hover td { background: var(--bg-3); }
 .summary-table .st-name { font-weight: 600; color: var(--accent); cursor: pointer; }
 .summary-table .st-client { font-size: 11px; color: var(--text-muted); }
+
+/* ─── カードタイトルのアイコンチップ（ぐるっと風・絵文字の格上げ） ─── */
+.ttl-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 9px; flex-shrink: 0; position: relative; top: -1px; }
+.ttl-ico svg { width: 17px; height: 17px; }
 .st-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .st-badge.done { background: rgba(16,185,129,0.12); color: var(--accent-2); }
 .st-badge.pending { background: rgba(245,158,11,0.14); color: var(--gold); }
@@ -541,7 +547,7 @@ body {
 
       <!-- ▼▼ 口コミ獲得KPI 全店舗合計（追加） ▼▼ -->
       <div class="card">
-        <div class="card-header"><div class="card-title">🎯 口コミ獲得KPI（全店舗合計・今月）</div></div>
+        <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></span>口コミ獲得KPI（全店舗合計・今月）</div></div>
         <div class="kpi-agg-grid">
           <div class="kpi-agg-cell"><div class="k-l">📱 QRスキャン</div><div class="k-v" id="aggScan">—</div></div>
           <div class="kpi-agg-cell"><div class="k-l">💬 アンケート回答</div><div class="k-v" id="aggSurvey">—</div></div>
@@ -560,7 +566,7 @@ body {
 
       <!-- ▼▼ AIコンサル（店舗を選んで健康診断・改善・優先アクション） ▼▼ -->
       <div class="card">
-        <div class="card-header"><div class="card-title">🧠 AIコンサル</div></div>
+        <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(139,92,246,0.14);color:#8b5cf6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 00-4 4 3 3 0 00-2 5.24A3 3 0 007 17a3 3 0 005 1 3 3 0 005-1 3 3 0 001-5.76A3 3 0 0016 6a4 4 0 00-4-4z"/><path d="M12 6v12"/></svg></span>AIコンサル</div></div>
         <div id="consulIntro" style="text-align:center;padding:12px 0;color:var(--text-sub);font-size:13px;line-height:2">
           AIコンサルは店舗ごとに分析を行います。<br>
           対象店舗を選択すると、<br>
@@ -579,7 +585,7 @@ body {
       <!-- ▼▼ 店舗別サマリー表（追加・順位軸の横断一覧） ▼▼ -->
       <div class="card">
         <div class="card-header" style="flex-wrap:wrap;gap:8px">
-          <div class="card-title">🏢 店舗別サマリー</div>
+          <div class="card-title"><span class="ttl-ico" style="background:rgba(46,143,240,0.12);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9h1M9 13h1M14 13h1"/></svg></span>店舗別サマリー</div>
           <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
             <input id="summarySearch" type="text" placeholder="店舗名・会社名で絞り込み" oninput="renderSummaryTable()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;width:200px;font-family:inherit">
             <select id="summaryFilter" onchange="renderSummaryTable()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:12px;font-family:inherit">
@@ -604,7 +610,7 @@ body {
 
       <!-- ▼▼ クイックアクション（ぐるっと相当の4ボタン） ▼▼ -->
       <div class="card">
-        <div class="card-header"><div class="card-title">⚡ クイックアクション</div></div>
+        <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(245,158,11,0.14);color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg></span>クイックアクション</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="quickGo('gbpPickerCard','店舗を管理対象に追加し、会社名を設定するとクライアントとして分類されます')">＋ クライアント追加</button>
           <button class="btn btn-primary btn-sm" onclick="quickGo('registerStoreCard')">＋ 店舗登録</button>
@@ -615,7 +621,7 @@ body {
 
 
       <div class="card">
-        <div class="card-header"><div class="card-title">🏢 全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
+        <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(46,143,240,0.12);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>全店舗 横断ビュー</div><div class="card-sub">クリックで店舗を選択</div></div>
         <div id="locationList"><div class="loading"><div class="spinner"></div>店舗情報を読み込み中...</div></div>
       </div>
     </div>
