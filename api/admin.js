@@ -19,6 +19,20 @@ function generatePassword() {
   return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+// メール送信（Resend・無料枠）。RESEND_API_KEY未設定なら false（＝送信スキップ・KV保存は継続）。
+async function sendMail(to, subject, html) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || !to) return false;
+  const from = process.env.RESEND_FROM || 'ラクラクMEO <onboarding@resend.dev>';
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -33,6 +47,8 @@ export default async function handler(req, res) {
     title: '本日はありがとうございました',
     intro: 'よろしければ、ご感想をお聞かせください。30秒で終わります。',
     ratingQuestion: '本日の満足度はいかがでしたか？',
+    lowHeading: 'もう少し詳しくお聞かせください',
+    feedbackEmail: '',
     completionMsg: '貴重なご意見をいただき、ありがとうございました。',
     lowMsg: '貴重なご意見をありがとうございます。いただいたお声は改善に活かします。差し支えなければ、もう少し詳しくお聞かせください。',
     goodPoints: ['スタッフが丁寧', '雰囲気が良い', 'また来たい', '説明が分かりやすい', '清潔感がある', '対応が早い', 'コスパが良い', 'おすすめしたい'],
@@ -100,16 +116,32 @@ export default async function handler(req, res) {
     if (!storeId || !text) return res.status(400).json({ error: 'storeId・text必須' });
     const key = `feedback_${storeId}`;
     const list = await kvGet(key) || [];
-    list.unshift({
+    const item = {
       id: 'f' + Date.now().toString(36),
       rating: parseInt(rating, 10) || null,
       text: String(text).slice(0, 1000),
       contact: String(contact || '').slice(0, 200),
       at: new Date().toISOString(),
-    });
+    };
+    list.unshift(item);
     if (list.length > 300) list.length = 300;
     await kvSet(key, list);
-    return res.json({ success: true });
+    // 通知先メールが設定されていれば会社宛に送信（未設定/送信不可でもKV保存は完了しているのでエラーにしない）
+    let emailed = false;
+    try {
+      const survey = await kvGet(`survey_${storeId}`) || {};
+      const to = String(survey.feedbackEmail || '').trim();
+      if (to) {
+        const esc = (s) => String(s || '').replace(/</g, '&lt;');
+        emailed = await sendMail(to, `【要対応】低評価フィードバックが届きました（★${item.rating || '-'}）`,
+          `<div style="font-family:sans-serif;line-height:1.8"><p>お客様から店内フィードバック（Google非公開）が届きました。</p>
+<p><b>評価：</b>★${item.rating || '-'}</p>
+<p><b>内容：</b><br>${esc(item.text).replace(/\n/g, '<br>')}</p>
+<p><b>連絡先：</b>${esc(item.contact) || '（記入なし）'}</p>
+<p style="color:#666;font-size:12px">受信日時：${item.at}</p></div>`);
+      }
+    } catch (e) { /* メール失敗はKV保存に影響させない */ }
+    return res.json({ success: true, emailed });
   }
 
   // 管理者ログイン確認：Google連携(access_token) または メール＋パスワード(pw_session) のどちらか。
@@ -200,7 +232,7 @@ export default async function handler(req, res) {
       const cur = { ...DEFAULT_SURVEY, ...(await kvGet(key) || {}) };
       const b = req.body || {};
       const next = { ...cur };
-      ['title', 'intro', 'ratingQuestion', 'completionMsg', 'lowMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
+      ['title', 'intro', 'ratingQuestion', 'lowHeading', 'lowMsg', 'feedbackEmail', 'completionMsg', 'gateMode', 'googleUrl', 'lineUrl'].forEach(k => { if (b[k] !== undefined) next[k] = String(b[k]); });
       if (b.qrEnabled !== undefined) next.qrEnabled = !!b.qrEnabled; // boolean（Stringで潰さない）
       if (Array.isArray(b.goodPoints)) next.goodPoints = b.goodPoints.map(s => String(s).slice(0, 30)).filter(Boolean).slice(0, 16);
       if (b.lowThreshold !== undefined) next.lowThreshold = Math.min(5, Math.max(1, parseInt(b.lowThreshold, 10) || 4));

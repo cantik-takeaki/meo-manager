@@ -946,8 +946,14 @@ body {
             <label style="font-size:12px;color:var(--text-sub)">LINE友だち追加URL（任意・完了画面に表示）
               <input id="svLine" type="url" placeholder="https://lin.ee/..." style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
             </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フォームの見出し（★3以下のSTEP2）
+              <input id="svLowHeading" type="text" placeholder="もう少し詳しくお聞かせください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
             <label style="font-size:12px;color:var(--text-sub)">低評価フォームの案内文
               <input id="svLowMsg" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:12px;color:var(--text-sub)">低評価フィードバックの通知先メール（この宛先に届きます・空欄で送信なし）
+              <input id="svFeedbackEmail" type="email" placeholder="例：info@your-company.co.jp" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
             </label>
             <label style="font-size:12px;color:var(--text-sub)">送信完了メッセージ
               <input id="svDone" type="text" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
@@ -2419,7 +2425,9 @@ async function openSurveyEditor() {
     document.getElementById('svThreshold').value = String(s.lowThreshold || 4);
     document.getElementById('svGoogle').value = s.googleUrl || localStorage.getItem('reviewUrl_' + currentLocationId) || '';
     document.getElementById('svLine').value = s.lineUrl || '';
+    document.getElementById('svLowHeading').value = s.lowHeading || '';
     document.getElementById('svLowMsg').value = s.lowMsg || '';
+    document.getElementById('svFeedbackEmail').value = s.feedbackEmail || '';
     document.getElementById('svDone').value = s.completionMsg || '';
   } catch (e) { showToast('設定の取得に失敗しました', 'error'); }
 }
@@ -2454,7 +2462,9 @@ async function saveSurvey() {
     lowThreshold: parseInt(document.getElementById('svThreshold').value, 10),
     googleUrl: document.getElementById('svGoogle').value.trim(),
     lineUrl: document.getElementById('svLine').value.trim(),
+    lowHeading: document.getElementById('svLowHeading').value.trim(),
     lowMsg: document.getElementById('svLowMsg').value.trim(),
+    feedbackEmail: document.getElementById('svFeedbackEmail').value.trim(),
     completionMsg: document.getElementById('svDone').value.trim(),
   };
   try {

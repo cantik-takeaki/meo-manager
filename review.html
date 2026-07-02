@@ -176,6 +176,7 @@ async function loadSurvey(){
       el.onclick = () => { kpiTrack('line'); window.open(SURVEY.lineUrl, '_blank'); };
     });
   }
+  if (SURVEY.lowHeading) document.getElementById('lowHeading').textContent = SURVEY.lowHeading;
   document.getElementById('lowMsg').textContent = SURVEY.lowMsg || 'いただいたお声は改善に活かします。差し支えなければ、もう少し詳しくお聞かせください。';
 }
 
