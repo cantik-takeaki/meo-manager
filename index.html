@@ -457,6 +457,11 @@ body {
 .ks-item { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:9px; margin-bottom:7px; cursor:pointer; }
 .ks-item:hover { border-color:var(--border-active); }
 .ks-item.on { background:rgba(46,143,240,0.06); border-color:var(--accent); }
+.gen-el-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.gen-el-row > span { min-width:66px; color:var(--text-sub); flex-shrink:0; }
+.gen-el-row input[type=range] { flex:1; min-width:80px; accent-color:var(--accent); height:4px; }
+.gen-el-row label { display:flex; align-items:center; gap:3px; color:var(--text-sub); white-space:nowrap; }
+.gen-el-row input[type=color] { width:32px; height:26px; border:1px solid var(--border); border-radius:5px; background:none; cursor:pointer; padding:1px; flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -1856,6 +1861,15 @@ body {
                   </select>
                 </label>
                 <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:3px"><input type="checkbox" id="genVertical" onchange="renderGenImage()"> 和文を縦書き</label>
+              </div>
+              <div style="border-top:1px dashed var(--border);padding-top:8px;margin-top:2px">
+                <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px">文字の詳細設定（要素ごとにサイズ・色）</div>
+                <div style="display:grid;gap:7px">
+                  <div class="gen-el-row"><span>見出し</span><input type="range" id="genHeadSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genHeadAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genHeadColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>英字見出し</span><input type="range" id="genEnSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genEnAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genEnColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>サブ</span><input type="range" id="genSubSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genSubAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genSubColor" value="#ffffff" oninput="renderGenImage()"></div>
+                  <div class="gen-el-row"><span>店名</span><input type="range" id="genStoreSize" min="0.6" max="1.7" step="0.05" value="1" oninput="renderGenImage()"><label><input type="checkbox" id="genStoreAuto" checked onchange="renderGenImage()">自動色</label><input type="color" id="genStoreColor" value="#ffffff" oninput="renderGenImage()"></div>
+                </div>
               </div>
               <div>
                 <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">背景（お店の写真を使うと雰囲気に合います）</label>
@@ -4946,71 +4960,72 @@ function renderGenImage() {
 
   const shadow = (on, strong) => { if (on) { ctx.shadowColor = strong ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.4)'; ctx.shadowBlur = strong ? 22 : 14; ctx.shadowOffsetY = 3; } else { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; } };
   const fitEn = (text, maxW, start, weight) => { let fs = start; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; while (ctx.measureText(text).width > maxW && fs > 40) { fs -= 6; ctx.font = `${weight} ${fs}px ${GEN_EN_SERIF}`; } return fs; };
+  // 要素ごとの文字サイズ倍率・色（自動色ならテンプレの既定色 def を使う）
+  const _es = (p, def) => { const sz = parseFloat(document.getElementById('gen' + p + 'Size')?.value) || 1; const auto = document.getElementById('gen' + p + 'Auto')?.checked !== false; return { sz, col: auto ? def : (document.getElementById('gen' + p + 'Color')?.value || def) }; };
 
-  // ══ テンプレート別描画 ══
+  // ══ テンプレート別描画（要素ごとの倍率 _es().sz と色 _es().col を適用）══
   if (tmpl === 'standard') {
-    let fs = Math.round(W / 10.4); ctx.font = `900 ${fs}px ${jpFont}`;
+    const eH = _es('Head', tcol), eS = _es('Sub', _genBg ? tcol : pal.accent), eST = _es('Store', 'rgba(255,255,255,0.92)');
+    let fs = Math.round(W / 10.4 * eH.sz); ctx.font = `900 ${fs}px ${jpFont}`;
     let lines = _wrapText(ctx, headline || 'キャッチコピーを入力', W - M * 2);
-    while (lines.length > 3 && fs > 56) { fs -= 8; ctx.font = `900 ${fs}px ${jpFont}`; lines = _wrapText(ctx, headline || ' ', W - M * 2); }
-    const lh = fs * 1.3, subFs = Math.round(fs * 0.46);
+    while (lines.length > 3 && fs > 44) { fs -= 8; ctx.font = `900 ${fs}px ${jpFont}`; lines = _wrapText(ctx, headline || ' ', W - M * 2); }
+    const lh = fs * 1.3, subFs = Math.round(fs * 0.46 * eS.sz);
     const blockH = lines.length * lh + (sub ? subFs + 26 : 0);
     let topY = layout === 'center' ? H / 2 - blockH / 2 + fs : H - Math.round(H * 0.11) - blockH + fs;
     ctx.fillStyle = pal.accent; ctx.fillRect(M, topY - fs - 34, 80, 10);
-    ctx.fillStyle = tcol; shadow(true, false);
+    ctx.fillStyle = eH.col; shadow(true, false);
     let y = topY; lines.forEach(l => { ctx.fillText(l, M, y); y += lh; });
     shadow(false);
-    if (sub) { ctx.fillStyle = _genBg ? tcol : pal.accent; ctx.font = `700 ${subFs}px ${jpFont}`; shadow(true, false); ctx.fillText(sub, M, y + 6); shadow(false); y += subFs + 18; }
-    if (store) { ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = `700 ${Math.round(fs * 0.38)}px ${jpFont}`; ctx.fillText(store, M, layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05))); }
+    if (sub) { ctx.fillStyle = eS.col; ctx.font = `700 ${subFs}px ${jpFont}`; shadow(true, false); ctx.fillText(sub, M, y + 6); shadow(false); y += subFs + 18; }
+    if (store) { ctx.fillStyle = eST.col; ctx.font = `700 ${Math.round(fs * 0.38 * eST.sz)}px ${jpFont}`; ctx.fillText(store, M, layout === 'center' ? H - Math.round(H * 0.06) : Math.min(y + 48, H - Math.round(H * 0.05))); }
 
   } else if (tmpl === 'elegant') {
-    // 英字セリフ大（中央寄せ・上1/3）＋和文縦書き（左下）
-    if (enHead) { const fs = fitEn(enHead, W - 120, Math.round(W / 5.5), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; ctx.textAlign = 'center'; shadow(true, true); ctx.fillText(enHead, W / 2, H * 0.36); shadow(false); ctx.textAlign = 'left'; }
+    const eE = _es('En', tcol), eH = _es('Head', tcol), eS = _es('Sub', tcol);
+    if (enHead) { const fs = fitEn(enHead, W - 120, Math.round(W / 5.5 * eE.sz), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.textAlign = 'center'; shadow(true, true); ctx.fillText(enHead, W / 2, H * 0.36); shadow(false); ctx.textAlign = 'left'; }
     if (headline) {
-      const cs = Math.round(W / 7.5); ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, true);
+      const cs = Math.round(W / 7.5 * eH.sz); ctx.font = `700 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true);
       if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.62, cs, cs * 1.25);
       else { let y = H - Math.round(H * 0.14); _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
       shadow(false);
     }
-    if (sub || store) { ctx.font = `600 ${Math.round(W / 26)}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(sub || store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
+    if (sub || store) { ctx.font = `600 ${Math.round(W / 26 * eS.sz)}px ${jpFont}`; ctx.fillStyle = eS.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(sub || store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
 
   } else if (tmpl === 'magazine') {
-    // 上：小英字ラベル → 巨大英字セリフ → 和文大 → サブ → 左下タグ枠
+    const eE = _es('En', tcol), eH = _es('Head', '#ffffff'), eST = _es('Store', '#ffffff'), eS = _es('Sub', tcol);
     let y = H * 0.09;
     const label = (sub || 'TOKYO GOURMET').toUpperCase();
-    ctx.font = `600 ${Math.round(W / 34)}px ${GEN_EN_SANS}`; ctx.fillStyle = tcol; shadow(true, false);
+    ctx.font = `600 ${Math.round(W / 34 * eS.sz)}px ${GEN_EN_SANS}`; ctx.fillStyle = eS.col; shadow(true, false);
     ctx.save(); ctx.letterSpacing = '4px'; try { ctx.fillText(label.slice(0, 26), M, y); } catch (e) { ctx.fillText(label.slice(0, 26), M, y); } ctx.restore();
     y += Math.round(W / 20);
-    if (enHead) { const fs = fitEn(enHead, W - M * 1.2, Math.round(W / 4.2), '600'); ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; shadow(true, true); ctx.fillText(enHead, M - 4, y + fs * 0.75); y += fs * 0.95; }
-    if (headline) { const cs = Math.round(W / 8.2); ctx.font = `800 ${cs}px ${jpFont}`; ctx.fillStyle = '#ffffff'; shadow(true, true); let yy = y + cs * 0.9; _wrapText(ctx, headline, W - M * 2).slice(0, 2).forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.15; }); shadow(false); }
-    // 左下タグ枠（東京/3行/グルメ 的な）
+    if (enHead) { const fs = fitEn(enHead, W - M * 1.2, Math.round(W / 4.2 * eE.sz), '600'); ctx.font = `600 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.fillText(enHead, M - 4, y + fs * 0.75); y += fs * 0.95; }
+    if (headline) { const cs = Math.round(W / 8.2 * eH.sz); ctx.font = `800 ${cs}px ${jpFont}`; ctx.fillStyle = eH.col; shadow(true, true); let yy = y + cs * 0.9; _wrapText(ctx, headline, W - M * 2).slice(0, 2).forEach(l => { ctx.fillText(l, M, yy); yy += cs * 1.15; }); shadow(false); }
     if (store) {
       const bx = M, by = H - Math.round(H * 0.17), bw = Math.round(W / 5.2), bh = Math.round(W / 5.2);
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; shadow(true, false); ctx.strokeRect(bx, by, bw, bh); shadow(false);
-      ctx.fillStyle = '#ffffff'; ctx.font = `700 ${Math.round(W / 32)}px ${jpFont}`; ctx.textAlign = 'center';
+      ctx.fillStyle = eST.col; ctx.font = `700 ${Math.round(W / 32 * eST.sz)}px ${jpFont}`; ctx.textAlign = 'center';
       _wrapText(ctx, store, bw - 16).slice(0, 3).forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + bh / 2 - 6 + i * Math.round(W / 26)));
       ctx.textAlign = 'left';
     }
 
   } else if (tmpl === 'mincho') {
-    // 英字セリフ（上・黒）＋和文縦書き（左・大）
-    if (enHead) { const fs = fitEn(enHead, W - M * 1.4, Math.round(W / 4.6), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 8; ctx.fillText(enHead, M - 2, H * 0.16); shadow(false); }
-    if (headline) { const cs = Math.round(W / 7.2); ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8;
+    const eE = _es('En', tcol), eH = _es('Head', tcol), eS = _es('Sub', tcol);
+    if (enHead) { const fs = fitEn(enHead, W - M * 1.4, Math.round(W / 4.6 * eE.sz), '500'); ctx.font = `500 ${fs}px ${GEN_EN_SERIF}`; ctx.fillStyle = eE.col; ctx.shadowColor = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 8; ctx.fillText(enHead, M - 2, H * 0.16); shadow(false); }
+    if (headline) { const cs = Math.round(W / 7.2 * eH.sz); ctx.font = `600 ${cs}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eH.col; ctx.shadowColor = 'rgba(255,255,255,0.55)'; ctx.shadowBlur = 8;
       if (vertical) _drawVertical(ctx, headline, M + cs * 0.2, H * 0.28, cs, cs * 1.28);
       else { let y = H * 0.3; _wrapText(ctx, headline, W - M * 2).forEach(l => { ctx.fillText(l, M, y); y += cs * 1.2; }); }
       shadow(false); }
-    if (sub) { ctx.font = `500 ${Math.round(W / 28)}px ${GEN_FONTS.mincho}`; ctx.fillStyle = tcol; ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 6; ctx.fillText(sub, M, H - Math.round(H * 0.06)); shadow(false); }
+    if (sub) { ctx.font = `500 ${Math.round(W / 28 * eS.sz)}px ${GEN_FONTS.mincho}`; ctx.fillStyle = eS.col; ctx.shadowColor = 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 6; ctx.fillText(sub, M, H - Math.round(H * 0.06)); shadow(false); }
 
   } else if (tmpl === 'bold') {
-    // 和文を極太＋白フチで縦書き（左）／英字・価格を添える
+    const eH = _es('Head', tcol), eE = _es('En', tcol), eST = _es('Store', tcol);
     if (headline) {
-      const cs = Math.round(W / 6.4); ctx.font = `900 ${cs}px ${jpFont}`;
+      const cs = Math.round(W / 6.4 * eH.sz); ctx.font = `900 ${cs}px ${jpFont}`;
       ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = cs * 0.12;
-      // フチ→本体の順で1文字ずつ
       let cx = M + cs * 0.25, cy = H * 0.2;
-      for (const ch of headline) { if (ch === '\n') { cx -= cs * 1.3; cy = H * 0.2; continue; } ctx.strokeText(ch, cx, cy); ctx.fillStyle = tcol; ctx.fillText(ch, cx, cy); cy += cs * 1.04; }
+      for (const ch of headline) { if (ch === '\n') { cx -= cs * 1.3; cy = H * 0.2; continue; } ctx.strokeText(ch, cx, cy); ctx.fillStyle = eH.col; ctx.fillText(ch, cx, cy); cy += cs * 1.04; }
     }
-    if (enHead || sub) { ctx.font = `800 ${Math.round(W / 20)}px ${GEN_EN_SANS}`; ctx.fillStyle = tcol; shadow(true, true); ctx.textAlign = 'right'; ctx.fillText(enHead || sub, W - M, H - Math.round(H * 0.08)); ctx.textAlign = 'left'; shadow(false); }
-    if (store) { ctx.font = `700 ${Math.round(W / 30)}px ${jpFont}`; ctx.fillStyle = tcol; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
+    if (enHead || sub) { ctx.font = `800 ${Math.round(W / 20 * eE.sz)}px ${GEN_EN_SANS}`; ctx.fillStyle = eE.col; shadow(true, true); ctx.textAlign = 'right'; ctx.fillText(enHead || sub, W - M, H - Math.round(H * 0.08)); ctx.textAlign = 'left'; shadow(false); }
+    if (store) { ctx.font = `700 ${Math.round(W / 30 * eST.sz)}px ${jpFont}`; ctx.fillStyle = eST.col; shadow(true, false); ctx.textAlign = 'right'; ctx.fillText(store, W - M, H - Math.round(H * 0.05)); ctx.textAlign = 'left'; shadow(false); }
   }
   shadow(false);
 }
