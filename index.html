@@ -1901,7 +1901,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <!-- 投稿画像作成（個別ページ・口コミPOP作成と同型） -->
       <div id="igGenView" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="closeImageGen()">← 前のページへ</button>
+          <button class="btn btn-outline btn-sm" onclick="backFromImageGen()">← 前のページへ</button>
           <div style="flex:1;min-width:180px">
             <div class="page-title" style="font-size:20px">投稿画像作成</div>
             <div class="page-sub">写真とテキストから投稿用の画像を作成（無料・ブラウザ内生成）</div>
@@ -2481,6 +2481,17 @@ body.role-viewer [data-edit-action] { display:none !important; }
               </label>
               <span id="postAspectHint" style="background:var(--bg-3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-variant-numeric:tabular-nums">1080 × 1350 px</span>
             </div>
+            <div style="display:flex;gap:16px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">
+              <div>
+                <div style="font-size:11px;color:var(--text-sub);margin-bottom:5px;font-weight:600">投稿プレビュー</div>
+                <div id="postPreview" style="width:190px;aspect-ratio:4 / 5;background:#eef1f5;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <button class="btn btn-outline btn-sm" onclick="openImageGenFrom('posts')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:5px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>画像を作成・編集</button>
+                <p style="font-size:11.5px;color:var(--text-sub);margin-top:8px;line-height:1.6">テンプレート・背景写真・ロゴで投稿画像を作れます（Instagram投稿と同じ画像作成機能）。作成した画像はライブラリに保存され、上のリストから選べます。左のプレビューは、選んだ比率で実際に投稿される見え方です。</p>
+              </div>
+            </div>
+          </div>
 
           <div class="form-row">
             <select id="postType">
@@ -5708,6 +5719,7 @@ function openImageGen() {
   const panel = document.getElementById('panel-instagram');
   const view = document.getElementById('igGenView');
   if (!panel || !view) return;
+  _genReturnPanel = _genPendingOrigin; _genPendingOrigin = null; // どこから開いたか（通常はnull＝instagram内）
   const st = document.getElementById('igGenStatus');
   if (st) st.textContent = ''; // 前回の保存結果を持ち越さない
   const sn = document.getElementById('genStoreName');
@@ -5856,6 +5868,12 @@ function closeImageGen() {
   if (!view || view.style.display === 'none') return;
   view.style.display = 'none';
   document.getElementById('panel-instagram')?.classList.remove('gen-open');
+}
+// 画像作成エディタの「← 前のページへ」：投稿管理などから開いた場合は元のページへ戻す
+function backFromImageGen() {
+  const ret = _genReturnPanel; _genReturnPanel = null;
+  closeImageGen();
+  if (ret && ret !== 'instagram') showPanel(ret);
 }
 function toggleImageGen() { openImageGen(); } // 旧ボタン互換
 function igGenTab(name) {
@@ -8313,10 +8331,36 @@ function clearPostImages() { _postImages = []; loadPostImages(); }
 function updatePostAspectHint() {
   const v = document.getElementById('postAspect')?.value || 'portrait';
   const hint = document.getElementById('postAspectHint');
-  if (!hint) return;
-  const size = v === 'square' ? '1080 × 1080 px（正方形 1:1）' : '1080 × 1350 px（縦長 4:5）';
+  if (hint) {
+    const size = v === 'square' ? '1080 × 1080 px（正方形 1:1）' : '1080 × 1350 px（縦長 4:5）';
+    const n = (_postImages || []).length;
+    hint.textContent = n >= 2 ? `${size}・カルーセル${n}枚` : size;
+  }
+  updatePostPreview();
+}
+// 投稿プレビュー：選択画像を、選んだ比率で「実際に投稿される見え方」で表示
+function updatePostPreview() {
+  const box = document.getElementById('postPreview');
+  if (!box) return;
+  const aspect = document.getElementById('postAspect')?.value || 'portrait';
+  box.style.aspectRatio = aspect === 'square' ? '1 / 1' : '4 / 5';
+  const m = (_postImages || [])[0];
+  if (!m) { box.innerHTML = '<span style="font-size:11px;color:var(--text-sub);text-align:center;padding:8px;line-height:1.5">画像を選ぶと<br>ここに表示されます</span>'; return; }
+  const url = m.isVideo ? (m.thumbnailUrl || m.url) : (aspect === 'square' ? (m.squareUrl || m.url) : (m.portraitUrl || m.squareUrl || m.url));
   const n = (_postImages || []).length;
-  hint.textContent = n >= 2 ? `${size}・カルーセル${n}枚` : size;
+  const badge = n >= 2 ? `<span style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border-radius:20px;font-size:10px;padding:2px 8px">1 / ${n}</span>` : '';
+  const vico = m.isVideo ? '<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.5);color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px">▶</span>' : '';
+  box.innerHTML = `<div style="position:relative;width:100%;height:100%"><img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block">${vico}${badge}</div>`;
+}
+// 投稿管理から画像作成エディタを開き、閉じたら元のページ（投稿管理）へ戻す
+let _genReturnPanel = null;
+let _genPendingOrigin = null;
+function openImageGenFrom(origin) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  _genPendingOrigin = origin || null; // openImageGenが取り込む
+  const onIg = document.getElementById('panel-instagram')?.classList.contains('active');
+  if (!onIg) showPanel('instagram');
+  openImageGen();
 }
 
 function updatePostCount() {
