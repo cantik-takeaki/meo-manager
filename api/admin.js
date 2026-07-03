@@ -567,6 +567,20 @@ export default async function handler(req, res) {
     return res.json(summary);
   }
 
+  // ── クライアント用レポートのPW発行（GBP管理店にも発行できる・監査#4） ──
+  if (req.method === 'POST' && action === 'client-issue') {
+    const { storeId, storeName, regenerate } = req.body || {};
+    if (!storeId || !storeName) return res.status(400).json({ error: 'storeId・storeName必須' });
+    const prev = await kvGet(`client_${storeId}`);
+    const password = (!prev || regenerate) ? generatePassword() : prev.password;
+    const rec = {
+      storeId, storeName: String(storeName).slice(0, 120), password, active: true,
+      createdAt: prev?.createdAt || new Date().toISOString(), issuedAt: new Date().toISOString(),
+    };
+    await kvSet(`client_${storeId}`, rec);
+    return res.json({ success: true, storeId, password, existing: !!prev && !regenerate, loginUrl: `/report.html?store=${encodeURIComponent(storeId)}` });
+  }
+
   // ── 企業ナレッジ（旧api/knowledge.jsを統合・Vercel関数枠を1つ回復） ──
   if (action === 'knowledge') {
     // 認証: Google連携(access_token) または メール＋パスワード(pw_session) のどちらでも可

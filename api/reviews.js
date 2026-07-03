@@ -1,5 +1,6 @@
 // api/reviews.js — 口コミ一覧・返信
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
+import { kvSet } from './_kv.js';
 
 function parseCookies(req) {
   const c = {};
@@ -77,6 +78,12 @@ export default async function handler(req, res) {
         distribution: dist,
         lowRatingAlerts: lowAlerts,
       };
+      // クライアントレポート用に統計をキャッシュ（client.jsがGBPトークン無しで参照できる）
+      try {
+        const locPart = String(locationName).match(/locations\/[^/]+/)?.[0] || '';
+        const cacheId = storeId || locPart.replace(/\//g, '_');
+        if (cacheId) await kvSet(`review_stats_${cacheId}`, { averageRating: data.stats.averageRating, totalCount: count, unrepliedCount: unreplied, distribution: dist, updatedAt: new Date().toISOString() });
+      } catch (e) { /* キャッシュ失敗は本体に影響させない */ }
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: e.message });

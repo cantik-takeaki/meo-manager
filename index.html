@@ -917,6 +917,7 @@ body {
                 <button class="more-item" onclick="_moreGo('survey')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><path d="M9 12h6M9 16h4"/></svg>アンケート回答履歴</button>
                 <button class="more-item" onclick="_moreGo('editsurvey')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>アンケート編集</button>
                 <button class="more-item" onclick="_moreGo('competitor')" style="border-top:1px solid var(--border)"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l6-4v18M19 21V11l-8-6M9 9v.01M9 13v.01M9 17v.01"/></svg>競合店舗管理</button>
+                <button class="more-item" onclick="_moreGo('client')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11l2 2 4-4"/></svg>クライアント用レポート発行</button>
                 <button class="more-item" onclick="_moreGo('edit')"><svg class="mi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V8l6-5 6 5v13M10 21v-4h4v4"/></svg>店舗情報を編集</button>
               </div>
             </div>
@@ -2667,6 +2668,17 @@ body {
 <div class="toast" id="toast"></div>
 
 <!-- パスワード変更モーダル -->
+<!-- クライアント用レポート発行モーダル -->
+<div id="clientIssueModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(15,23,42,0.45);align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg-2);border-radius:14px;padding:22px;width:min(480px,92vw);max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:800;font-size:15px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" style="vertical-align:-2px;margin-right:6px"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M16 11l2 2 4-4"/></svg>クライアント用レポート発行</div>
+      <button class="rk-modal-x" onclick="document.getElementById('clientIssueModal').style.display='none'">&times;</button>
+    </div>
+    <div id="clientIssueBody"></div>
+  </div>
+</div>
+
 <div id="pwModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(15,23,42,0.45);align-items:center;justify-content:center">
   <div style="background:var(--bg-2);border-radius:16px;padding:28px;width:360px;max-width:90%;box-shadow:0 20px 60px rgba(15,23,42,0.25)">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">パスワード変更</div>
@@ -6482,6 +6494,45 @@ function _moreGo(what) {
   else if (what === 'edit') showStoreEdit(idx);
   else if (what === 'competitor') showStoreCompetitors(idx);
   else if (what === 'editsurvey') showSurveyEdit(idx);
+  else if (what === 'client') openClientIssue(idx);
+}
+
+// ─── クライアント用レポートの発行（GBP管理店にもPW発行できる・report.htmlへ配布） ───
+async function openClientIssue(idx, regenerate) {
+  const loc = window._locations?.[idx];
+  if (!loc) return showToast('店舗を選択してください', 'error');
+  const storeId = loc.storeId || (loc.name || '').replace(/\//g, '_');
+  const modal = document.getElementById('clientIssueModal');
+  const body = document.getElementById('clientIssueBody');
+  modal.style.display = 'flex';
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>発行中...</div>';
+  try {
+    const d = await fetch('/api/admin?action=client-issue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId, storeName: loc.title || '店舗', regenerate: !!regenerate }),
+    }).then(r => r.json());
+    if (!d.success) { body.innerHTML = `<div style="color:var(--red);font-size:13px">${escapeHtml(d.error || '発行に失敗しました')}</div>`; return; }
+    const url = location.origin + d.loginUrl;
+    window._clientIssue = { url, id: d.storeId, pw: d.password };
+    body.innerHTML = `
+      <p style="font-size:12.5px;color:var(--text-sub);line-height:1.8;margin-bottom:12px">クライアントに下記3点を伝えると、<b>順位・口コミ・競合比較のレポート</b>をいつでも閲覧してもらえます${d.existing ? '(発行済みの情報を表示しています)' : ''}。</p>
+      <div style="display:grid;gap:10px">
+        <div><div style="font-size:11px;color:var(--text-sub);margin-bottom:3px">レポートURL</div><div style="display:flex;gap:6px"><input readonly value="${escapeHtml(url)}" class="ed-in" style="flex:1;font-size:12px" onclick="this.select()"><button class="btn btn-outline btn-sm" onclick="_copyIssue('url')">コピー</button></div></div>
+        <div><div style="font-size:11px;color:var(--text-sub);margin-bottom:3px">ログインID（店舗ID）</div><div style="display:flex;gap:6px"><input readonly value="${escapeHtml(d.storeId)}" class="ed-in" style="flex:1;font-size:12px" onclick="this.select()"><button class="btn btn-outline btn-sm" onclick="_copyIssue('id')">コピー</button></div></div>
+        <div><div style="font-size:11px;color:var(--text-sub);margin-bottom:3px">パスワード</div><div style="display:flex;gap:6px"><input readonly value="${escapeHtml(d.password)}" class="ed-in" style="flex:1;font-size:12px;font-family:ui-monospace,monospace" onclick="this.select()"><button class="btn btn-outline btn-sm" onclick="_copyIssue('pw')">コピー</button></div></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="_copyIssue('all')">3点まとめてコピー（案内文つき）</button>
+        <button class="btn btn-sm" style="background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.3)" onclick="if(confirm('パスワードを再発行しますか？（今のパスワードは使えなくなります）'))openClientIssue(${idx},true)">PW再発行</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-sub);margin-top:10px">口コミ統計は管理画面で口コミを開いた時点の値が反映されます。配布前に一度「口コミ管理」を開いて最新化してください。</p>`;
+  } catch (e) { body.innerHTML = `<div style="color:var(--red);font-size:13px">通信エラー: ${escapeHtml(e.message)}</div>`; }
+}
+function _copyIssue(what) {
+  const d = window._clientIssue; if (!d) return;
+  const text = what === 'url' ? d.url : what === 'id' ? d.id : what === 'pw' ? d.pw
+    : `【${currentLocation?.title || '店舗'} MEOレポートのご案内】\nいつでも下記から集客レポートをご確認いただけます。\n\nURL: ${d.url}\nログインID: ${d.id}\nパスワード: ${d.pw}`;
+  navigator.clipboard.writeText(text).then(() => showToast('コピーしました', 'success')).catch(() => showToast('コピーできませんでした', 'error'));
 }
 
 // ─── 一括順位入力 ───

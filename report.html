@@ -160,6 +160,25 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="chart-wrap"><canvas id="rankChart"></canvas></div>
     </div>
 
+    <!-- Reviews Summary -->
+    <div class="card" id="reviewCard" style="display:none">
+      <div class="card-title">💬 Google口コミ</div>
+      <div class="stats-grid" style="margin-bottom:10px">
+        <div class="stat-card"><div class="stat-label">累計口コミ</div><div class="stat-value blue" id="rvTotal">—</div></div>
+        <div class="stat-card"><div class="stat-label">平均評価</div><div class="stat-value gold" id="rvAvg">—</div></div>
+        <div class="stat-card"><div class="stat-label">未返信</div><div class="stat-value" style="color:var(--red)" id="rvUnreplied">—</div></div>
+        <div class="stat-card"><div class="stat-label">返信率</div><div class="stat-value green" id="rvRate">—</div></div>
+      </div>
+      <div id="rvDist"></div>
+      <div id="rvUpdated" style="font-size:11px;color:var(--text-sub);margin-top:6px"></div>
+    </div>
+
+    <!-- Competitor Compare -->
+    <div class="card" id="compCard" style="display:none">
+      <div class="card-title">🏁 競合との順位比較</div>
+      <div id="compTable"></div>
+    </div>
+
     <!-- Challenges -->
     <div class="card">
       <div class="card-title">🎯 現在の課題と改善ポイント</div>
@@ -310,6 +329,41 @@ async function loadReport(sid) {
             </div>
           </div>`).join('')
         : '<div class="empty">現在課題はありません ✅</div>';
+    }
+
+    // Reviews Summary（管理画面が口コミを読み込んだ時点の統計キャッシュ）
+    const rv = data.reviewStats;
+    if (rv && rv.totalCount != null) {
+      document.getElementById('reviewCard').style.display = '';
+      document.getElementById('rvTotal').textContent = rv.totalCount + '件';
+      document.getElementById('rvAvg').textContent = '★' + (rv.averageRating || 0);
+      document.getElementById('rvUnreplied').textContent = (rv.unrepliedCount || 0) + '件';
+      const rate = rv.totalCount ? Math.round(((rv.totalCount - (rv.unrepliedCount || 0)) / rv.totalCount) * 100) : 0;
+      document.getElementById('rvRate').textContent = rate + '%';
+      const dist = rv.distribution || {};
+      const maxD = Math.max(1, ...[1, 2, 3, 4, 5].map(s => dist[s] || 0));
+      document.getElementById('rvDist').innerHTML = [5, 4, 3, 2, 1].map(s => `
+        <div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:12px">
+          <span style="width:34px;color:var(--text-sub)">★${s}</span>
+          <div style="flex:1;height:10px;background:var(--bg-3,#f1f5f9);border-radius:99px;overflow:hidden"><div style="width:${Math.round(((dist[s] || 0) / maxD) * 100)}%;height:100%;background:${s >= 4 ? '#10b981' : s === 3 ? '#f59e0b' : '#ef4444'};border-radius:99px"></div></div>
+          <span style="width:40px;text-align:right;color:var(--text-sub)">${dist[s] || 0}件</span>
+        </div>`).join('');
+      if (rv.updatedAt) document.getElementById('rvUpdated').textContent = '集計時点: ' + new Date(rv.updatedAt).toLocaleString('ja-JP');
+    }
+
+    // Competitor Compare（自店の順位取得時に同時記録された競合順位）
+    const cc = data.compCompare || [];
+    if (cc.length) {
+      document.getElementById('compCard').style.display = '';
+      const fmt = r => (Number.isFinite(r) && r >= 1) ? r + '位' : '圏外';
+      document.getElementById('compTable').innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">
+        <thead><tr style="border-bottom:2px solid var(--border,#e2e8f0)"><th style="text-align:left;padding:8px 6px">キーワード</th><th style="padding:8px 6px">自店</th>${(data.competitors || []).map(n => `<th style="padding:8px 6px">${n}</th>`).join('')}</tr></thead>
+        <tbody>${cc.map(h => `<tr style="border-bottom:1px solid var(--border,#eef2f7)">
+          <td style="padding:8px 6px;font-weight:600">${h.keyword}</td>
+          <td style="padding:8px 6px;text-align:center;font-weight:700;color:${Number.isFinite(h.self) && h.self <= 3 ? '#10b981' : Number.isFinite(h.self) && h.self <= 10 ? '#f59e0b' : '#64748b'}">${fmt(h.self)}</td>
+          ${h.comps.map(c => `<td style="padding:8px 6px;text-align:center;color:${Number.isFinite(h.self) && (!Number.isFinite(c.rank) || h.self < c.rank) ? '#10b981' : '#ef4444'}">${fmt(c.rank)}</td>`).join('')}
+        </tr>`).join('')}</tbody></table></div>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:6px">緑＝自店が競合に勝っているキーワード／赤＝負けているキーワード</div>`;
     }
 
     // Store Info

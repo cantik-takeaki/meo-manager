@@ -56,12 +56,24 @@ export default async function handler(req, res) {
     if (!session?.storeId && !cookies.access_token) return res.status(401).json({ error: '認証エラー' });
     if (session && session.storeId !== storeId && !cookies.access_token) return res.status(403).json({ error: '権限なし' });
 
-    const [store, knowledge, rankings] = await Promise.all([
+    const [store, knowledge, rankings, reviewStats, compHist, competitors] = await Promise.all([
       kvGet(`client_${storeId}`),
       kvGet(`knowledge_${storeId}`),
       kvGet(`rankings_${storeId}`),
+      kvGet(`review_stats_${storeId}`),   // reviews.jsが管理画面での閲覧時にキャッシュした口コミ統計
+      kvGet(`comp_history_${storeId}`),   // 競合順位の自動記録
+      kvGet(`competitors_${storeId}`),
     ]);
     if (!store) return res.status(404).json({ error: '店舗が見つかりません' });
+
+    // 競合比較（KWごとの最新記録）
+    const compList = (competitors || []).filter(c => c.compare !== false);
+    const latestByKw = {};
+    (compHist || []).forEach(h => { if (!latestByKw[h.keyword] || latestByKw[h.keyword].date <= h.date) latestByKw[h.keyword] = h; });
+    const compCompare = compList.length ? Object.values(latestByKw).map(h => ({
+      keyword: h.keyword, date: h.date, self: h.self,
+      comps: compList.map(c => ({ name: c.name, rank: ((h.comps || []).find(x => x.id === c.id) || {}).rank ?? null })),
+    })) : [];
 
     const history = rankings?.history || [];
     const latest = history[history.length - 1];
@@ -83,7 +95,12 @@ export default async function handler(req, res) {
       challenges.push({ level: 'low', message: '全キーワードがトップ3以内です。引き続き口コミ返信と定期投稿で維持しましょう。' });
     }
 
-    return res.json({ store: { storeName: store.storeName }, knowledge: knowledge || {}, rankingData, rankingHistory: history, challenges, updatedAt: latest?.recordedAt || null });
+    return res.json({
+      store: { storeName: store.storeName }, knowledge: knowledge || {},
+      rankingData, rankingHistory: history, challenges,
+      reviewStats: reviewStats || null, compCompare, competitors: compList.map(c => c.name),
+      updatedAt: latest?.recordedAt || null,
+    });
   }
 
   return res.status(405).end();
