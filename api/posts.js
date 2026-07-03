@@ -494,8 +494,10 @@ export default async function handler(req, res) {
       // DM：会話一覧（Webhook受信をKVから。Graph APIはWebhook前提で空のため）
       if (req.method === 'GET' && sub === 'conversations') {
         const myId = await resolveMyId();
-        let events = (myId && await kvGet(`ig_dm_${myId}`)) || [];
-        if (!events.length) events = await kvGet('ig_dm_all') || []; // 宛先ID解決できなくてもデモ表示
+        // myId未解決時に全体プール(ig_dm_all)へフォールバックしない。
+        // 全体プールには他店舗宛のDMも混在するため、本番で他店の会話が見えるプライバシー事故になる（監査指摘）。
+        if (!myId) return res.json({ data: [], source: 'no-id', error: 'IGユーザーIDを解決できませんでした。Instagram連携を確認してください' });
+        const events = await kvGet(`ig_dm_${myId}`) || [];
         const convs = {};
         for (const e of events) {
           const other = String(e.senderId) === myId ? e.recipientId : e.senderId;
@@ -520,8 +522,9 @@ export default async function handler(req, res) {
         const { conversationId } = req.query;
         if (!conversationId) return res.status(400).json({ error: 'conversationId必須' });
         const myId = await resolveMyId();
-        let events = (myId && await kvGet(`ig_dm_${myId}`)) || [];
-        if (!events.length) events = await kvGet('ig_dm_all') || [];
+        // 同上: 全体プールへのフォールバックはプライバシーリスクのため行わない
+        if (!myId) return res.json({ messages: { data: [] }, myId: '', error: 'IGユーザーIDを解決できませんでした' });
+        const events = await kvGet(`ig_dm_${myId}`) || [];
         const thread = events
           .filter(e => String(e.senderId) === String(conversationId) || String(e.recipientId) === String(conversationId))
           .sort((a, b) => (a.ts || 0) - (b.ts || 0))
