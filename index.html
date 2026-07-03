@@ -472,6 +472,10 @@ body {
 @media (max-width:1023px) { .gen-2col { grid-template-columns:1fr; } }
 /* 投稿画像作成ページ表示中は他の子を常時抑止（非同期のインサイト表示等が後から割り込むのも防ぐ） */
 #panel-instagram.gen-open > :not(#igGenView) { display:none !important; }
+/* ロール=viewer は閲覧のみ：主要な操作ボタン(btn-primary/btn-success/危険操作)を隠す */
+body.role-viewer .btn-primary,
+body.role-viewer .btn-success,
+body.role-viewer [data-edit-action] { display:none !important; }
 /* 設定ページのトグルスイッチ */
 .tgl { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
 .tgl input { opacity:0; width:0; height:0; }
@@ -2712,8 +2716,31 @@ body {
         </div>
       </div>
 
+      <!-- チーム・権限（super_adminのみ） -->
+      <div class="card" style="max-width:720px" data-min-role="super_admin">
+        <div class="card-header">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>チーム・権限</div>
+          <button class="btn btn-outline btn-sm" onclick="openTeamAdd()">＋ メンバー追加</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">スタッフや代理店担当を追加し、権限（ロール）を割り当てられます。<b>管理者</b>=ほぼ全操作／<b>編集者</b>=投稿・返信・レポート等の運用／<b>閲覧のみ</b>=データ閲覧だけ。管理者アカウント（あなた）は常に最上位です。</p>
+        <div id="teamList" style="font-size:13px"></div>
+        <div id="teamAddForm" style="display:none;margin-top:12px;padding:12px;background:var(--bg-3);border-radius:10px">
+          <div style="display:grid;gap:8px;max-width:420px">
+            <input id="teamEmail" type="email" placeholder="メールアドレス" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <input id="teamName" type="text" placeholder="表示名（例：山田）" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <input id="teamPass" type="password" placeholder="初期パスワード（6文字以上）" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <select id="teamRole" style="background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              <option value="admin">管理者（ほぼ全操作）</option>
+              <option value="editor" selected>編集者（運用操作）</option>
+              <option value="viewer">閲覧のみ</option>
+            </select>
+            <div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" onclick="saveTeamMember()">追加する</button><button class="btn btn-outline btn-sm" onclick="document.getElementById('teamAddForm').style.display='none'">キャンセル</button></div>
+          </div>
+        </div>
+      </div>
+
       <!-- AIプロンプト調整 -->
-      <div class="card" style="max-width:720px">
+      <div class="card" style="max-width:720px" data-min-role="admin">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>AIプロンプト調整（上級者向け）</div></div>
         <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">AI生成の文体や禁止事項を、機能ごとに「追加指示」として調整できます。既定のルールに<b>追加</b>される形なので既存の品質を壊しません（空にして保存すると既定に戻ります）。例:「絵文字は使わない」「敬語をやわらかめに」「地域名は必ず◯◯市と表記」</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
@@ -2741,7 +2768,7 @@ body {
       </div>
 
       <!-- システムステータス -->
-      <div class="card" style="max-width:720px">
+      <div class="card" style="max-width:720px" data-min-role="admin">
         <div class="card-header">
           <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>システムステータス</div>
           <button class="btn btn-outline btn-sm" onclick="loadSysStatus()">確認する</button>
@@ -3008,6 +3035,9 @@ async function submitChangePw(e) {
 async function loadSettings() {
   let me = {};
   try { me = await fetch('/api/me').then(r => r.json()); } catch (e) {}
+  window._authRole = me.role || window._authRole || 'super_admin';
+  applyRoleGates();
+  if (roleAtLeast('super_admin')) loadTeam(); // チーム管理はsuper_adminのみ
   // 表示名
   const nameIn = document.getElementById('setName');
   if (nameIn) nameIn.value = me.name || '';
@@ -3077,6 +3107,47 @@ async function loadSettings() {
       if (bar) { bar.style.width = pct + '%'; bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--gold)' : 'var(--accent)'; }
     } else if (t) t.textContent = '利用状況を取得できませんでした';
   } catch (e) { const t = document.getElementById('setSerpText'); if (t) t.textContent = '利用状況を取得できませんでした'; }
+}
+
+// ── チーム・権限（super_adminのみ） ──
+const _ROLE_LABEL = { admin: '管理者', editor: '編集者', viewer: '閲覧のみ', super_admin: '管理者(最上位)' };
+async function loadTeam() {
+  const box = document.getElementById('teamList');
+  if (!box || !roleAtLeast('super_admin')) return;
+  try {
+    const d = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'team-list' }) }).then(r => r.json());
+    const users = d.users || [];
+    box.innerHTML = `<div class="set-row" style="padding:8px 0;border-bottom:2px solid var(--border)"><div class="set-row-main"><div class="set-row-title" style="font-size:12.5px">${escapeHtml(window._authEmail || '')}</div><div class="set-row-sub">あなた</div></div><span style="font-size:12px;font-weight:700;color:var(--accent)">管理者(最上位)</span></div>`
+      + (users.length ? users.map(u => `<div class="set-row" style="padding:9px 0">
+          <div class="set-row-main"><div class="set-row-title" style="font-size:12.5px">${escapeHtml(u.name || u.user)}</div><div class="set-row-sub">${escapeHtml(u.user)}</div></div>
+          <span style="font-size:12px;font-weight:700;color:var(--text-sub);margin-right:10px">${_ROLE_LABEL[u.role] || u.role}</span>
+          <button class="btn btn-sm" style="background:rgba(239,68,68,0.08);color:var(--red);border:1px solid rgba(239,68,68,0.3)" onclick="delTeamMember('${escapeHtml(u.user)}')">削除</button>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--text-sub);padding:8px 0">追加メンバーはいません。</div>');
+  } catch (e) { box.innerHTML = `<span style="color:var(--red);font-size:12px">取得に失敗しました</span>`; }
+}
+function openTeamAdd() {
+  document.getElementById('teamAddForm').style.display = 'block';
+  ['teamEmail', 'teamName', 'teamPass'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+}
+async function saveTeamMember() {
+  const user = document.getElementById('teamEmail').value.trim();
+  const name = document.getElementById('teamName').value.trim();
+  const pass = document.getElementById('teamPass').value;
+  const role = document.getElementById('teamRole').value;
+  if (!user || !pass) return showToast('メールとパスワードを入力してください', 'error');
+  try {
+    const r = await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'team-add', user, name, pass, role }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) { showToast('メンバーを追加しました', 'success'); document.getElementById('teamAddForm').style.display = 'none'; loadTeam(); }
+    else showToast(d.error || '追加できませんでした', 'error');
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+async function delTeamMember(user) {
+  if (!confirm('このメンバーを削除しますか？（次回からログインできなくなります）')) return;
+  try {
+    await fetch('/api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'team-del', user }) });
+    showToast('削除しました', 'success'); loadTeam();
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 async function saveProfileName() {
@@ -3219,6 +3290,10 @@ async function init() {
     if (user.picture) { const p = document.getElementById('userPic'); p.src = user.picture; p.style.display = 'block'; if (ini) ini.style.display = 'none'; }
     window._authEmail = user.email || '';
     window._gbpConnected = !!user.gbpConnected;
+    window._authRole = user.role || 'super_admin'; // super_admin/admin/editor/viewer
+    applyRoleGates(); // ロールに応じてUIを制限（viewer=閲覧のみ 等）
+    const roleEl = document.querySelector('.side-user-role');
+    if (roleEl) roleEl.textContent = ({ super_admin: '管理者アカウント', admin: '管理者', editor: '編集者', viewer: '閲覧のみ' })[window._authRole] || '管理者アカウント';
     // パスワード変更ボタンはenv管理でない（サイトで登録した）アカウントのみ表示
     const cpb = document.getElementById('changePwBtn');
     if (cpb) cpb.style.display = (user.method === 'password' && !user.envManaged) ? '' : 'none';
@@ -8143,6 +8218,27 @@ const ICO_OK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" styl
 const ICO_TODO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-muted)" stroke-width="2" style="vertical-align:-3px;margin-right:5px;flex-shrink:0"><circle cx="12" cy="12" r="9"/></svg>';
 const ICO_DOT = (color) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0"></span>`;
 const ICO_STAR = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#f59e0b" style="vertical-align:-2px;margin-right:3px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>';
+
+// ─── ロール権限（super_admin/admin/editor/viewer）───
+// body に role クラスを付け、CSSで data-min-role を満たさない要素を隠す。破壊的操作はJS側でも確認。
+const _ROLE_RANK = { viewer: 1, editor: 2, admin: 3, super_admin: 4 };
+function roleAtLeast(min) { return (_ROLE_RANK[window._authRole] || 4) >= (_ROLE_RANK[min] || 0); }
+function applyRoleGates() {
+  const role = window._authRole || 'super_admin';
+  document.body.setAttribute('data-role', role);
+  // data-min-role="editor|admin|super_admin" の要素を、満たさないロールでは非表示に
+  document.querySelectorAll('[data-min-role]').forEach(el => {
+    el.style.display = roleAtLeast(el.getAttribute('data-min-role')) ? '' : 'none';
+  });
+  // viewerは閲覧のみ＝全ページで編集/追加/削除ボタンを抑止（CSSクラスで一括）
+  document.body.classList.toggle('role-viewer', role === 'viewer');
+}
+// 破壊的操作の前段ガード（JS側）。falseなら呼び出し側は中断する。
+function canEdit(silent) {
+  if (roleAtLeast('editor')) return true;
+  if (!silent) showToast('閲覧のみの権限のため、この操作はできません', 'error');
+  return false;
+}
 
 // ─── クイックスタート（オンボーディング・完了自動判定＋手動チェック） ───
 const ONBOARD_STEPS = [

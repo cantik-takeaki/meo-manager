@@ -9,6 +9,8 @@ import crypto from 'crypto';
 const ADMIN_KEY = 'admin_credential'; // { user(email), salt, hash, name, createdAt }
 const NAME_KEY = 'admin_display_name'; // 表示名の上書き（env管理でも表示名だけは変えられる）
 const TWOFA_KEY = 'twofa_enabled'; // 2段階認証の設定（false=無効。未設定=有効＝従来挙動）
+const TEAM_KEY = 'team_users'; // 追加ユーザー配列 [{ user,salt,hash,name,role,createdAt }]。roleは admin/editor/viewer
+const ROLES = ['admin', 'editor', 'viewer'];
 
 function parseCookies(req) {
   const c = {};
@@ -70,6 +72,30 @@ function setSession(res, cred, dispName) {
 async function getDisplayName(cred) {
   try { const nm = await kvGet(NAME_KEY); if (nm) return nm; } catch (e) {}
   return (cred && cred.name) || '管理者';
+}
+
+// ── チームユーザー（追加メンバー）── プライマリ管理者は常にsuper_admin（ロックアウト防止）。
+const teamSessionToken = (u) => crypto.createHash('sha256').update('team|' + u.user + '|' + u.hash).digest('hex');
+async function getTeamUsers() { try { return (await kvGet(TEAM_KEY)) || []; } catch (e) { return []; } }
+function setTeamSession(res, u) {
+  const MAXAGE = 60 * 60 * 24 * 30;
+  res.setHeader('Set-Cookie', [
+    // 既存API(存在チェックのみ)を通すため pw_session に team トークンを入れる。GET /api/me が team_user で識別しロールを返す。
+    `pw_session=${teamSessionToken(u)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
+    `team_user=${encodeURIComponent(u.user)}; Path=/; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
+    `user_name=${encodeURIComponent(u.name || u.user)}; Path=/; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
+  ]);
+}
+// リクエストのログインユーザーを解決（プライマリ=super_admin / チーム=各ロール）。not logged in → null
+async function resolveSessionUser(req, c) {
+  if (c.team_user) {
+    const users = await getTeamUsers();
+    const u = users.find(x => x.user === String(c.team_user).toLowerCase());
+    if (u && c.pw_session === teamSessionToken(u)) return { role: u.role, email: u.user, name: u.name, team: true };
+  }
+  const cred = await getCred();
+  if (cred && c.pw_session === sessionToken(cred)) return { role: 'super_admin', email: cred.user, name: cred.name, primary: true, _env: !!cred._env };
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -148,6 +174,34 @@ export default async function handler(req, res) {
       return res.json({ success: true, enabled });
     }
 
+    // ── チームユーザー管理（super_adminのみ）──
+    if (action === 'team-list' || action === 'team-add' || action === 'team-del') {
+      const me = await resolveSessionUser(req, c);
+      if (!me || me.role !== 'super_admin') return res.status(403).json({ error: '管理者権限が必要です' });
+      const users = await getTeamUsers();
+      if (action === 'team-list') {
+        return res.json({ users: users.map(u => ({ user: u.user, name: u.name, role: u.role, createdAt: u.createdAt })) });
+      }
+      if (action === 'team-add') {
+        const em = String(user || '').trim().toLowerCase();
+        const role = ROLES.includes((req.body || {}).role) ? req.body.role : 'viewer';
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return res.status(400).json({ error: 'メールアドレスの形式が正しくありません' });
+        if (cred && cred.user === em) return res.status(400).json({ error: 'このメールは管理者アカウントです' });
+        if (String(pass || '').length < 6) return res.status(400).json({ error: 'パスワードは6文字以上にしてください' });
+        const salt = crypto.randomBytes(8).toString('hex');
+        const rec = { user: em, salt, hash: hashPw(String(pass), salt), name: String(name || em).slice(0, 40), role, createdAt: new Date().toISOString() };
+        const idx = users.findIndex(u => u.user === em);
+        if (idx >= 0) users[idx] = { ...users[idx], ...rec }; else users.push(rec);
+        await kvSet(TEAM_KEY, users);
+        return res.json({ success: true });
+      }
+      if (action === 'team-del') {
+        const em = String(user || '').trim().toLowerCase();
+        await kvSet(TEAM_KEY, users.filter(u => u.user !== em));
+        return res.json({ success: true });
+      }
+    }
+
     // ── コード検証（2段階認証の2手目）──
     if (action === 'verify') {
       if (!cred) return res.status(400).json({ error: '未登録です' });
@@ -167,7 +221,14 @@ export default async function handler(req, res) {
 
     // ── ログイン（1手目: メール＋パスワード）──
     if (!cred) return res.status(400).json({ error: 'まだ登録されていません。先に登録してください。' });
-    if (String(user).toLowerCase() !== cred.user || hashPw(String(pass), cred.salt) !== cred.hash) {
+    const _em = String(user || '').toLowerCase();
+    // プライマリ管理者に一致しなければチームユーザーを照合（チームは2FA無しで即ログイン）
+    if (_em !== cred.user || hashPw(String(pass), cred.salt) !== cred.hash) {
+      const team = (await getTeamUsers()).find(u => u.user === _em);
+      if (team && hashPw(String(pass), team.salt) === team.hash) {
+        setTeamSession(res, team);
+        return res.json({ success: true, name: team.name || team.user, role: team.role });
+      }
       return res.status(401).json({ error: 'メールアドレスまたはパスワードが違います' });
     }
     // 設定で2段階認証がOFFなら、コードを送らずそのままログイン
@@ -192,6 +253,18 @@ export default async function handler(req, res) {
   }
 
   // ── GET: ログイン状態 ──
+  // チームユーザー（team_user cookie）を先に判定→各ロールを返す。
+  if (c.team_user) {
+    const users = await getTeamUsers();
+    const tu = users.find(x => x.user === String(c.team_user).toLowerCase());
+    if (tu && c.pw_session === teamSessionToken(tu)) {
+      const gbp = await getMasterInfo();
+      return res.json({
+        loggedIn: true, method: 'password', name: tu.name || tu.user, email: tu.user, role: tu.role,
+        gbpConnected: gbp.connected, gbpEmail: gbp.email, twofaAvailable: false, twofaEnabled: false,
+      });
+    }
+  }
   // パスワードセッションを優先判定する。GBP連携で access_token Cookie が残っていても、
   // 実際のログインはメール＋パスワードなので、設定ページで正しくアカウント管理できるようにする。
   const cred = await getCred();
@@ -201,7 +274,7 @@ export default async function handler(req, res) {
     const twofaPref = await kvGet(TWOFA_KEY);
     const twofaAvailable = !!process.env.RESEND_API_KEY;
     return res.json({
-      loggedIn: true, method: 'password', name: dn, email: cred.user, envManaged: !!cred._env,
+      loggedIn: true, method: 'password', name: dn, email: cred.user, envManaged: !!cred._env, role: 'super_admin',
       gbpConnected: gbp.connected, gbpEmail: gbp.email,
       twofaAvailable, twofaEnabled: twofaAvailable && twofaPref !== false,
     });
