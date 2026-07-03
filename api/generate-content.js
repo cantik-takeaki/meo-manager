@@ -347,20 +347,27 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
   // 日本語はひらがな/カタカナの有無で判定（漢字は中国語と共通のため）。
   const _rt = reviewText || '';
   const _detectLang = (t) => {
-    if (/[぀-ヿ]/.test(t)) return { ja: true };                       // かな有り＝日本語
-    if (/[가-힣]/.test(t)) return { ja: false, name: '韓国語（ハングル）' };
-    if (/[一-鿿㐀-䶿]/.test(t)) return { ja: false, name: '中国語（簡体字・繁体字はそのまま）' };
-    if (/[฀-๿]/.test(t)) return { ja: false, name: 'タイ語' };
-    if (/[Ѐ-ӿ]/.test(t)) return { ja: false, name: 'ロシア語' };
-    return { ja: false, name: '口コミと同じ言語（英語など）' };        // ラテン文字等
+    if (/[぀-ヿ]/.test(t)) return { ja: true, en: 'Japanese' };        // かな有り＝日本語
+    if (/[가-힣]/.test(t)) return { ja: false, en: 'Korean' };
+    if (/[一-鿿㐀-䶿]/.test(t)) return { ja: false, en: 'Chinese' };
+    if (/[฀-๿]/.test(t)) return { ja: false, en: 'Thai' };
+    if (/[Ѐ-ӿ]/.test(t)) return { ja: false, en: 'Russian' };
+    return { ja: false, en: 'the same language as the review' };      // ラテン文字等
   };
   const _lang = _detectLang(_rt);
   const _reviewIsJa = _lang.ja;
-  const _langLead = _reviewIsJa ? '' : `\n\n★最優先ルール：この口コミの言語は「${_lang.name}」です。返信は必ず${_lang.name}で書いてください。日本語や英語の定型文は使わず、${_lang.name}で自然な挨拶から始め、最後まで${_lang.name}だけで書きます。下記の日本語テンプレートは"構成の順序（挨拶→お礼→具体点→今後→締め）"の参考にとどめます。`;
+  // 外国語の口コミ用：日本語テンプレを一切含まない専用プロンプト（英語で指示＝llamaが確実に対象言語で返す）
+  const _foreignReplyPrompt = (sentiment) => `You are the owner/staff of "${storeName}"${knowledge.category ? ' (' + knowledge.category + ')' : ''}. A customer left the following review. Write a warm, polite reply.
 
-  if (type === 'reply_positive') {
+Review: ${reviewText}
+${sentiment === 'negative' ? 'This is a low rating. Sincerely apologize for the specific point the customer was unhappy about, explain how you will improve (only realistically), and invite them to give another chance. Do not make excuses or shift blame.' : 'This is a high rating. Thank them, mention the specific thing they praised, and warmly invite them back.'}
+
+CRITICAL: Write the ENTIRE reply in ${_lang.en}. Do NOT use any Japanese. Match the customer's language exactly. 100-180 words. Only mention facts stated in the review; do not invent details. Output only the reply text (no labels, no explanations).`;
+
+  if (type === 'reply_positive' && !_reviewIsJa) { prompt = _foreignReplyPrompt('positive'); }
+  else if (type === 'reply_positive') {
     const { verb, close } = bizPhrasing(knowledge.category, storeName);
-    prompt = `あなたは${storeName}のオーナー/スタッフです。お客様がくれた高評価の口コミに、下記の"型"に沿って丁寧な返信を書いてください。${_langLead}
+    prompt = `あなたは${storeName}のオーナー/スタッフです。お客様がくれた高評価の口コミに、下記の"型"に沿って丁寧な返信を書いてください。
 
 【お店】${storeName}${knowledge.category ? '（' + knowledge.category + '）' : ''}
 【口コミ本文】${reviewText}
@@ -376,7 +383,7 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
 3ブロック目：口コミ本文で実際に褒められた具体的な点を1つ拾ってそれに触れ「〜についてお褒めいただき（／ご満足いただけたとのことで）、大変嬉しく思います」と受ける → 今後の姿勢を一言（例：今後も〜できるよう努めてまいります）→ 締めの一文「${close}」。
 
 【厳守】
-- ${_reviewIsJa ? '上記の「お世話になっております。」で必ず始め、3ブロックを空行で区切る。です・ます調。' : '口コミと同じ言語で、挨拶→お礼→本文の具体点への言及→今後の姿勢→締め、の順で自然に書く（日本語テンプレートの語句は使わない）。'}全体で150〜240文字程度。
+- 上記の「お世話になっております。」で必ず始め、3ブロックを空行で区切る。全体で150〜240文字程度。です・ます調。
 - 業種に合った言い回しにする：この店は${verb}が自然（${knowledge.category || '該当業種'}）。飲食/美容/整体などは来院・来店系、制作/士業/EC等は依頼・購入系。不自然な語は使わない。
 - 口コミ本文に実際に書かれた点だけを拾う。本文に無い事実（来店回数・注文内容など）は作らない。
 - ${humanTone}
@@ -385,9 +392,10 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
   }
 
   // ★1〜3：謝罪・改善の返信（お世話になっております〜の3ブロック定型・業種別・トーン別）
-  if (type === 'reply_negative') {
+  if (type === 'reply_negative' && !_reviewIsJa) { prompt = _foreignReplyPrompt('negative'); }
+  else if (type === 'reply_negative') {
     const { verb } = bizPhrasing(knowledge.category, storeName);
-    prompt = `あなたは${storeName}のオーナー/スタッフです。低評価の口コミに、下記の"型"に沿って誠実な返信を書いてください。${_langLead}
+    prompt = `あなたは${storeName}のオーナー/スタッフです。低評価の口コミに、下記の"型"に沿って誠実な返信を書いてください。
 
 【お店】${storeName}${knowledge.category ? '（' + knowledge.category + '）' : ''}
 【口コミ本文】${reviewText}
@@ -403,7 +411,7 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
 3ブロック目：指摘点をどう受け止め・どう改善するかを可能な範囲で具体的に伝える（実在の範囲で。言い訳・責任転嫁はしない）→ もう一度機会をいただきたい気持ちを丁寧に添えて締める。
 
 【厳守】
-- ${_reviewIsJa ? '「お世話になっております。」で必ず始め、3ブロックを空行で区切る。です・ます調。誠実で温かみのある文体。' : '口コミと同じ言語で、挨拶→お礼とお詫び→指摘点への誠実な言及→改善姿勢→締め、の順で自然に書く（日本語テンプレートの語句は使わない）。'}全体で170〜260文字程度。
+- 「お世話になっております。」で必ず始め、3ブロックを空行で区切る。全体で170〜260文字程度。です・ます調。誠実で温かみのある文体。
 - 業種に合った言い回し（この店は${verb}が自然・${knowledge.category || '該当業種'}）。
 - ${humanTone}
 - 口コミ本文に無い事実や言い訳を作らない。責任転嫁しない。
