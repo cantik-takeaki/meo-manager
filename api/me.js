@@ -22,14 +22,24 @@ const hashPw = (pass, salt) => crypto.createHash('sha256').update('rakuraku|' + 
 const sessionToken = (cred) => crypto.createHash('sha256').update('sess|' + cred.user + '|' + cred.hash).digest('hex');
 const codeKey = (email) => 'login_code_' + String(email).toLowerCase();
 
+function envCred() {
+  const salt = 'env';
+  return { user: String(process.env.ADMIN_USER).toLowerCase(), salt, hash: hashPw(process.env.ADMIN_PASS, salt), name: process.env.ADMIN_NAME || '管理者', _env: true };
+}
+
 async function getCred() {
-  // 環境変数(ADMIN_USER/ADMIN_PASS)を最優先。社長が設定した正規資格情報で必ずログインできるようにする。
-  // （過去のテストで残った古いKVレコードに上書きされてログイン不能になる事故を防ぐ）
-  if (process.env.ADMIN_USER && process.env.ADMIN_PASS) {
-    const salt = 'env';
-    return { user: String(process.env.ADMIN_USER).toLowerCase(), salt, hash: hashPw(process.env.ADMIN_PASS, salt), name: process.env.ADMIN_NAME || '管理者', _env: true };
-  }
-  // envが無い場合のみKV（サイト内で初回セットアップした場合）。
+  // 優先順位（社長指示2026-07-04で設定ページからのメール/PW変更に対応）:
+  // 1) ADMIN_RESET=1 が設定されていれば env を強制（新PWを忘れた時の復旧用エスケープハッチ）
+  // 2) 設定ページから明示変更されたKV資格情報（_userSet=true のみ。テスト残骸の古いKVは対象外）
+  // 3) env（ADMIN_USER/ADMIN_PASS）
+  // 4) KV（envが無い環境で初回セットアップした場合）
+  const hasEnv = process.env.ADMIN_USER && process.env.ADMIN_PASS;
+  if (hasEnv && process.env.ADMIN_RESET === '1') return envCred();
+  try {
+    const kv = await kvGet(ADMIN_KEY);
+    if (kv && kv.user && kv.hash && kv._userSet) return kv;
+  } catch (e) {}
+  if (hasEnv) return envCred();
   try { const kv = await kvGet(ADMIN_KEY); if (kv && kv.user && kv.hash) return kv; } catch (e) {}
   return null;
 }
@@ -87,19 +97,31 @@ export default async function handler(req, res) {
       return res.json({ success: true, name: rec.name });
     }
 
-    // ── パスワード変更（ログイン中のみ）──
+    // ── パスワード変更（ログイン中のみ・env管理でも変更可＝KVに_userSetで保存しenvより優先） ──
+    // 復旧: 新PWを忘れた場合はVercelで ADMIN_RESET=1 を設定するとenvのADMIN_USER/PASSで必ずログインできる
     if (action === 'changepw') {
       if (!cred) return res.status(400).json({ error: '未登録です' });
       if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
-      // env管理アカウントはUIから変更不可（変更してもenvが優先され混乱するため明示的にブロック）
-      if (cred._env) return res.status(400).json({ error: '管理者パスワードは環境変数(ADMIN_PASS)で管理されています。変更するにはVercelの環境変数を更新してください。' });
       if (hashPw(String(pass || ''), cred.salt) !== cred.hash) return res.status(401).json({ error: '現在のパスワードが違います' });
       if (String(newPass || '').length < 6) return res.status(400).json({ error: '新しいパスワードは6文字以上にしてください' });
       const salt = crypto.randomBytes(8).toString('hex');
-      const rec = { user: cred.user, salt, hash: hashPw(String(newPass), salt), name: cred.name || '管理者', createdAt: cred.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const rec = { user: cred.user, salt, hash: hashPw(String(newPass), salt), name: cred.name || '管理者', createdAt: cred.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), _userSet: true };
       await kvSet(ADMIN_KEY, rec);
-      setSession(res, rec);
+      setSession(res, rec, await getDisplayName(rec));
       return res.json({ success: true });
+    }
+
+    // ── ログインメールアドレス変更（ログイン中のみ・現在のパスワード必須） ──
+    if (action === 'changemail') {
+      if (!cred) return res.status(400).json({ error: '未登録です' });
+      if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
+      if (hashPw(String(pass || ''), cred.salt) !== cred.hash) return res.status(401).json({ error: '現在のパスワードが違います' });
+      const newMail = String((req.body || {}).newEmail || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newMail)) return res.status(400).json({ error: 'メールアドレスの形式が正しくありません' });
+      const rec = { user: newMail, salt: cred.salt, hash: cred.hash, name: cred.name || '管理者', createdAt: cred.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), _userSet: true };
+      await kvSet(ADMIN_KEY, rec);
+      setSession(res, rec, await getDisplayName(rec)); // user変更でセッショントークンが変わるため再発行
+      return res.json({ success: true, email: newMail });
     }
 
     // ── プロフィール（表示名）変更（ログイン中のみ）──
@@ -170,10 +192,8 @@ export default async function handler(req, res) {
   }
 
   // ── GET: ログイン状態 ──
-  if (c.access_token) {
-    try { await getValidCookieToken(req, res); } catch (e) {}
-    return res.json({ loggedIn: true, method: 'google', email: c.user_email, name: c.user_name, picture: c.user_picture });
-  }
+  // パスワードセッションを優先判定する。GBP連携で access_token Cookie が残っていても、
+  // 実際のログインはメール＋パスワードなので、設定ページで正しくアカウント管理できるようにする。
   const cred = await getCred();
   if (cred && c.pw_session && c.pw_session === sessionToken(cred)) {
     const gbp = await getMasterInfo();
@@ -185,6 +205,10 @@ export default async function handler(req, res) {
       gbpConnected: gbp.connected, gbpEmail: gbp.email,
       twofaAvailable, twofaEnabled: twofaAvailable && twofaPref !== false,
     });
+  }
+  if (c.access_token) {
+    try { await getValidCookieToken(req, res); } catch (e) {}
+    return res.json({ loggedIn: true, method: 'google', email: c.user_email, name: c.user_name, picture: c.user_picture });
   }
   return res.status(401).json({ loggedIn: false, needsSetup: !cred });
 }

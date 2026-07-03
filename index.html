@@ -613,7 +613,9 @@ body {
   <!-- Topbar（メイン列の上） -->
   <header class="topbar">
     <div id="topbarTitle" style="font-weight:700;font-size:16px;color:var(--text)">ダッシュボード</div>
-    <div class="topbar-user">
+    <div class="topbar-user" style="display:flex;align-items:center;gap:10px">
+      <span id="topbarUpdated" style="font-size:12px;color:var(--text-sub);white-space:nowrap"></span>
+      <button class="btn btn-outline btn-sm" id="topbarRefreshBtn" onclick="refreshCurrentPanel(this)" title="このページを最新のデータに更新"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
       <span id="gbpConnectState"></span>
     </div>
   </header>
@@ -667,7 +669,7 @@ body {
           <div class="kpi-agg-cell"><div class="k-l">💬 アンケート回答</div><div class="k-v" id="aggSurvey">—</div></div>
           <div class="kpi-agg-cell"><div class="k-l">✨ AI生成</div><div class="k-v" id="aggAi">—</div></div>
           <div class="kpi-agg-cell"><div class="k-l">🔗 Googleクリック</div><div class="k-v" id="aggClick">—</div></div>
-          <div class="kpi-agg-cell"><div class="k-l">📣 LINE誘導</div><div class="k-v" id="aggLine">—</div></div>
+          <div class="kpi-agg-cell"><div class="k-l"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M3 11v3a1 1 0 001 1h2l3.5 5a1 1 0 001.5-.86V5.86A1 1 0 009.5 5L6 10H4a1 1 0 00-1 1z"/><path d="M14 8a4.5 4.5 0 010 8M17.5 5a8.5 8.5 0 010 14"/></svg>LINE誘導</div><div class="k-v" id="aggLine">—</div></div>
           <div class="kpi-agg-cell"><div class="k-l">📩 メール取得</div><div class="k-v" id="aggMail">—</div></div>
         </div>
         <div class="kpi-agg-rate">
@@ -758,7 +760,7 @@ body {
             <div id="rsDist"></div>
           </div>
           <div style="display:flex;gap:12px;min-width:200px">
-            <div class="kpi-agg-cell" style="flex:1"><div class="k-l">✅ 返信済み</div><div class="k-v" style="color:var(--accent-2)" id="rsReplied">—</div></div>
+            <div class="kpi-agg-cell" style="flex:1"><div class="k-l"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>返信済み</div><div class="k-v" style="color:var(--accent-2)" id="rsReplied">—</div></div>
             <div class="kpi-agg-cell" style="flex:1"><div class="k-l">⏳ 未返信</div><div class="k-v" style="color:var(--gold)" id="rsUnreplied">—</div></div>
           </div>
         </div>
@@ -1018,7 +1020,7 @@ body {
         <div id="gbpCheckList"></div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
           <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
-          <div style="margin-top:4px;line-height:1.9">📷 写真（外観/内観/メニューを月数枚）／🛍 商品・サービス登録（価格つき）／❓ Q&Aの自作／🏷 属性（バリアフリー等）／📝 説明文／📰 投稿（週1）</div>
+          <div style="margin-top:4px;line-height:1.9"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>写真（外観/内観/メニューを月数枚）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>商品・サービス登録（価格つき）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Q&Aの自作／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><path d="M7 7h.01"/></svg>属性（バリアフリー等）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>説明文／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9h4"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>投稿（週1）</div>
         </div>
       </div>
 
@@ -1030,7 +1032,7 @@ body {
         <!-- ① 口コミ依頼URL / QR（固定・常設） -->
         <div id="reviewLinkBox" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;background:var(--bg-3);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px">
           <div style="flex:1;min-width:260px">
-            <div style="font-size:13px;font-weight:700;margin-bottom:4px">📣 口コミ依頼リンク（この店舗の固定URL）</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M3 11v3a1 1 0 001 1h2l3.5 5a1 1 0 001.5-.86V5.86A1 1 0 009.5 5L6 10H4a1 1 0 00-1 1z"/><path d="M14 8a4.5 4.5 0 010 8M17.5 5a8.5 8.5 0 010 14"/></svg>口コミ依頼リンク（この店舗の固定URL）</div>
             <p style="font-size:11px;color:var(--text-sub);margin-bottom:8px">QR・LINE・POPすべて、この1つの入口です。お客様は満足度アンケート→高評価はGoogleへ、低評価は店内フィードバックへ自動で分かれます。</p>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <input id="reviewLinkInput" readonly style="flex:1;min-width:200px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
@@ -1045,7 +1047,7 @@ body {
 
             <!-- 確認用（プレビュー・集計されない） -->
             <div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
-              <div style="font-size:12px;font-weight:700;margin-bottom:4px">🔎 確認用リンク（スタッフ確認・集計されません）</div>
+              <div style="font-size:12px;font-weight:700;margin-bottom:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>確認用リンク（スタッフ確認・集計されません）</div>
               <p style="font-size:11px;color:var(--text-sub);margin-bottom:6px">自分たちで動作チェックする時はこちら。スキャンしてもKPIやリードに記録されません。</p>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <input id="reviewPreviewInput" readonly style="flex:1;min-width:200px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
@@ -2228,9 +2230,9 @@ body {
       <div class="card">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></svg>サイテーション効果の目安</div></div>
         <div style="font-size:13px;color:var(--text-sub);line-height:2">
-          <div>✅ 5媒体以上: 基本的なサイテーション完成</div>
-          <div>✅ 10媒体以上: 直接検索+89%、検索表示+91%（実績値）</div>
-          <div>✅ 20媒体以上: 上位表示に大きく貢献</div>
+          <div><svg viewBox="0 0 24 24" width="13" height="13" fill="none" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>5媒体以上: 基本的なサイテーション完成</div>
+          <div><svg viewBox="0 0 24 24" width="13" height="13" fill="none" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>10媒体以上: 直接検索+89%、検索表示+91%（実績値）</div>
+          <div><svg viewBox="0 0 24 24" width="13" height="13" fill="none" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>20媒体以上: 上位表示に大きく貢献</div>
           <div style="margin-top:10px;padding:10px;background:rgba(79,125,243,0.08);border-radius:8px">
             💡 <strong>最重要:</strong> NAP情報（店舗名・住所・電話番号）は全媒体で完全に統一することが必須です。表記ゆれがあると逆効果になります。
           </div>
@@ -2559,6 +2561,22 @@ body {
             <div class="set-row-title">ログイン方法</div>
             <div class="set-row-sub" id="setLoginInfo">—</div>
           </div>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main" style="flex:1">
+            <div class="set-row-title">ログインメールアドレス</div>
+            <div class="set-row-sub" id="setMailCur">—</div>
+            <div id="setMailEdit" style="display:none;margin-top:10px;max-width:380px">
+              <input id="setMailNew" type="email" placeholder="新しいメールアドレス" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              <input id="setMailPass" type="password" placeholder="現在のパスワード" autocomplete="current-password" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;margin-top:6px">
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-primary btn-sm" onclick="saveMailChange()">変更する</button>
+                <button class="btn btn-outline btn-sm" onclick="document.getElementById('setMailEdit').style.display='none'">キャンセル</button>
+              </div>
+              <div class="set-row-sub" style="margin-top:6px">変更後は新しいメールアドレスでログインします（ログイン状態はそのまま維持されます）。</div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" id="setMailBtn" onclick="document.getElementById('setMailEdit').style.display='block'" style="display:none;flex-shrink:0">変更</button>
         </div>
         <div class="set-row">
           <div class="set-row-main">
@@ -2892,17 +2910,19 @@ async function loadSettings() {
   if (info) info.textContent = me.method === 'google'
     ? `Googleアカウント（${me.email || ''}）でログイン中`
     : `メール＋パスワード（${me.email || ''}）でログイン中${me.envManaged ? '・管理者アカウント' : ''}`;
+  // メールアドレス
+  const mailCur = document.getElementById('setMailCur');
+  const mailBtn = document.getElementById('setMailBtn');
+  if (mailCur) mailCur.textContent = me.email || '—';
+  if (mailBtn) mailBtn.style.display = isPw ? '' : 'none';
   // パスワード
   const pwHint = document.getElementById('setPwHint');
   const pwBtn = document.getElementById('setPwBtn');
   if (me.method !== 'password') {
     if (pwHint) pwHint.textContent = 'Googleログインのため、パスワードはGoogleアカウント側で管理されています。';
     if (pwBtn) pwBtn.style.display = 'none';
-  } else if (me.envManaged) {
-    if (pwHint) pwHint.textContent = 'パスワードは環境変数（ADMIN_PASS）で管理されています。変更はVercelの環境変数を更新してください。';
-    if (pwBtn) pwBtn.style.display = 'none';
   } else {
-    if (pwHint) pwHint.textContent = 'ログインパスワードを変更できます。';
+    if (pwHint) pwHint.textContent = 'ログインパスワードを変更できます。' + (me.envManaged ? '変更後のパスワードを忘れた場合は、VercelでADMIN_RESET=1を設定すると初期パスワードに戻せます。' : '');
     if (pwBtn) pwBtn.style.display = '';
   }
   // 2段階認証
@@ -2963,6 +2983,27 @@ async function saveProfileName() {
       showToast('表示名を変更しました', 'success');
       const un = document.getElementById('userName'); if (un) un.textContent = d.name;
       const ini = document.getElementById('userInitial'); if (ini) ini.textContent = (d.name.trim()[0] || 'C').toUpperCase();
+    } else showToast(d.error || '変更できませんでした', 'error');
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+async function saveMailChange() {
+  const newEmail = (document.getElementById('setMailNew')?.value || '').trim();
+  const pass = document.getElementById('setMailPass')?.value || '';
+  if (!newEmail) return showToast('新しいメールアドレスを入力してください', 'error');
+  if (!pass) return showToast('現在のパスワードを入力してください', 'error');
+  try {
+    const r = await fetch('/api/me', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'changemail', pass, newEmail }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) {
+      showToast('ログインメールアドレスを変更しました', 'success');
+      document.getElementById('setMailEdit').style.display = 'none';
+      document.getElementById('setMailNew').value = '';
+      document.getElementById('setMailPass').value = '';
+      loadSettings();
     } else showToast(d.error || '変更できませんでした', 'error');
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
@@ -3585,7 +3626,7 @@ async function renderReviewLink() {
   const banner = document.getElementById('reviewGoogleBanner');
   if (banner) {
     if (_surveyCache && _surveyCache.googleUrl) {
-      banner.innerHTML = '<span style="font-size:12px;color:var(--accent-2);font-weight:700">✅ Google口コミURL設定済み</span>';
+      banner.innerHTML = '<span style="font-size:12px;color:var(--accent-2);font-weight:700">' + ICO_OK + 'Google口コミURL設定済み</span>';
     } else {
       banner.innerHTML = `<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--gold);line-height:1.6">⚠️ Google口コミURL未設定。このままだとお客様が投稿画面まで進めません。<button class="btn btn-outline btn-sm" style="margin-left:6px" onclick="openSurveyEditor();setTimeout(()=>{var e=document.getElementById('svGoogle');if(e){e.scrollIntoView({block:'center'});e.focus();}},200)">アンケート編集で設定</button></div>`;
     }
@@ -4777,7 +4818,7 @@ function gbpCheck() {
   document.getElementById('gbpCheckScore').textContent = `${done}/${items.length} 設定済み`;
   const missing = items.filter(i => !i.ok);
   document.getElementById('gbpCheckList').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px 14px">` +
-    items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`).join('') + '</div>'
+    items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? ICO_OK : ICO_TODO}${i.label}</div>`).join('') + '</div>'
     + (missing.length ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg-3);border-radius:8px">
         <div style="font-size:12px;font-weight:700;margin-bottom:6px">未設定項目の設定方法（Googleビジネスプロフィール側で設定します）</div>
         ${missing.map(i => `<div style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:4px"><b style="color:var(--text)">${i.label}:</b> ${i.hint}</div>`).join('')}
@@ -4945,7 +4986,7 @@ async function loadDiagnosis() {
   le.innerHTML = `<span style="display:inline-block;min-width:26px;padding:1px 8px;border-radius:7px;background:${gradeInfo.color};color:#fff;font-weight:900;margin-right:6px">${grade}</span>${gradeInfo.label}`;
   le.style.color = gradeInfo.color;
   document.getElementById('meoChecklist').innerHTML = items.map(i =>
-    `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`
+    `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? ICO_OK : ICO_TODO}${i.label}</div>`
   ).join('');
 
   const adv = document.getElementById('meoAdvice');
@@ -7397,9 +7438,9 @@ async function diagnoseReview(i) {
     if (!j) { box.innerHTML = '<div style="font-size:12px;color:var(--red);padding:8px">診断できませんでした。もう一度お試しください。</div>'; return; }
     const score = Math.max(0, Math.min(100, parseInt(j.score, 10) || 0));
     const risk = j.risk || (score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low');
-    const conf = { high: { c: '#ef4444', bg: 'rgba(239,68,68,0.08)', bd: 'rgba(239,68,68,0.3)', dot: '🔴', label: '削除申請候補' },
-      medium: { c: '#f59e0b', bg: 'rgba(245,158,11,0.08)', bd: 'rgba(245,158,11,0.3)', dot: '🟡', label: '様子見' },
-      low: { c: '#10b981', bg: 'rgba(16,185,129,0.08)', bd: 'rgba(16,185,129,0.3)', dot: '🟢', label: '返信推奨' } }[risk] || {};
+    const conf = { high: { c: '#ef4444', bg: 'rgba(239,68,68,0.08)', bd: 'rgba(239,68,68,0.3)', dot: ICO_DOT('#ef4444'), label: '削除申請候補' },
+      medium: { c: '#f59e0b', bg: 'rgba(245,158,11,0.08)', bd: 'rgba(245,158,11,0.3)', dot: ICO_DOT('#f59e0b'), label: '様子見' },
+      low: { c: '#10b981', bg: 'rgba(16,185,129,0.08)', bd: 'rgba(16,185,129,0.3)', dot: ICO_DOT('#10b981'), label: '返信推奨' } }[risk] || {};
     const reasons = (j.reasons || []).map(x => `<li>${escapeHtml(x)}</li>`).join('');
     const canReport = risk === 'high' || j.recommend === 'report';
     box.innerHTML = `
@@ -7734,6 +7775,30 @@ function switchPanel(name, triggerEl) {
   if (name === 'rankreport') loadRankReport();
   if (name === 'knowledge') loadNotionStatus();
   if (name === 'settings') loadSettings();
+  _stampUpdated();
+}
+
+// ─── 共有SVGアイコン（絵文字の代わりに使う・社長恒久指示） ───
+const ICO_OK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" style="vertical-align:-3px;margin-right:5px;flex-shrink:0"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+const ICO_TODO = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--text-muted)" stroke-width="2" style="vertical-align:-3px;margin-right:5px;flex-shrink:0"><circle cx="12" cy="12" r="9"/></svg>';
+const ICO_DOT = (color) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0"></span>`;
+const ICO_STAR = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#f59e0b" style="vertical-align:-2px;margin-right:3px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>';
+
+// ─── 全ページ共通: 最終更新時刻＋更新ボタン（トップバー） ───
+function _stampUpdated() {
+  const el = document.getElementById('topbarUpdated');
+  if (el) el.textContent = '最終更新: ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+function refreshCurrentPanel(btn) {
+  let name = 'dashboard';
+  try { name = sessionStorage.getItem('rakuraku_panel') || 'dashboard'; } catch (e) {}
+  if (btn) { btn.disabled = true; setTimeout(() => { btn.disabled = false; }, 1200); }
+  if (name === 'dashboard') {
+    loadDashboardSummary();
+    if (currentLocationId) { loadDiagnosis(); }
+  }
+  switchPanel(name); // 各ページのローダーを再実行（同じページのまま最新化）
+  showToast('最新のデータに更新しています…', 'success');
 }
 
 function showPanel(name, el) {
@@ -8123,7 +8188,7 @@ function renderCitationSites(registered, nap) {
   const highDone = CITATION_SITES.filter(s => s.priority === 'high' && registeredIds.includes(s.id)).length;
   document.getElementById('citationScore').textContent = `${count}/${total}媒体 | 最重要 ${highDone}/${highTotal}`;
 
-  const priorityLabel = { high: '⭐ 最重要', mid: '推奨', low: '任意' };
+  const priorityLabel = { high: ICO_STAR + '最重要', mid: '推奨', low: '任意' };
   const priorityColor = { high: 'var(--red)', mid: 'var(--gold)', low: 'var(--text-muted)' };
   const categories = [...new Set(CITATION_SITES.map(s => s.category))];
 
@@ -8257,7 +8322,7 @@ async function loadAio() {
 function renderAioChecklist(checks) {
   const categories = [...new Set(AIO_CHECKS.map(c => c.category))];
   const levelColor = { critical: 'var(--red)', high: 'var(--gold)', mid: 'var(--accent)', low: 'var(--text-muted)' };
-  const levelLabel = { critical: '🔴 必須', high: '🟡 重要', mid: '🔵 推奨', low: '⚪ 確認' };
+  const levelLabel = { critical: ICO_DOT('var(--red)') + '必須', high: ICO_DOT('#f59e0b') + '重要', mid: ICO_DOT('#3b82f6') + '推奨', low: ICO_DOT('#94a3b8') + '確認' };
 
   const done = AIO_CHECKS.filter(c => checks[c.id]).length;
   document.getElementById('aioProgress').textContent = `${done} / ${AIO_CHECKS.length} 完了`;
