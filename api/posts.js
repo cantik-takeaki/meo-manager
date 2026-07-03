@@ -250,27 +250,33 @@ export default async function handler(req, res) {
 
     // 削除（CloudinaryからもKVからも削除）
     if (req.method === 'DELETE') {
-      const { publicId } = req.query;
-      if (!publicId) return res.status(400).json({ error: 'publicId必須' });
+      // 単体削除(publicId) と 一括削除(publicIds=カンマ区切り) の両対応
+      const ids = (req.query.publicIds ? String(req.query.publicIds).split(',') : [req.query.publicId])
+        .map(s => (s || '').trim()).filter(Boolean);
+      if (!ids.length) return res.status(400).json({ error: 'publicId必須' });
       const fullList = await kvGet(key) || [];
-      const target = fullList.find(m => m.publicId === publicId);
-      const rtype = target?.isVideo ? 'video' : 'image';
+      const idSet = new Set(ids);
+      const targets = fullList.filter(m => idSet.has(m.publicId));
       if (CLOUD && CKEY && CSECRET) {
-        try {
-          const ts = Math.floor(Date.now() / 1000);
-          const toSign = `public_id=${publicId}&timestamp=${ts}`;
-          const signature = crypto.createHash('sha1').update(toSign + CSECRET).digest('hex');
-          const form = new URLSearchParams();
-          form.set('public_id', publicId);
-          form.set('api_key', CKEY);
-          form.set('timestamp', String(ts));
-          form.set('signature', signature);
-          await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/${rtype}/destroy`, { method: 'POST', body: form });
-        } catch (e) { /* Cloudinary削除失敗してもKVは消す */ }
+        // Cloudinary実体を1件ずつ削除（失敗してもKVは消す）。KV書き込みは最後に1回だけ＝レース防止
+        for (const t of targets) {
+          try {
+            const rtype = t.isVideo ? 'video' : 'image';
+            const ts = Math.floor(Date.now() / 1000);
+            const toSign = `public_id=${t.publicId}&timestamp=${ts}`;
+            const signature = crypto.createHash('sha1').update(toSign + CSECRET).digest('hex');
+            const form = new URLSearchParams();
+            form.set('public_id', t.publicId);
+            form.set('api_key', CKEY);
+            form.set('timestamp', String(ts));
+            form.set('signature', signature);
+            await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/${rtype}/destroy`, { method: 'POST', body: form });
+          } catch (e) { /* 個別失敗は無視してKVからは消す */ }
+        }
       }
-      const list = fullList.filter(m => m.publicId !== publicId);
+      const list = fullList.filter(m => !idSet.has(m.publicId));
       await kvSet(key, list);
-      return res.json({ success: true, media: list });
+      return res.json({ success: true, media: list, deleted: targets.length });
     }
 
     return res.status(405).end();

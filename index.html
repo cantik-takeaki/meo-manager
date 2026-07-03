@@ -1930,16 +1930,18 @@ body.role-viewer [data-edit-action] { display:none !important; }
                   <option value="magazine">マガジン（英字大・SHIBUYA風）</option>
                   <option value="mincho">明朝見出し（SanMichele風）</option>
                   <option value="bold">筆太ゴシック（塚田農場風）</option>
+                  <option value="plain">文字なし（写真のみ）</option>
                 </select>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                   <button class="pop-tpl pop-tpl-on gen-tpl" data-tpl="standard" onclick="igGenSetTpl('standard')">スタンダード<br><span style="font-weight:400;font-size:11px;opacity:.75">下グラデ・万能</span></button>
                   <button class="pop-tpl gen-tpl" data-tpl="elegant" onclick="igGenSetTpl('elegant')">エレガント<br><span style="font-weight:400;font-size:11px;opacity:.75">白セリフ・CORNER風</span></button>
                   <button class="pop-tpl gen-tpl" data-tpl="magazine" onclick="igGenSetTpl('magazine')">マガジン<br><span style="font-weight:400;font-size:11px;opacity:.75">英字大・SHIBUYA風</span></button>
                   <button class="pop-tpl gen-tpl" data-tpl="mincho" onclick="igGenSetTpl('mincho')">明朝見出し<br><span style="font-weight:400;font-size:11px;opacity:.75">SanMichele風</span></button>
-                  <button class="pop-tpl gen-tpl" data-tpl="bold" onclick="igGenSetTpl('bold')" style="grid-column:1 / -1">筆太ゴシック<br><span style="font-weight:400;font-size:11px;opacity:.75">塚田農場風・縦書き特化</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="bold" onclick="igGenSetTpl('bold')">筆太ゴシック<br><span style="font-weight:400;font-size:11px;opacity:.75">塚田農場風・縦書き</span></button>
+                  <button class="pop-tpl gen-tpl" data-tpl="plain" onclick="igGenSetTpl('plain')">文字なし<br><span style="font-weight:400;font-size:11px;opacity:.75">写真のみ・ロゴ可</span></button>
                 </div>
               </div>
-              <div class="card">
+              <div class="card" id="genTextCard">
                 <div class="card-header"><div class="card-title" style="font-size:13px">テキスト内容</div></div>
                 <div style="display:grid;gap:11px">
                   <div>
@@ -2066,8 +2068,35 @@ body.role-viewer [data-edit-action] { display:none !important; }
                     <span id="genBgScaleVal" style="font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums">100%</span>
                   </div>
                   <input type="range" id="genBgScale" min="50" max="300" value="100" step="1" style="width:100%" oninput="genBgScaleInput(this.value)">
-                  <p style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.5">スライダーで写真の大きさを変え、プレビュー上で写真を<b>ドラッグ</b>すると位置を動かせます（文字のない場所をドラッグ）。</p>
+                  <p style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.5">取り込んだ写真は<b>元の縦横比のまま</b>表示されます。スライダーで大きさを変え、プレビュー上で写真を<b>ドラッグ</b>して位置を調整（文字のない場所をドラッグ）。縮小すると写真全体が枠に収まり、余白は自動でぼかして埋めます。</p>
                   <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;margin-top:6px" onclick="genBgReset()">背景の位置・サイズをリセット</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">ロゴ</div></div>
+                <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">お店のロゴを重ねられます。透過PNG推奨。プレビュー上でドラッグして位置を調整できます。</p>
+                <input type="file" id="genLogoInput" accept="image/*" style="display:none" onchange="genLogoUpload(this)">
+                <button class="btn btn-outline btn-sm" onclick="document.getElementById('genLogoInput').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>ロゴ画像を選ぶ</button>
+                <div id="genLogoAdjust" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:12px;color:var(--text-sub)">ロゴの大きさ</label>
+                    <span id="genLogoSizeVal" style="font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums">22%</span>
+                  </div>
+                  <input type="range" id="genLogoSize" min="6" max="45" value="22" step="1" style="width:100%" oninput="genLogoSizeInput(this.value)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px">
+                    <label style="font-size:12px;color:var(--text-sub)">透明度</label>
+                    <span id="genLogoOpacityVal" style="font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums">100%</span>
+                  </div>
+                  <input type="range" id="genLogoOpacity" min="20" max="100" value="100" step="1" style="width:100%" oninput="genLogoOpacityInput(this.value)">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+                    <span style="font-size:11px;color:var(--text-sub);align-self:center">位置:</span>
+                    <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px" onclick="genLogoCorner('tl')">左上</button>
+                    <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px" onclick="genLogoCorner('tr')">右上</button>
+                    <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px" onclick="genLogoCorner('c')">中央</button>
+                    <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px" onclick="genLogoCorner('bl')">左下</button>
+                    <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 8px" onclick="genLogoCorner('br')">右下</button>
+                  </div>
+                  <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;margin-top:10px;color:#e5484d" onclick="genLogoClear()">ロゴを外す</button>
                 </div>
               </div>
             </div>
@@ -2106,7 +2135,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <button class="btn btn-primary" onclick="document.getElementById('mediaFileInput').click()">＋ 写真をアップロード</button>
         <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M17 9h5M2 15h5M17 15h5"/></svg>動画をアップロード</button>
         <button class="btn btn-outline" onclick="toggleImageGen()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>画像を生成</button>
+        <button class="btn btn-outline" id="mediaSelToggle" onclick="toggleMediaSelMode()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>選択して削除</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
+
+        <div id="mediaSelBar" style="display:none;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:8px 12px">
+          <span id="mediaSelCount" style="font-size:13px;font-weight:700;color:var(--text)">0件選択中</span>
+          <button class="btn btn-outline btn-sm" onclick="mediaSelectAll()">すべて選択</button>
+          <button class="btn btn-outline btn-sm" onclick="mediaClearSel()">選択を解除</button>
+          <button class="btn btn-sm" id="mediaBulkDelBtn" onclick="bulkDeleteMedia()" style="background:#e5484d;color:#fff;border:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>選択した写真を削除</button>
+        </div>
 
         <div id="mediaGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:16px"></div>
       </div>
@@ -5311,6 +5348,8 @@ async function loadDiagnosis() {
 
 // ─── Instagram投稿（クライアント別 写真ライブラリ） ───
 let _mediaList = [];
+let _mediaSelMode = false;        // 一括削除の選択モード
+let _mediaSel = new Set();        // 選択中のpublicId
 let _igSelected = null;
 
 // Instagram連携カードの描画（連携状態はバックエンドの ig_conn_{storeId} を直接確認）
@@ -5441,8 +5480,24 @@ async function loadMedia() {
 function renderMedia() {
   const g = document.getElementById('mediaGallery');
   if (!g) return;
+  updateMediaSelBar();
   if (!_mediaList.length) {
     g.innerHTML = '<p style="font-size:12px;color:var(--text-sub);grid-column:1/-1">まだ写真がありません。上のボタンからアップロードしてください。</p>';
+    return;
+  }
+  // 選択モード: 各タイルをタップで選択トグル（チェック表示）。通常のボタン群は隠す
+  if (_mediaSelMode) {
+    g.innerHTML = _mediaList.map((m) => {
+      const on = _mediaSel.has(m.publicId);
+      const pid = String(m.publicId).replace(/'/g, "\\'");
+      const check = on ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+      return `
+    <div onclick="toggleMediaSel('${pid}')" style="position:relative;border-radius:8px;overflow:hidden;border:2px solid ${on ? 'var(--accent)' : 'var(--border)'};aspect-ratio:1;cursor:pointer">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;${on ? 'opacity:.7' : ''}">
+      ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
+      <div style="position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:${on ? 'var(--accent)' : 'rgba(0,0,0,0.35)'};display:flex;align-items:center;justify-content:center">${check}</div>
+    </div>`;
+    }).join('');
     return;
   }
   g.innerHTML = _mediaList.map((m, i) => `
@@ -5453,6 +5508,50 @@ function renderMedia() {
       ${m.isVideo ? '' : `<button onclick="event.stopPropagation();postPhotoToGbp(${i})" title="Googleビジネスプロフィールに写真を追加" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;line-height:1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Google</button>`}
       <button onclick="deleteMedia('${m.publicId}')" title="削除" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1">×</button>
     </div>`).join('');
+}
+
+// ── 写真ライブラリの一括削除（選択モード） ──
+function updateMediaSelBar() {
+  const bar = document.getElementById('mediaSelBar');
+  const toggle = document.getElementById('mediaSelToggle');
+  if (bar) bar.style.display = _mediaSelMode ? 'flex' : 'none';
+  if (toggle) toggle.style.background = _mediaSelMode ? 'var(--bg-3)' : '';
+  const cnt = document.getElementById('mediaSelCount');
+  if (cnt) cnt.textContent = `${_mediaSel.size}件選択中`;
+  const del = document.getElementById('mediaBulkDelBtn');
+  if (del) { del.disabled = _mediaSel.size === 0; del.style.opacity = _mediaSel.size === 0 ? '.5' : '1'; del.style.cursor = _mediaSel.size === 0 ? 'default' : 'pointer'; }
+}
+function toggleMediaSelMode() {
+  _mediaSelMode = !_mediaSelMode;
+  _mediaSel.clear();
+  renderMedia();
+}
+function toggleMediaSel(pid) {
+  if (_mediaSel.has(pid)) _mediaSel.delete(pid); else _mediaSel.add(pid);
+  renderMedia();
+}
+function mediaSelectAll() {
+  _mediaList.forEach(m => _mediaSel.add(m.publicId));
+  renderMedia();
+}
+function mediaClearSel() { _mediaSel.clear(); renderMedia(); }
+async function bulkDeleteMedia() {
+  const ids = [..._mediaSel];
+  if (!ids.length) return;
+  if (!confirm(`選択した${ids.length}件の写真を削除します。よろしいですか？（元に戻せません）`)) return;
+  const status = document.getElementById('mediaUploadStatus');
+  if (status) status.textContent = `${ids.length}件を削除中...`;
+  try {
+    const res = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}&publicIds=${encodeURIComponent(ids.join(','))}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { if (status) status.textContent = data.error; return; }
+    _mediaList = data.media || [];
+    _mediaSel.clear();
+    _mediaSelMode = false;
+    renderMedia();
+    if (status) status.textContent = '';
+    showToast(`${data.deleted ?? ids.length}件を削除しました`, 'success');
+  } catch (e) { if (status) status.textContent = '削除失敗: ' + e.message; showToast('一括削除に失敗しました', 'error'); }
 }
 
 // スマホ写真をブラウザ側でリサイズ（アップロード軽量化・関数の本文制限対策）
@@ -5547,18 +5646,22 @@ let _genBgBaseUrl = null; // 背景写真の元URL（比率変更時に再変換
 const GEN_ASPECTS = { square: { w: 1080, h: 1080 }, portrait: { w: 1080, h: 1350 }, story: { w: 1080, h: 1920 } };
 function _genDims() { return GEN_ASPECTS[document.getElementById('genAspect')?.value] || GEN_ASPECTS.portrait; }
 
-// 元URLから、選択中の比率＋スマートクロップ＋自動補正の背景URLを作る
+// 元URLから背景URLを作る。取り込んだ写真の縦横比はそのまま保つ（クロップしない）。
+// 投稿枠へのはめ込みはcanvas側のcoverフィット＋ユーザーの拡大縮小・移動で行うため、
+// ここで比率を強制すると「取り込んだ元画像とサイズ・トリミングが変わる」ので c_limit を使う。
 function buildGenBgUrl(baseUrl) {
-  const { w, h } = _genDims();
   const enhance = document.getElementById('genEnhance')?.checked;
-  const tr = `c_fill,g_auto,w_${w},h_${h},q_auto${enhance ? ',e_improve' : ''}`;
-  // 既存の変換を除去して付け直す
-  const clean = baseUrl.replace(/\/upload\/[^/]*\//, '/upload/');
+  // c_limit=縦横比を保ったまま最大1600pxに収める（拡大はしない・クロップしない）
+  const tr = `c_limit,w_1600,h_1600,q_auto${enhance ? ',e_improve' : ''}`;
+  // Cloudinary以外（GoogleのGBP写真など）は/upload/を含まないので変換は付かず、元画像がそのまま読まれる
+  const clean = baseUrl.replace(/\/upload\/[^/]*\//, '/upload/'); // 既存の変換/バージョンを除去して付け直す
   return clean.replace('/upload/', `/upload/${tr}/`);
 }
 
-// 比率・補正の変更時：背景を作り直して再描画
+// 比率・補正の変更時：背景を作り直して再描画。枠の形が変わるので背景の位置・サイズもリセット
+// （移動量はcanvas px絶対値のため、比率変更後にそのまま持ち越すと配置がズレて見える）
 function changeGenAspect() {
+  _genBgResetTf(); // 先にリセット。selectGenBgは同一URLならisNew=falseで再リセットしないため維持される
   if (_genBgBaseUrl) selectGenBg(_genBgBaseUrl);
   else renderGenImage();
 }
@@ -5584,7 +5687,7 @@ function openImageGen() {
   const st = document.getElementById('igGenStatus');
   if (st) st.textContent = ''; // 前回の保存結果を持ち越さない
   const sn = document.getElementById('genStoreName');
-  if (sn && sn.dataset.forStore !== currentLocationId) { sn.value = currentLocation?.title || ''; sn.dataset.forStore = currentLocationId; }
+  if (sn && sn.dataset.forStore !== currentLocationId) { sn.value = currentLocation?.title || ''; sn.dataset.forStore = currentLocationId; _genLogo = null; } // 店舗が変わったらロゴは持ち越さない（クライアント別）
   _genOffClear();
   _genBgResetTf();
   panel.classList.add('gen-open');
@@ -5593,6 +5696,7 @@ function openImageGen() {
   igGenSyncControls();
   renderGenBgPicker();
   _genBgAdjustToggle();
+  _genLogoAdjustToggle();
   renderGenImage();
   view.scrollIntoView({ block: 'start' });
 }
@@ -5603,7 +5707,8 @@ let _genHitBoxes = []; // renderGenImageが毎回更新 {p,x,y,w,h}
 let _genDrag = null;
 let _genBgScale = 1;            // 背景写真の拡大率（coverフィット基準の倍率）
 let _genBgOff = { x: 0, y: 0 }; // 背景写真の移動量（canvas px）
-function _genOffClear() { _genOff = { Head: { x: 0, y: 0 }, En: { x: 0, y: 0 }, Sub: { x: 0, y: 0 }, Store: { x: 0, y: 0 } }; }
+let _genLogo = null;            // 合成するロゴ画像(Image) or null
+function _genOffClear() { _genOff = { Head: { x: 0, y: 0 }, En: { x: 0, y: 0 }, Sub: { x: 0, y: 0 }, Store: { x: 0, y: 0 }, Logo: { x: 0, y: 0 } }; }
 _genOffClear();
 function genResetOffsets() { _genOffClear(); renderGenImage(); }
 // 背景写真の位置・サイズを初期値へ（描画はしない）
@@ -5623,6 +5728,50 @@ function genBgScaleInput(val) {
 // 背景調整UIの表示/非表示（写真がある時だけ出す）
 function _genBgAdjustToggle() {
   const box = document.getElementById('genBgAdjust'); if (box) box.style.display = _genBg ? 'block' : 'none';
+}
+// ── ロゴ合成 ──
+function _genLogoAdjustToggle() {
+  const box = document.getElementById('genLogoAdjust'); if (box) box.style.display = _genLogo ? 'block' : 'none';
+}
+function genLogoUpload(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    const img = new Image();
+    img.onload = () => { _genLogo = img; (_genOff.Logo = { x: 0, y: 0 }); _genLogoAdjustToggle(); renderGenImage(); };
+    img.onerror = () => showToast('ロゴ画像を読み込めませんでした', 'error');
+    img.src = e.target.result;
+  };
+  r.onerror = () => showToast('ロゴ画像を読み込めませんでした', 'error');
+  r.readAsDataURL(f);
+  input.value = '';
+}
+function genLogoClear() { _genLogo = null; _genLogoAdjustToggle(); renderGenImage(); }
+function genLogoSizeInput(v) {
+  const e = document.getElementById('genLogoSizeVal'); if (e) e.textContent = Math.round(parseFloat(v) || 22) + '%';
+  renderGenImage();
+}
+function genLogoOpacityInput(v) {
+  const e = document.getElementById('genLogoOpacityVal'); if (e) e.textContent = Math.round(parseFloat(v) || 100) + '%';
+  renderGenImage();
+}
+// ロゴを四隅・中央に配置（既定アンカーは左上(M,M)。_genOff.Logoで移動）
+function genLogoCorner(pos) {
+  if (!_genLogo) return;
+  const { w: W, h: H } = _genDims();
+  const M = 90;
+  const lw0 = _genLogo.naturalWidth || _genLogo.width, lh0 = _genLogo.naturalHeight || _genLogo.height;
+  const pct = (parseFloat(document.getElementById('genLogoSize')?.value) || 22) / 100;
+  const lw = W * pct, lh = lw * (lh0 / lw0);
+  let x = 0, y = 0;
+  if (pos === 'tr') { x = W - lw - M - M; y = 0; }
+  else if (pos === 'bl') { x = 0; y = H - lh - M - M; }
+  else if (pos === 'br') { x = W - lw - M - M; y = H - lh - M - M; }
+  else if (pos === 'c') { x = (W - lw) / 2 - M; y = (H - lh) / 2 - M; }
+  // 'tl' は {0,0}
+  _genOff.Logo = { x, y };
+  renderGenImage();
 }
 function _genCanvasPos(ev) {
   const c = document.getElementById('genCanvas');
@@ -5654,6 +5803,12 @@ function genDragStart(ev) {
   ev.preventDefault();
   ev.target.style.cursor = 'grabbing';
 }
+// ドラッグ中の再描画はrAFで1フレーム1回に間引く（背景ぼかし込みの描画が毎moveで走る負荷を抑える）
+let _genRenderRaf = 0;
+function renderGenSoon() {
+  if (_genRenderRaf) return;
+  _genRenderRaf = requestAnimationFrame(() => { _genRenderRaf = 0; renderGenImage(); });
+}
 function genDragMove(ev) {
   const c = ev.target;
   if (!_genDrag) { c.style.cursor = (_genHitAt(_genCanvasPos(ev)) || _genBg) ? 'grab' : 'default'; return; }
@@ -5663,11 +5818,13 @@ function genDragMove(ev) {
   } else {
     _genOff[_genDrag.p] = { x: _genDrag.ox + pos.x - _genDrag.sx, y: _genDrag.oy + pos.y - _genDrag.sy };
   }
-  renderGenImage();
+  renderGenSoon();
 }
 function genDragEnd(ev) {
   if (!_genDrag) return;
   _genDrag = null;
+  if (_genRenderRaf) { cancelAnimationFrame(_genRenderRaf); _genRenderRaf = 0; }
+  renderGenImage(); // 最終位置を確実に反映
   ev.target.style.cursor = 'grab';
 }
 function closeImageGen() {
@@ -5781,6 +5938,9 @@ function onGenTemplate() {
   else if (t === 'bold') { tc.value = 'white'; vt.checked = true; }
   else if (t === 'magazine') { tc.value = 'gold'; vt.checked = false; }
   else { tc.value = 'white'; vt.checked = false; }
+  // 「文字なし」は文字入力カードを隠す（写真＋ロゴのみ）
+  const textCard = document.getElementById('genTextCard');
+  if (textCard) textCard.style.display = (t === 'plain') ? 'none' : '';
   _genOffClear(); // テンプレでレイアウトが変わるためドラッグ配置はリセット
   renderGenImage();
 }
@@ -5822,7 +5982,16 @@ function renderGenImage() {
   // ── 背景 ──
   if (_genBg) {
     const iw = _genBg.naturalWidth, ih = _genBg.naturalHeight;
-    const scale = Math.max(W / iw, H / ih) * _genBgScale; // coverフィット×ユーザー拡大率
+    const cover = Math.max(W / iw, H / ih); // 枠を隙間なく覆う基準スケール
+    // 背景埋め: 縮小（拡大率<1）や移動で枠に隙間ができた時に黒/透明が出ないよう、
+    // 同じ写真を枠いっぱいにぼかして敷く。等倍・無移動なら前面が完全に覆うので見えない。
+    ctx.save();
+    ctx.filter = 'blur(26px) brightness(0.82)';
+    const bdw = iw * cover * 1.14, bdh = ih * cover * 1.14; // ぼかしの端欠けを防ぐため少し大きめ
+    ctx.drawImage(_genBg, (W - bdw) / 2, (H - bdh) / 2, bdw, bdh);
+    ctx.restore(); // filter解除（以降の描画に影響させない）
+    // 前面: ユーザーの拡大率・移動を反映した写真本体
+    const scale = cover * _genBgScale;
     const dw = iw * scale, dh = ih * scale;
     ctx.drawImage(_genBg, (W - dw) / 2 + _genBgOff.x, (H - dh) / 2 + _genBgOff.y, dw, dh);
     // テンプレ別オーバーレイ（読みやすさ。写真の絵を活かすものは薄め＋文字影で対応）
@@ -6013,6 +6182,22 @@ function renderGenImage() {
     }
   }
   shadow(false);
+
+  // ── ロゴ合成（最前面・ドラッグ移動可。既定アンカーは左上(M,M)） ──
+  if (_genLogo) {
+    const lw0 = _genLogo.naturalWidth || _genLogo.width || 1, lh0 = _genLogo.naturalHeight || _genLogo.height || 1;
+    const pct = (parseFloat(document.getElementById('genLogoSize')?.value) || 22) / 100;
+    const op = (parseFloat(document.getElementById('genLogoOpacity')?.value) || 100) / 100;
+    const lw = W * pct, lh = lw * (lh0 / lw0);
+    eDraw('Logo', () => {
+      ctx.globalAlpha = op;
+      ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 2;
+      ctx.drawImage(_genLogo, M, M, lw, lh);
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.globalAlpha = 1;
+    });
+    _hit('Logo', M, M, lw, lh);
+  }
 }
 
 // 画像テキスト欄のAI生成（type: catchcopy / en_headline / subtext）
@@ -6036,6 +6221,7 @@ async function aiSubText() { return _aiGenField('subtext', 'genSub', 30); }
 
 async function saveGenImage() {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (_genBgTainted) return showToast('この背景写真はCORS非対応のため保存できません。別の写真をお選びください', 'error');
   let dataUri;
   try {
     dataUri = document.getElementById('genCanvas').toDataURL('image/jpeg', 0.92);
