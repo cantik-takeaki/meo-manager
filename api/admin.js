@@ -567,6 +567,30 @@ export default async function handler(req, res) {
     return res.json(summary);
   }
 
+  // ── 企業ナレッジ（旧api/knowledge.jsを統合・Vercel関数枠を1つ回復） ──
+  if (action === 'knowledge') {
+    // 認証: Google連携(access_token) または メール＋パスワード(pw_session) のどちらでも可
+    const _kc = parseCookies(req);
+    if (!_kc.access_token && !_kc.pw_session) return res.status(401).json({ error: 'ログインが必要です' });
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId必須' });
+    const kKey = `knowledge_${locationId}`;
+    if (req.method === 'GET') {
+      const data = await kvGet(kKey) || {
+        storeName: '', category: '', address: '', phone: '', businessHours: '',
+        description: '', strengths: '', services: '', targetCustomer: '',
+        nearbyLandmarks: '', parking: '', keywords: ['', '', '', '', ''], updatedAt: null,
+      };
+      return res.json(data);
+    }
+    if (req.method === 'POST') {
+      const body = req.body || {};
+      body.updatedAt = new Date().toISOString();
+      await kvSet(kKey, body);
+      return res.json({ success: true });
+    }
+  }
+
   // ── 週次サマリーメールのON/OFF（設定ページ） ──
   if (action === 'notify-pref') {
     if (req.method === 'GET') {
