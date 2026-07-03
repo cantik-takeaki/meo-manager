@@ -886,6 +886,11 @@ body {
             </div>
           </div>
         </div>
+        <!-- クライアント単位のロールアップ集計（このクライアントの全店舗を合算） -->
+        <div class="card" id="cdRollupCard" style="display:none">
+          <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>このクライアントの集計</div></div>
+          <div class="kpi-agg-grid" id="cdRollup"></div>
+        </div>
         <div class="card">
           <div class="card-header"><div class="card-title">登録店舗 <span id="cdStoreCount" style="color:var(--text-sub);font-weight:400;font-size:13px"></span></div></div>
           <div id="cdStoreList"></div>
@@ -7216,6 +7221,29 @@ function openClientDetail(name) {
   const phone = _clientPhone(client);
   document.getElementById('cdPhone').textContent = phone || '未設定';
   document.getElementById('cdStoreCount').textContent = `${client.stores.length}件`;
+  // クライアント単位のロールアップ（このクライアントの全店舗を合算・ダッシュボード集計から）
+  const per = window._dashSummary?.perStore || [];
+  const keys = new Set(client.stores.map(s => _storeKey(s)));
+  const mine = per.filter(p => keys.has(p.storeId));
+  const roll = document.getElementById('cdRollup');
+  const rollCard = document.getElementById('cdRollupCard');
+  if (mine.length && roll) {
+    const sum = (f) => mine.reduce((a, p) => a + (p[f] || 0), 0);
+    const avgRanks = mine.map(p => p.avgRank).filter(v => Number.isFinite(v));
+    const avgRank = avgRanks.length ? Math.round(avgRanks.reduce((a, b) => a + b, 0) / avgRanks.length * 10) / 10 : null;
+    const up = mine.filter(p => (p.mom || 0) > 0).length, down = mine.filter(p => (p.mom || 0) < 0).length;
+    rollCard.style.display = '';
+    roll.innerHTML = [
+      ['店舗数', client.stores.length],
+      ['管理キーワード', sum('kwCount')],
+      ['TOP3', sum('top3'), 'var(--accent-2)'],
+      ['TOP10', sum('top10'), 'var(--accent)'],
+      ['圏外', sum('out'), 'var(--red)'],
+      ['平均順位', avgRank != null ? avgRank + '位' : '—', 'var(--gold)'],
+      ['順位UP店舗', up, 'var(--accent-2)'],
+      ['順位DOWN店舗', down, 'var(--red)'],
+    ].map(([l, v, c]) => `<div class="kpi-agg-cell"><div class="k-l">${l}</div><div class="k-v"${c ? ` style="color:${c}"` : ''}>${v}</div></div>`).join('');
+  } else if (rollCard) { rollCard.style.display = 'none'; }
   const kwMap = _kwCountMap();
   const list = document.getElementById('cdStoreList');
   list.innerHTML = client.stores.map(loc => {
