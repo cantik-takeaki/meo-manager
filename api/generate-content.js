@@ -343,10 +343,20 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
   let prompt = '';
 
   // ★4〜5：感謝の返信（お世話になっております〜の3ブロック定型・業種別・トーン別）
-  // 口コミ本文が日本語かを判定。漢字は中国語と共通のため、ひらがな/カタカナの有無で判定する
-  // （日本語はほぼ必ずかなを含む・中国語は含まない）。かなが無ければ外国語として同言語返信させる。
-  const _reviewIsJa = /[぀-ヿ]/.test(reviewText || '');
-  const _langLead = _reviewIsJa ? '' : `\n\n★最優先ルール：この口コミは日本語ではありません。返信は必ず【口コミと同じ言語】で書いてください。日本語の定型文（「お世話になっております。」等）は一切使わず、その言語で自然な挨拶から始めてください。下記の日本語テンプレートは"構成の順序"だけを参考にし、文章はすべて口コミと同じ言語で書きます。`;
+  // 口コミの言語をサーバー側で具体的に判定して名指しする（モデルは「同じ言語で」より言語名指定の方が確実）。
+  // 日本語はひらがな/カタカナの有無で判定（漢字は中国語と共通のため）。
+  const _rt = reviewText || '';
+  const _detectLang = (t) => {
+    if (/[぀-ヿ]/.test(t)) return { ja: true };                       // かな有り＝日本語
+    if (/[가-힣]/.test(t)) return { ja: false, name: '韓国語（ハングル）' };
+    if (/[一-鿿㐀-䶿]/.test(t)) return { ja: false, name: '中国語（簡体字・繁体字はそのまま）' };
+    if (/[฀-๿]/.test(t)) return { ja: false, name: 'タイ語' };
+    if (/[Ѐ-ӿ]/.test(t)) return { ja: false, name: 'ロシア語' };
+    return { ja: false, name: '口コミと同じ言語（英語など）' };        // ラテン文字等
+  };
+  const _lang = _detectLang(_rt);
+  const _reviewIsJa = _lang.ja;
+  const _langLead = _reviewIsJa ? '' : `\n\n★最優先ルール：この口コミの言語は「${_lang.name}」です。返信は必ず${_lang.name}で書いてください。日本語や英語の定型文は使わず、${_lang.name}で自然な挨拶から始め、最後まで${_lang.name}だけで書きます。下記の日本語テンプレートは"構成の順序（挨拶→お礼→具体点→今後→締め）"の参考にとどめます。`;
 
   if (type === 'reply_positive') {
     const { verb, close } = bizPhrasing(knowledge.category, storeName);
