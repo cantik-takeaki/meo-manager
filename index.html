@@ -6370,6 +6370,14 @@ function _cleanHashtags(s, max = HASHTAG_MAX) {
   (String(s || '').replace(/＃/g, '#').match(/#[^\s#　、,]+/g) || []).forEach(t => { const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } });
   return out.slice(0, max).join(' ');
 }
+// #なしの語列（例「相模原カフェ 南橋本ランチ」）を#タグに変換（AIが#を付け忘れた時の保険）
+function _wordsToHashtags(s, max = HASHTAG_MAX) {
+  const seen = new Set(); const out = [];
+  String(s || '').replace(/[#＃]/g, '').split(/[\s、，,\n]+/).map(w => w.trim()).filter(Boolean).forEach(w => {
+    const t = '#' + w; const k = t.toLowerCase(); if (!seen.has(k) && out.length < max) { seen.add(k); out.push(t); }
+  });
+  return out.join(' ');
+}
 // 適正数の表示（3〜5個が目安・最大5個）
 function updateHashCount(inputId, countId) {
   const el = document.getElementById(inputId), out = document.getElementById(countId);
@@ -6393,13 +6401,16 @@ async function genHashtagsInto(inputId, countId, noteEl) {
       body: JSON.stringify({ locationId: currentLocationId, type: 'hashtags', photoNote: note }),
     });
     const d = await res.json();
-    ta.value = d.content ? _cleanHashtags(d.content) : old;
-    if (d.error && !d.content) { ta.value = old; showToast(d.error, 'error'); }
+    if (d.content) {
+      // AIが#を付け忘れて語だけ返すことがあるので、その場合は#を補完
+      ta.value = _cleanHashtags(d.content) || _wordsToHashtags(d.content) || old;
+    } else { ta.value = old; if (d.error) showToast(d.error, 'error'); }
   } catch (e) { ta.value = old; showToast('ハッシュタグ生成に失敗しました', 'error'); }
   updateHashCount(inputId, countId);
 }
 function genIgHashtags() { return genHashtagsInto('igHashtags', 'igHashCount', 'igPhotoNote'); }
 function genPostHashtags() { return genHashtagsInto('postHashtags', 'postHashCount', 'postGenTopic'); }
+function genDraftHashtags(id) { return genHashtagsInto('drafthash-' + id, 'drafthashcount-' + id, 'draft-' + id); }
 
 async function publishIgPost() {
   if (!_igSelected) return showToast('写真を選択してください', 'error');
@@ -9876,7 +9887,7 @@ async function loadDrafts() {
       ? `<div style="background:${cnt.overdue ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)'};border:1px solid ${cnt.overdue ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'};border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12.5px">${cnt.overdue ? `期日を過ぎた未投稿が <b>${cnt.overdue}件</b> あります。` : ''}${cnt.today ? ` 本日公開予定が <b>${cnt.today}件</b> あります。` : ''}内容を確認して「今すぐ投稿」で公開してください。</div>`
       : '';
     if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">予約投稿はまだありません。新規投稿で「予約する」、または「月間投稿プラン」で作成してください。</p>'; return; }
-    _draftImages = {};
+    _draftImages = {}; _draftAspect = {}; _draftHashtags = {}; // 削除済み下書きの古いキーを残さない
     drafts.forEach(d => { _draftImages[d.id] = d.images || []; _draftAspect[d.id] = d.aspect || 'portrait'; _draftHashtags[d.id] = d.hashtags || ''; });
     listEl.innerHTML = drafts.map(d => { const st = _draftStatus(d); return `
       <div style="border:1px solid ${st.key === 'overdue' ? 'rgba(239,68,68,0.4)' : 'var(--border)'};border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
@@ -9897,12 +9908,17 @@ async function loadDrafts() {
         <div id="draftcount-${d.id}" style="font-size:11px;color:var(--text-sub);text-align:right">${(d.summary || '').length}字</div>
         <div style="font-size:12px;color:var(--text-sub);margin:6px 0 4px">画像（複数選択でカルーセル／動画＝リール）</div>
         <div id="draftimg-${d.id}" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div style="font-size:12px;color:var(--text-sub);margin:10px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">ハッシュタグ<span style="font-weight:400">（Instagram投稿にのみ付きます）</span>
+          <button class="btn btn-outline btn-sm" onclick="genDraftHashtags('${d.id}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで生成</button>
+          <span id="drafthashcount-${d.id}" style="font-size:11px;color:var(--text-sub)"></span>
+        </div>
+        <input id="drafthash-${d.id}" type="text" oninput="updateHashCount('drafthash-${d.id}','drafthashcount-${d.id}')" value="${escapeHtml(d.hashtags || '')}" placeholder="#地域名業種 #サービス #来店動機" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="saveDraft('${d.id}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>保存</button>
           <button class="btn btn-success btn-sm" onclick="publishDraftNow('${d.id}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>今すぐ投稿</button>
         </div>
       </div>`; }).join('');
-    drafts.forEach(d => renderDraftImages(d.id));
+    drafts.forEach(d => { renderDraftImages(d.id); updateHashCount('drafthash-' + d.id, 'drafthashcount-' + d.id); });
   } catch { listEl.innerHTML = ''; }
 }
 
@@ -9946,12 +9962,16 @@ async function deleteDraft(id) {
 // 予約投稿の内容を保存（日付・時間・媒体・画像・本文）
 async function saveDraft(id, silent) {
   const storeId = currentLocation?.storeId || '';
+  const hashEl = document.getElementById('drafthash-' + id);
+  if (hashEl) _draftHashtags[id] = hashEl.value; // 編集内容をメモリにも反映
   const body = {
     id,
     summary: document.getElementById('draft-' + id)?.value || '',
     scheduledDate: document.getElementById('draftdate-' + id)?.value || '',
     scheduledTime: document.getElementById('drafttime-' + id)?.value || '',
     images: _draftImages[id] || [],
+    aspect: _draftAspect[id] || 'portrait',
+    hashtags: _draftHashtags[id] || '',
     targetGoogle: document.getElementById('draftG-' + id)?.checked,
     targetInstagram: document.getElementById('draftI-' + id)?.checked,
   };
