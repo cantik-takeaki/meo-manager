@@ -1,7 +1,6 @@
 {
   "functions": {
-    "api/**/*.js": { "maxDuration": 30 },
-    "api/admin.js": { "maxDuration": 60 }
+    "api/**/*.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/admin?action=cron-rank", "schedule": "0 18 * * 0" }
