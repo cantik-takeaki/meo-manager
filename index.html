@@ -2060,6 +2060,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
                 <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">背景に店内・料理の写真を選ぶと、雰囲気に合った高品質な画像になります。</p>
                 <div id="genBgPicker" style="display:flex;gap:6px;flex-wrap:wrap"></div>
                 <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:4px;margin-top:12px"><input type="checkbox" id="genEnhance" checked onchange="changeGenAspect()"> 自動補正（明るさ・コントラスト）</label>
+                <div id="genBgAdjust" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:12px;color:var(--text-sub)">背景写真のサイズ（拡大・縮小）</label>
+                    <span id="genBgScaleVal" style="font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums">100%</span>
+                  </div>
+                  <input type="range" id="genBgScale" min="50" max="300" value="100" step="1" style="width:100%" oninput="genBgScaleInput(this.value)">
+                  <p style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.5">スライダーで写真の大きさを変え、プレビュー上で写真を<b>ドラッグ</b>すると位置を動かせます（文字のない場所をドラッグ）。</p>
+                  <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;margin-top:6px" onclick="genBgReset()">背景の位置・サイズをリセット</button>
+                </div>
               </div>
             </div>
           </div>
@@ -5577,11 +5586,13 @@ function openImageGen() {
   const sn = document.getElementById('genStoreName');
   if (sn && sn.dataset.forStore !== currentLocationId) { sn.value = currentLocation?.title || ''; sn.dataset.forStore = currentLocationId; }
   _genOffClear();
+  _genBgResetTf();
   panel.classList.add('gen-open');
   view.style.display = 'block';
   igGenTab('basic');
   igGenSyncControls();
   renderGenBgPicker();
+  _genBgAdjustToggle();
   renderGenImage();
   view.scrollIntoView({ block: 'start' });
 }
@@ -5590,9 +5601,29 @@ function openImageGen() {
 let _genOff = {};
 let _genHitBoxes = []; // renderGenImageが毎回更新 {p,x,y,w,h}
 let _genDrag = null;
+let _genBgScale = 1;            // 背景写真の拡大率（coverフィット基準の倍率）
+let _genBgOff = { x: 0, y: 0 }; // 背景写真の移動量（canvas px）
 function _genOffClear() { _genOff = { Head: { x: 0, y: 0 }, En: { x: 0, y: 0 }, Sub: { x: 0, y: 0 }, Store: { x: 0, y: 0 } }; }
 _genOffClear();
 function genResetOffsets() { _genOffClear(); renderGenImage(); }
+// 背景写真の位置・サイズを初期値へ（描画はしない）
+function _genBgResetTf() {
+  _genBgScale = 1; _genBgOff = { x: 0, y: 0 };
+  const s = document.getElementById('genBgScale'); if (s) s.value = 100;
+  const v = document.getElementById('genBgScaleVal'); if (v) v.textContent = '100%';
+}
+// 背景写真の位置・サイズをリセット（ボタン）
+function genBgReset() { _genBgResetTf(); renderGenImage(); }
+// スライダーで背景サイズを変更（中心基準でズーム）
+function genBgScaleInput(val) {
+  _genBgScale = Math.max(0.5, Math.min(3, (parseFloat(val) || 100) / 100));
+  const v = document.getElementById('genBgScaleVal'); if (v) v.textContent = Math.round(_genBgScale * 100) + '%';
+  renderGenImage();
+}
+// 背景調整UIの表示/非表示（写真がある時だけ出す）
+function _genBgAdjustToggle() {
+  const box = document.getElementById('genBgAdjust'); if (box) box.style.display = _genBg ? 'block' : 'none';
+}
 function _genCanvasPos(ev) {
   const c = document.getElementById('genCanvas');
   const r = c.getBoundingClientRect();
@@ -5609,18 +5640,29 @@ function _genHitAt(pos) {
 function genDragStart(ev) {
   const pos = _genCanvasPos(ev);
   const b = _genHitAt(pos);
-  if (!b) return;
-  const o = _genOff[b.p] || { x: 0, y: 0 };
-  _genDrag = { p: b.p, sx: pos.x, sy: pos.y, ox: o.x, oy: o.y };
+  if (b) {
+    // 文字要素をドラッグ
+    const o = _genOff[b.p] || { x: 0, y: 0 };
+    _genDrag = { p: b.p, sx: pos.x, sy: pos.y, ox: o.x, oy: o.y };
+  } else if (_genBg) {
+    // 文字のない場所 → 背景写真をドラッグして移動
+    _genDrag = { p: '__bg', sx: pos.x, sy: pos.y, ox: _genBgOff.x, oy: _genBgOff.y };
+  } else {
+    return;
+  }
   try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
   ev.preventDefault();
   ev.target.style.cursor = 'grabbing';
 }
 function genDragMove(ev) {
   const c = ev.target;
-  if (!_genDrag) { c.style.cursor = _genHitAt(_genCanvasPos(ev)) ? 'grab' : 'default'; return; }
+  if (!_genDrag) { c.style.cursor = (_genHitAt(_genCanvasPos(ev)) || _genBg) ? 'grab' : 'default'; return; }
   const pos = _genCanvasPos(ev);
-  _genOff[_genDrag.p] = { x: _genDrag.ox + pos.x - _genDrag.sx, y: _genDrag.oy + pos.y - _genDrag.sy };
+  if (_genDrag.p === '__bg') {
+    _genBgOff = { x: _genDrag.ox + pos.x - _genDrag.sx, y: _genDrag.oy + pos.y - _genDrag.sy };
+  } else {
+    _genOff[_genDrag.p] = { x: _genDrag.ox + pos.x - _genDrag.sx, y: _genDrag.oy + pos.y - _genDrag.sy };
+  }
   renderGenImage();
 }
 function genDragEnd(ev) {
@@ -5689,14 +5731,16 @@ async function renderGenBgPicker() {
 
 let _genBgTainted = false; // CORSなしで読んだ＝保存時に注意
 function selectGenBg(baseUrl) {
-  if (!baseUrl) { _genBg = null; _genBgBaseUrl = null; _genBgTainted = false; renderGenBgPicker(); renderGenImage(); return; }
+  if (!baseUrl) { _genBg = null; _genBgBaseUrl = null; _genBgTainted = false; _genBgResetTf(); renderGenBgPicker(); _genBgAdjustToggle(); renderGenImage(); return; }
+  const isNew = baseUrl !== _genBgBaseUrl;
   _genBgBaseUrl = baseUrl;
+  if (isNew) _genBgResetTf(); // 新しい写真を選んだらサイズ・位置をリセット（比率変更時は維持）
   const url = buildGenBgUrl(baseUrl);
   // まずCORSありで読み込み（保存可能）。失敗したらCORSなしで再試行（プレビューは出る）
   const load = (useCors) => {
     const img = new Image();
     if (useCors) img.crossOrigin = 'anonymous';
-    img.onload = () => { _genBg = img; _genBgTainted = !useCors; renderGenBgPicker(); renderGenImage(); };
+    img.onload = () => { _genBg = img; _genBgTainted = !useCors; renderGenBgPicker(); _genBgAdjustToggle(); renderGenImage(); };
     img.onerror = () => {
       if (useCors) load(false);
       else showToast('背景画像の読み込みに失敗しました', 'error');
@@ -5778,9 +5822,9 @@ function renderGenImage() {
   // ── 背景 ──
   if (_genBg) {
     const iw = _genBg.naturalWidth, ih = _genBg.naturalHeight;
-    const scale = Math.max(W / iw, H / ih);
+    const scale = Math.max(W / iw, H / ih) * _genBgScale; // coverフィット×ユーザー拡大率
     const dw = iw * scale, dh = ih * scale;
-    ctx.drawImage(_genBg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.drawImage(_genBg, (W - dw) / 2 + _genBgOff.x, (H - dh) / 2 + _genBgOff.y, dw, dh);
     // テンプレ別オーバーレイ（読みやすさ。写真の絵を活かすものは薄め＋文字影で対応）
     if (tmpl === 'standard') {
       if (layout === 'center') { const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.7); rg.addColorStop(0, 'rgba(0,0,0,0.55)'); rg.addColorStop(1, 'rgba(0,0,0,0.2)'); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H); }
