@@ -973,7 +973,7 @@ body {
             <button class="btn btn-primary btn-sm" onclick="openKwAdd()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 5v14M5 12h14"/></svg>キーワード追加</button>
           </div>
         </div>
-        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">地域名＋業種・サービスの掛け合わせで対策語を管理します。順位は手入力、または「AIで順位取得」でGoogleマップから自動計測できます。</p>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">地域名＋業種・サービスの掛け合わせで対策語を管理します。<b style="color:var(--accent)">適正数は主力5〜7個</b>（多すぎると施策が分散し、少なすぎると機会損失になります）。順位は手入力、または「AIで順位取得」でGoogleマップから自動計測できます。</p>
         <div style="overflow-x:auto">
           <table class="summary-table">
             <thead><tr>
@@ -4722,19 +4722,27 @@ function gbpCheck() {
   if (!isGbp) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   const cats = loc.categories || {};
+  // hint = 未設定のとき「どこで設定するか」を案内（これらはGoogleビジネスプロフィール側の項目）
+  const GBP_EDIT = 'Googleマップで自店舗を開く →「プロフィールを編集」→「ビジネス情報」';
   const items = [
-    { label: '店名', ok: !!loc.title },
-    { label: '住所', ok: !!loc.storefrontAddress },
-    { label: 'メインカテゴリ', ok: !!(cats.primaryCategory) },
-    { label: 'サブカテゴリ', ok: !!(cats.additionalCategories && cats.additionalCategories.length) },
-    { label: '営業時間', ok: !!(loc.regularHours && (loc.regularHours.periods || []).length) },
-    { label: '電話番号', ok: !!(loc.phoneNumbers && loc.phoneNumbers.primaryPhone) },
-    { label: 'ウェブサイト', ok: !!loc.websiteUri },
+    { label: '店名', ok: !!loc.title, hint: `${GBP_EDIT} → ビジネス名` },
+    { label: '住所', ok: !!loc.storefrontAddress, hint: `${GBP_EDIT} → 住所` },
+    { label: 'メインカテゴリ', ok: !!(cats.primaryCategory), hint: `${GBP_EDIT} →「カテゴリ」→ メインカテゴリを選択` },
+    { label: 'サブカテゴリ', ok: !!(cats.additionalCategories && cats.additionalCategories.length), hint: `${GBP_EDIT} →「カテゴリ」→「別のカテゴリを追加」で関連カテゴリを2〜3個追加（例: メイン「ラーメン店」＋サブ「中華料理店」）。設定するとこのチェックに自動反映されます` },
+    { label: '営業時間', ok: !!(loc.regularHours && (loc.regularHours.periods || []).length), hint: `${GBP_EDIT} →「営業時間」` },
+    { label: '電話番号', ok: !!(loc.phoneNumbers && loc.phoneNumbers.primaryPhone), hint: `${GBP_EDIT} →「電話番号」` },
+    { label: 'ウェブサイト', ok: !!loc.websiteUri, hint: `${GBP_EDIT} →「ウェブサイト」` },
   ];
   const done = items.filter(i => i.ok).length;
   document.getElementById('gbpCheckScore').textContent = `${done}/${items.length} 設定済み`;
+  const missing = items.filter(i => !i.ok);
   document.getElementById('gbpCheckList').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px 14px">` +
-    items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`).join('') + '</div>';
+    items.map(i => `<div style="font-size:13px;color:${i.ok ? 'var(--text)' : 'var(--red)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`).join('') + '</div>'
+    + (missing.length ? `<div style="margin-top:12px;padding:10px 12px;background:var(--bg-3);border-radius:8px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px">未設定項目の設定方法（Googleビジネスプロフィール側で設定します）</div>
+        ${missing.map(i => `<div style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:4px"><b style="color:var(--text)">${i.label}:</b> ${i.hint}</div>`).join('')}
+        <div style="font-size:11px;color:var(--text-sub);margin-top:6px">反映まで数分かかることがあります。反映後、この画面を開き直すとチェックが更新されます。</div>
+      </div>` : '');
 }
 
 // 競合分析のキーワード候補をAIで提示（まず登録済み対策KW→無ければAI生成）。チップで入力欄に反映。
