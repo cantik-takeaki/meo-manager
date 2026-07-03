@@ -1,5 +1,6 @@
 // api/admin.js — 店舗登録・順位入力（統合）
 import { kvGet, kvSet, kvDel } from './_kv.js';
+import { getMasterInfo } from './_tokens.js';
 
 function parseCookies(req) {
   const c = {};
@@ -391,7 +392,9 @@ export default async function handler(req, res) {
 
   // ── 店舗一覧（GBP連携状況付き）──
   if (req.method === 'GET' && !action) {
-    const list = await kvGet('admin_stores') || [];
+    const all = await kvGet('admin_stores') || [];
+    // 既定はアーカイブ除外。archived=1でアーカイブ済みのみ返す（復元UI用）
+    const list = req.query.archived === '1' ? all.filter(s => s.archived) : all.filter(s => !s.archived);
     const stores = await Promise.all(list.map(async (s) => {
       const gbp = await kvGet(`gbp_tokens_${s.storeId}`);
       return {
@@ -419,12 +422,33 @@ export default async function handler(req, res) {
     return res.json({ success: true, storeId, password, loginUrl: `/report.html?store=${storeId}` });
   }
 
-  // ── 店舗削除 ──
+  // ── 店舗削除（既定=アーカイブ・hard=1で完全削除） ──
   if (req.method === 'DELETE' && !action) {
-    const { storeId } = req.query;
-    const list = (await kvGet('admin_stores') || []).filter(s => s.storeId !== storeId);
+    const { storeId, hard } = req.query;
+    const list = await kvGet('admin_stores') || [];
+    if (hard === '1') {
+      await kvSet('admin_stores', list.filter(s => s.storeId !== storeId));
+      await kvDel(`gbp_tokens_${storeId}`);
+      await kvDel(`client_${storeId}`);
+      return res.json({ success: true, deleted: true });
+    }
+    const idx = list.findIndex(s => s.storeId === storeId);
+    if (idx < 0) return res.status(404).json({ error: '店舗が見つかりません' });
+    list[idx].archived = true;
+    list[idx].archivedAt = new Date().toISOString();
     await kvSet('admin_stores', list);
-    await kvDel(`gbp_tokens_${storeId}`);
+    return res.json({ success: true, archived: true });
+  }
+
+  // ── アーカイブから復元 ──
+  if (req.method === 'POST' && action === 'unarchive') {
+    const storeId = req.query.storeId || (req.body || {}).storeId;
+    const list = await kvGet('admin_stores') || [];
+    const idx = list.findIndex(s => s.storeId === storeId);
+    if (idx < 0) return res.status(404).json({ error: '店舗が見つかりません' });
+    delete list[idx].archived;
+    delete list[idx].archivedAt;
+    await kvSet('admin_stores', list);
     return res.json({ success: true });
   }
 
@@ -455,6 +479,33 @@ export default async function handler(req, res) {
     const ym = new Date().toISOString().slice(0, 7);
     const used = await kvGet(`serpapi_usage_${ym}`) || 0;
     return res.json({ month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
+  }
+
+  // ── システムステータス（設定ページ・外部連携と枠の健全性を一目で） ──
+  if (req.method === 'GET' && action === 'status') {
+    const ym = new Date().toISOString().slice(0, 7);
+    let kvOk = true, used = 0, cronLast = null, managedCount = 0;
+    try {
+      used = await kvGet(`serpapi_usage_${ym}`) || 0;
+      cronLast = await kvGet('cron_rank_last') || null;
+      managedCount = ((await kvGet('managed_locations')) || []).length;
+    } catch (e) { kvOk = false; }
+    let gbp = { connected: false };
+    try { gbp = await getMasterInfo(); } catch (e) {}
+    return res.json({
+      kv: kvOk,
+      gbp: { connected: !!gbp.connected, email: gbp.email || '' },
+      env: {
+        groq: !!process.env.GROQ_API_KEY,
+        serpapi: !!process.env.SERPAPI_KEY,
+        resend: !!process.env.RESEND_API_KEY,
+        cronSecret: !!process.env.CRON_SECRET,
+        adminEnv: !!(process.env.ADMIN_USER && process.env.ADMIN_PASS),
+      },
+      serpapi: { month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) },
+      cronLast: cronLast ? { at: cronLast.at, date: cronLast.date, ok: cronLast.ok, fail: cronLast.fail, targets: cronLast.targets } : null,
+      managedStores: managedCount,
+    });
   }
 
   // ── 順位の定期自動取得（Vercel Cron: 毎週月曜3時JST = 0 18 * * 0 UTC）──

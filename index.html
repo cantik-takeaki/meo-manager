@@ -898,7 +898,10 @@ body {
             <div class="page-title">店舗管理</div>
             <div class="page-sub"><span id="storeCount">0</span>件</div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="showStoreAdd()">＋ 店舗追加</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="showArchivedStores()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 12h4"/></svg>アーカイブ一覧</button>
+            <button class="btn btn-primary btn-sm" onclick="showStoreAdd()">＋ 店舗追加</button>
+          </div>
         </div>
         <div class="card" style="padding:14px 16px">
           <input id="storeSearch" type="text" placeholder="🔍 店舗名・住所・会社名で検索" oninput="renderStoreTable()"
@@ -2686,6 +2689,15 @@ body {
         </div>
       </div>
 
+      <!-- システムステータス -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>システムステータス</div>
+          <button class="btn btn-outline btn-sm" onclick="loadSysStatus()">確認する</button>
+        </div>
+        <div id="sysStatusBody" style="font-size:12px;color:var(--text-sub)">「確認する」を押すと外部連携・利用枠の状態を表示します。</div>
+      </div>
+
       <!-- ログアウト -->
       <div class="card" style="max-width:720px">
         <div class="set-row" style="padding:2px 0">
@@ -3032,6 +3044,31 @@ async function saveProfileName() {
       const ini = document.getElementById('userInitial'); if (ini) ini.textContent = (d.name.trim()[0] || 'C').toUpperCase();
     } else showToast(d.error || '変更できませんでした', 'error');
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+async function loadSysStatus() {
+  const box = document.getElementById('sysStatusBody');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>確認中...</div>';
+  try {
+    const d = await fetch('/api/admin?action=status').then(r => r.json());
+    const row = (label, ok, detail) => `<div class="set-row" style="padding:9px 0">
+      <div class="set-row-main"><div class="set-row-title" style="font-size:12.5px">${label}</div>${detail ? `<div class="set-row-sub">${detail}</div>` : ''}</div>
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${ok ? '#10b981' : 'var(--red)'};flex-shrink:0">${ICO_DOT(ok ? '#10b981' : 'var(--red)')}${ok ? '正常' : '未設定'}</span>
+    </div>`;
+    const sp = d.serpapi || {};
+    const cl = d.cronLast;
+    box.innerHTML =
+      row('データベース（KV）', d.kv, '店舗・順位・設定の保存先') +
+      row('Googleビジネスプロフィール連携', d.gbp?.connected, d.gbp?.email || '口コミ・インサイト・投稿の取得元') +
+      row('AI生成（GROQ_API_KEY）', d.env?.groq, '口コミ返信・投稿・コンサル等のAI機能') +
+      row('順位取得（SERPAPI_KEY）', d.env?.serpapi, `今月 ${sp.used}/${sp.limit} 回使用（残り${sp.remaining}回）`) +
+      row('メール送信（RESEND_API_KEY）', d.env?.resend, '週次レポートメール・2段階認証に使用') +
+      row('自動計測の保護（CRON_SECRET）', d.env?.cronSecret, '未設定でも動作しますが設定を推奨') +
+      `<div class="set-row" style="padding:9px 0">
+        <div class="set-row-main"><div class="set-row-title" style="font-size:12.5px">週次順位自動計測（毎週月曜3時）</div>
+        <div class="set-row-sub">${cl ? `最終実行 ${cl.date}: 対象${cl.targets}件・成功${cl.ok}件・失敗${cl.fail}件` : 'まだ実行されていません（優先度AのKWが対象・次回月曜3時）'}</div></div>
+      </div>`;
+  } catch (e) { box.innerHTML = `<span style="color:var(--red)">取得に失敗しました: ${escapeHtml(e.message)}</span>`; }
 }
 
 async function saveMailChange() {
@@ -8069,10 +8106,42 @@ function copyCredentials() {
 }
 
 async function deleteStore(storeId) {
-  if (!confirm('この店舗を削除しますか？')) return;
+  if (!confirm('この店舗をアーカイブしますか？\n（一覧から非表示になります。データは残り、あとから復元できます）')) return;
   await fetch(`/api/admin?storeId=${storeId}`, { method: 'DELETE' });
   loadClientStores();
-  showToast('削除しました', 'success');
+  showToast('アーカイブしました（復元は店舗管理の「アーカイブ一覧」から）', 'success');
+}
+
+// ── アーカイブ一覧（復元・完全削除） ──
+async function showArchivedStores() {
+  const modal = document.getElementById('clientIssueModal');
+  const body = document.getElementById('clientIssueBody');
+  modal.style.display = 'flex';
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>読み込み中...</div>';
+  try {
+    const d = await fetch('/api/admin?archived=1').then(r => r.json());
+    const list = d.stores || [];
+    if (!list.length) { body.innerHTML = '<p style="font-size:13px;color:var(--text-sub)">アーカイブされた店舗はありません。</p>'; return; }
+    body.innerHTML = `<div style="font-weight:700;font-size:13px;margin-bottom:10px">アーカイブ済みの店舗（${list.length}件）</div>` + list.map(s => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${escapeHtml(s.storeName)}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${s.archivedAt ? 'アーカイブ日: ' + new Date(s.archivedAt).toLocaleDateString('ja-JP') : ''}</div></div>
+        <button class="btn btn-outline btn-sm" onclick="unarchiveStore('${s.storeId}')">復元</button>
+        <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--red);border:none" onclick="hardDeleteStore('${s.storeId}')">完全削除</button>
+      </div>`).join('');
+  } catch (e) { body.innerHTML = `<div style="color:var(--red);font-size:13px">取得に失敗しました: ${escapeHtml(e.message)}</div>`; }
+}
+async function unarchiveStore(storeId) {
+  await fetch(`/api/admin?action=unarchive&storeId=${encodeURIComponent(storeId)}`, { method: 'POST' });
+  showToast('復元しました', 'success');
+  showArchivedStores();
+  loadClientStores();
+}
+async function hardDeleteStore(storeId) {
+  if (!confirm('完全に削除しますか？この操作は取り消せません（順位履歴・クライアント発行情報も削除されます）')) return;
+  await fetch(`/api/admin?storeId=${encodeURIComponent(storeId)}&hard=1`, { method: 'DELETE' });
+  showToast('完全に削除しました', 'success');
+  showArchivedStores();
 }
 
 function copyConnectUrl(path) {
