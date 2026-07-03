@@ -656,6 +656,24 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── AIプロンプトの追加指示（設定ページ・typeごとにKV保存→generate-contentが末尾付加） ──
+  if (action === 'prompt-extra') {
+    const ALLOWED = ['reply_positive', 'reply_negative', 'post', 'instagram_post', 'catchcopy', 'gbp_description', 'hp_content', 'product_desc', 'qa_generate', 'weekly_tasks', 'diagnosis', 'keyword_ideas'];
+    if (req.method === 'GET') {
+      const out = {};
+      for (const t of ALLOWED) { const v = await kvGet(`prompt_extra_${t}`); if (v) out[t] = v; }
+      return res.json({ extras: out, types: ALLOWED });
+    }
+    if (req.method === 'POST') {
+      const { type: pType, text } = req.body || {};
+      if (!ALLOWED.includes(pType)) return res.status(400).json({ error: '不明なtypeです' });
+      const v = String(text || '').trim().slice(0, 1500);
+      if (v) await kvSet(`prompt_extra_${pType}`, v);
+      else await kvDel(`prompt_extra_${pType}`);
+      return res.json({ success: true });
+    }
+  }
+
   // ── 週次サマリーメールのON/OFF（設定ページ） ──
   if (action === 'notify-pref') {
     if (req.method === 'GET') {

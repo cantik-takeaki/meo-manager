@@ -2694,6 +2694,34 @@ body {
         </div>
       </div>
 
+      <!-- AIプロンプト調整 -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>AIプロンプト調整（上級者向け）</div></div>
+        <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">AI生成の文体や禁止事項を、機能ごとに「追加指示」として調整できます。既定のルールに<b>追加</b>される形なので既存の品質を壊しません（空にして保存すると既定に戻ります）。例:「絵文字は使わない」「敬語をやわらかめに」「地域名は必ず◯◯市と表記」</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <select id="pxType" onchange="pxOnType()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <option value="reply_positive">口コミ返信（高評価）</option>
+            <option value="reply_negative">口コミ返信（低評価）</option>
+            <option value="post">Google投稿</option>
+            <option value="instagram_post">Instagram投稿</option>
+            <option value="catchcopy">画像キャッチコピー</option>
+            <option value="gbp_description">GBP説明文</option>
+            <option value="hp_content">HPコンテンツ</option>
+            <option value="product_desc">商品・サービス説明</option>
+            <option value="qa_generate">Q&amp;A生成</option>
+            <option value="weekly_tasks">AIコンサル（週次タスク）</option>
+            <option value="diagnosis">MEO診断の助言</option>
+            <option value="keyword_ideas">キーワード候補</option>
+          </select>
+          <span id="pxState" style="font-size:11px;color:var(--text-sub)"></span>
+        </div>
+        <textarea id="pxText" placeholder="この機能のAIへの追加指示（最大1500文字・空にして保存すると既定に戻ります）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:70px;font-family:inherit;line-height:1.7"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="pxSave()">保存</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('pxText').value='';pxSave()">既定に戻す</button>
+        </div>
+      </div>
+
       <!-- システムステータス -->
       <div class="card" style="max-width:720px">
         <div class="card-header">
@@ -3048,6 +3076,40 @@ async function saveProfileName() {
       const un = document.getElementById('userName'); if (un) un.textContent = d.name;
       const ini = document.getElementById('userInitial'); if (ini) ini.textContent = (d.name.trim()[0] || 'C').toUpperCase();
     } else showToast(d.error || '変更できませんでした', 'error');
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+// ── AIプロンプト調整（追加指示のKV保存・設定ページ） ──
+window._pxExtras = {};
+async function pxLoad() {
+  try {
+    const d = await fetch('/api/admin?action=prompt-extra').then(r => r.json());
+    window._pxExtras = d.extras || {};
+  } catch (e) { window._pxExtras = {}; }
+  pxOnType();
+}
+function pxOnType() {
+  const t = document.getElementById('pxType')?.value;
+  const ta = document.getElementById('pxText');
+  const st = document.getElementById('pxState');
+  if (!t || !ta) return;
+  ta.value = window._pxExtras[t] || '';
+  if (st) st.textContent = window._pxExtras[t] ? '追加指示 設定済み' : '既定のまま';
+}
+async function pxSave() {
+  const t = document.getElementById('pxType')?.value;
+  const text = document.getElementById('pxText')?.value || '';
+  try {
+    const r = await fetch('/api/admin?action=prompt-extra', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: t, text }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) {
+      if (text.trim()) window._pxExtras[t] = text.trim(); else delete window._pxExtras[t];
+      pxOnType();
+      showToast(text.trim() ? 'AIへの追加指示を保存しました' : '既定のプロンプトに戻しました', 'success');
+    } else showToast(d.error || '保存できませんでした', 'error');
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
 }
 
@@ -7961,7 +8023,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'rankmgr') loadRankMgr();
   if (name === 'rankreport') loadRankReport();
   if (name === 'knowledge') loadNotionStatus();
-  if (name === 'settings') loadSettings();
+  if (name === 'settings') { loadSettings(); pxLoad(); }
   _stampUpdated();
 }
 

@@ -1031,6 +1031,12 @@ ${topText || 'データなし'}
   const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
   if (seoWeave && _seoTypes.includes(type)) prompt += seoWeave;
 
+  // 運用者が設定ページで登録した「AIへの追加指示」（typeごと・KV）。文体調整・禁止事項の追加に使う
+  try {
+    const extra = await kvGet(`prompt_extra_${type}`);
+    if (extra && String(extra).trim()) prompt += `\n\n【運用者からの追加指示（上のルールに加えて必ず従う）】\n${String(extra).trim().slice(0, 1500)}`;
+  } catch (e) { /* 追加指示の取得失敗は無視して既定プロンプトで続行 */ }
+
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
