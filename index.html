@@ -417,6 +417,18 @@ body {
 .pop-color-row .pop-clabel { font-size:13px; color:var(--text); width:88px; flex-shrink:0; }
 .pop-color-row input[type=color] { width:46px; height:38px; border:1px solid var(--border); border-radius:8px; background:none; cursor:pointer; padding:2px; }
 .pop-color-row .pop-chex { font-size:12.5px; color:var(--text-muted); font-family:ui-monospace,monospace; }
+.pop-mode { flex:1; padding:11px 8px; border:1.5px solid var(--border); background:var(--bg-2); color:var(--text-sub); font-size:13px; font-weight:700; border-radius:10px; cursor:pointer; font-family:inherit; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:6px; }
+.pop-mode:hover { border-color:var(--border-active); }
+.pop-mode-on { border-color:var(--accent); color:#fff; background:var(--accent); box-shadow:0 2px 8px rgba(46,143,240,.32); }
+.pop-tpl-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.pop-tpl-sw { display:block; width:100%; height:24px; border-radius:6px; margin-bottom:6px; position:relative; border:1px solid rgba(0,0,0,.08); }
+.pop-tpl-sw i { position:absolute; right:5px; bottom:5px; width:11px; height:11px; border-radius:50%; box-shadow:0 0 0 2px #fff; }
+.pop-tpl-nm { font-size:11.5px; line-height:1.25; display:block; }
+.pop-fit { flex:1; padding:9px 8px; border:1.5px solid var(--border); background:var(--bg-2); color:var(--text-sub); font-size:12.5px; font-weight:600; border-radius:9px; cursor:pointer; font-family:inherit; transition:all .15s; }
+.pop-fit:hover { border-color:var(--border-active); }
+.pop-fit-on { border-color:var(--accent); color:var(--accent); background:rgba(46,143,240,.06); box-shadow:0 0 0 1px var(--accent) inset; }
+.pop-thumb { width:100%; max-height:120px; object-fit:contain; border-radius:8px; border:1px solid var(--border); margin-top:8px; background:var(--bg-3); }
+.pop-steps { font-size:12px; color:var(--text-sub); line-height:1.9; padding-left:18px; margin:6px 0 0; }
 
 /* ─── 順位管理 / 順位レポート ─── */
 .rk-card { background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:16px 14px; text-align:center; }
@@ -1641,6 +1653,14 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div style="display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:18px;align-items:start">
           <!-- 左：編集パネル -->
           <div>
+            <!-- モード切替 -->
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button class="pop-mode pop-mode-on" data-mode="template" onclick="popSetMode('template')"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>テンプレートで作成</button>
+              <button class="pop-mode" data-mode="upload" onclick="popSetMode('upload')"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>デザインをアップロード</button>
+            </div>
+
+            <!-- ▼ テンプレートで作成 ▼ -->
+            <div id="popTemplateUi">
             <!-- タブ -->
             <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;margin-bottom:14px">
               <button class="pop-tab pop-tab-on" data-tab="basic" onclick="popTab('basic')">基本</button>
@@ -1653,11 +1673,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <div class="pop-panel" data-panel="basic">
               <div class="card">
                 <div class="card-header"><div class="card-title" style="font-size:13px">テンプレート</div></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-                  <button class="pop-tpl pop-tpl-on" data-tpl="clean" onclick="popSetTpl('clean')">シンプル清潔</button>
-                  <button class="pop-tpl" data-tpl="luxe" onclick="popSetTpl('luxe')">高級感</button>
-                  <button class="pop-tpl" data-tpl="pop" onclick="popSetTpl('pop')">やさしいポップ</button>
-                </div>
+                <div id="popTplWrap" class="pop-tpl-grid"></div>
               </div>
               <div class="card">
                 <div class="card-header"><div class="card-title" style="font-size:13px">用紙サイズ</div></div>
@@ -1694,6 +1710,13 @@ body.role-viewer [data-edit-action] { display:none !important; }
                 <div class="card-header"><div class="card-title" style="font-size:13px">カラー設定</div></div>
                 <div style="display:grid;gap:14px" id="popColorWrap"></div>
               </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">装飾オプション</div></div>
+                <div style="display:grid;gap:12px">
+                  <label style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:9px;cursor:pointer"><input id="pop-stars" type="checkbox" onchange="popSetStars(this.checked)" style="width:16px;height:16px"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fbbc04"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>評価スター（★★★★★）を表示</label>
+                  <label style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:9px;cursor:pointer"><input id="pop-google" type="checkbox" onchange="popSetGoogle(this.checked)" style="width:16px;height:16px"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="#4285F4" d="M23 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.16c-.27 1.4-1.07 2.59-2.28 3.39v2.82h3.68C21.7 18.98 23 15.92 23 12.27z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.68-2.82c-1.02.69-2.33 1.1-4.25 1.1-3.27 0-6.04-2.21-7.03-5.18H1.16v2.91C3.13 21.03 7.24 24 12 24z"/><path fill="#FBBC05" d="M4.97 14.19c-.25-.75-.4-1.55-.4-2.37s.14-1.62.4-2.37V6.54H1.16C.42 8.09 0 9.99 0 11.82s.42 3.73 1.16 5.28l3.81-2.91z"/><path fill="#EA4335" d="M12 4.75c1.84 0 3.5.63 4.8 1.87l3.6-3.6C18.2 1 15.49 0 12 0 7.24 0 3.13 2.97 1.16 6.54l3.81 2.91C5.96 6.96 8.73 4.75 12 4.75z"/></svg>Googleクチコミバッジを表示</label>
+                </div>
+              </div>
             </div>
 
             <!-- 画像・QR -->
@@ -1714,6 +1737,56 @@ body.role-viewer [data-edit-action] { display:none !important; }
                 <div class="card-header"><div class="card-title" style="font-size:13px">QRコード</div></div>
                 <div style="display:grid;gap:16px" id="popQrWrap"></div>
                 <label class="pop-fld" style="margin-top:12px">QR下テキスト<textarea id="pop-qrText" rows="2" class="ed-in" style="resize:vertical" oninput="popBindQr('text',this.value)"></textarea></label>
+              </div>
+            </div>
+            </div><!-- /popTemplateUi -->
+
+            <!-- ▼ デザインをアップロード ▼ -->
+            <div id="popUploadUi" style="display:none">
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">デザイン画像</div></div>
+                <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">Canvaなどで作った完成デザイン（ポスター・POP）を読み込み、QRコードを重ねて印刷できます。用紙の比率に合わせた画像がおすすめです。</p>
+                <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--border-active);border-radius:10px;padding:22px;cursor:pointer;color:var(--text-sub);font-size:13px">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+                  <span id="pop-designLabel">デザイン画像をアップロード</span>
+                  <input type="file" accept="image/*" style="display:none" onchange="popDesignUpload(this)">
+                </label>
+                <img id="pop-designThumb" class="pop-thumb" style="display:none" alt="">
+                <div id="pop-designActions" style="display:none;margin-top:10px;justify-content:space-between;align-items:center;gap:8px">
+                  <div style="display:flex;gap:8px">
+                    <button class="pop-fit pop-fit-on" data-fit="cover" onclick="popSetDesignFit('cover')">余白なし</button>
+                    <button class="pop-fit" data-fit="contain" onclick="popSetDesignFit('contain')">全体表示</button>
+                  </div>
+                  <button class="btn btn-outline btn-sm" onclick="popClearDesign()">削除</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title" style="font-size:13px">用紙サイズ</div></div>
+                <div style="display:grid;gap:8px">
+                  <button class="pop-paper pop-paper-on" data-paper="tent" onclick="popSetPaper('tent')">卓上POP (90×150mm)</button>
+                  <button class="pop-paper" data-paper="a5" onclick="popSetPaper('a5')">A5縦 (148×210mm)</button>
+                  <button class="pop-paper" data-paper="a4" onclick="popSetPaper('a4')">A4縦 (210×297mm)</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                  <div class="card-title" style="font-size:13px">QRコードの配置</div>
+                  <label style="font-size:12px;color:var(--text-sub);display:flex;align-items:center;gap:6px;cursor:pointer"><input id="pop-designFrame" type="checkbox" checked onchange="popSetDesignFrame(this.checked)" style="width:15px;height:15px">白フレーム</label>
+                </div>
+                <div style="display:grid;gap:16px" id="popDesignQrWrap"></div>
+                <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>プレビュー上のQRをドラッグしても移動できます</p>
+              </div>
+              <div class="card" style="border-color:rgba(0,120,223,.28)">
+                <div class="card-header"><div class="card-title" style="font-size:13px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6-6.3 4.6L7.9 14 2 9.4h7.6z"/></svg>Canvaで高品質デザインを作る</div></div>
+                <p style="font-size:12px;color:var(--text-sub);line-height:1.7">無料のCanvaでプロ級のPOPを作り、PNGで書き出して上の欄に読み込めば、QRを重ねてそのまま印刷できます。</p>
+                <ol class="pop-steps">
+                  <li>「Canvaを開く」でポスター／チラシを作成</li>
+                  <li>用紙比率（例：卓上90×150mm ＝ 3:5）に合わせる</li>
+                  <li>右上「共有 → ダウンロード → PNG」で保存</li>
+                  <li>上の「デザイン画像をアップロード」に読み込む</li>
+                  <li>QRの位置・サイズを調整して印刷</li>
+                </ol>
+                <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="popOpenCanva()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>Canvaを開く</button>
               </div>
             </div>
           </div>
@@ -3983,9 +4056,18 @@ const POP_PAPERS = {
   a4:   { w: 210, h: 297, label: 'A4縦 (210×297mm)' },
 };
 const POP_TPLS = {
-  clean: { bg: '#ffffff', card: '#f1f5f9', text: '#1e293b', accent: '#2563eb' },
-  luxe:  { bg: '#0c1424', card: '#16213a', text: '#f3e9d6', accent: '#c9a86a' },
-  pop:   { bg: '#fff7ed', card: '#ffedd5', text: '#7c2d12', accent: '#f97316' },
+  clean:  { name: 'シンプル清潔',   bg: '#ffffff', card: '#f1f5f9', text: '#1e293b', accent: '#2563eb', stars: false, google: false },
+  luxe:   { name: '高級感',        bg: '#0c1424', card: '#16213a', text: '#f3e9d6', accent: '#c9a86a', stars: true,  google: false, bgGrad: 'linear-gradient(160deg,#0c1424,#182740)' },
+  pop:    { name: 'やさしいポップ',  bg: '#fff7ed', card: '#ffedd5', text: '#7c2d12', accent: '#f97316', stars: false, google: false },
+  google: { name: 'Googleクチコミ', bg: '#ffffff', card: '#f8faff', text: '#202124', accent: '#4285F4', stars: true,  google: true },
+  fresh:  { name: 'フレッシュ緑',    bg: '#f0fdf4', card: '#dcfce7', text: '#14532d', accent: '#16a34a', stars: true,  google: false },
+  berry:  { name: 'ベリーピンク',    bg: '#fff1f5', card: '#ffe4ec', text: '#9d174d', accent: '#ec4899', stars: true,  google: false, bgGrad: 'linear-gradient(160deg,#fff1f5,#ffe0ec)' },
+  ocean:  { name: 'オーシャン',      bg: '#eff6ff', card: '#dbeafe', text: '#0c4a6e', accent: '#0284c7', stars: false, google: false, bgGrad: 'linear-gradient(160deg,#eff6ff,#e0f2fe)' },
+  night:  { name: 'ナイトブルー',    bg: '#0f172a', card: '#1e293b', text: '#e2e8f0', accent: '#38bdf8', stars: true,  google: false, bgGrad: 'linear-gradient(160deg,#0b1120,#1e293b)' },
+  sunny:  { name: 'サニー',         bg: '#fffbeb', card: '#fef3c7', text: '#78350f', accent: '#f59e0b', stars: true,  google: false },
+  mint:   { name: 'ミント',         bg: '#f0fdfa', card: '#ccfbf1', text: '#134e4a', accent: '#14b8a6', stars: false, google: false },
+  grape:  { name: 'グレープ',        bg: '#faf5ff', card: '#f3e8ff', text: '#581c87', accent: '#a855f7', stars: true,  google: false, bgGrad: 'linear-gradient(160deg,#faf5ff,#f3e8ff)' },
+  coral:  { name: 'コーラル',        bg: '#fff5f5', card: '#ffe3e3', text: '#7f1d1d', accent: '#ef4444', stars: true,  google: false },
 };
 const POP_FS_FIELDS = [
   { k: 'catch', label: 'キャッチコピー' }, { k: 'title', label: 'タイトル' },
@@ -3994,14 +4076,21 @@ const POP_FS_FIELDS = [
 ];
 const POP_FS_DEFAULT = { catch: 10, title: 20, store: 9, desc: 10, message: 9, qr: 8 };
 function popDefaultState() {
+  const t = POP_TPLS.clean;
   return {
+    mode: 'template',
     template: 'clean', paper: 'tent',
     store: '', catch: '30秒でかんたんアンケート',
     title: 'お客様の声をお聞かせください',
     desc: 'サービス向上のため、ぜひご意見をお聞かせください。', message: '',
-    fs: { ...POP_FS_DEFAULT }, color: { ...POP_TPLS.clean },
+    fs: { ...POP_FS_DEFAULT },
+    color: { bg: t.bg, card: t.card, text: t.text, accent: t.accent },
+    stars: !!t.stars, google: !!t.google, bgGrad: t.bgGrad || '',
     logoShow: true, logoData: '',
     qr: { size: 52, margin: 4, text: 'スマートフォンのカメラで\nQRコードを読み取ってください' },
+    // アップロードモード（完成デザイン画像 + QR合成）
+    designData: '', designFit: 'cover', designQrFrame: true,
+    designQr: { x: 50, y: 80, size: 32 },
   };
 }
 window._popState = window._popState || popDefaultState();
@@ -4019,11 +4108,15 @@ async function showStorePop(idx) {
   st.store = currentLocation?.title || '当店';
   if (_surveyCache?.popTitle) st.title = _surveyCache.popTitle;
   if (_surveyCache?.popDesc) st.desc = _surveyCache.popDesc;
+  popBuildTemplates();
   popSyncTplPaperButtons();
   popSyncInputs();
   popBuildControls();
+  popBuildDesignControls();
+  popSyncStyleToggles();
+  popSyncDesignInputs();
   popTab('basic');
-  renderPop();
+  popSetMode(st.mode || 'template');
 }
 
 function popTab(name) {
@@ -4036,9 +4129,38 @@ function popSyncTplPaperButtons() {
   document.querySelectorAll('#storePopView .pop-paper').forEach(b => b.classList.toggle('pop-paper-on', b.dataset.paper === st.paper));
 }
 function popSetTpl(t) {
-  const st = window._popState; st.template = t; st.color = { ...POP_TPLS[t] };
-  popSyncTplPaperButtons(); popBuildControls(); renderPop();
+  const st = window._popState, tpl = POP_TPLS[t] || POP_TPLS.clean; st.template = t;
+  st.color = { bg: tpl.bg, card: tpl.card, text: tpl.text, accent: tpl.accent };
+  st.stars = !!tpl.stars; st.google = !!tpl.google; st.bgGrad = tpl.bgGrad || '';
+  popSyncTplPaperButtons(); popBuildControls(); popSyncStyleToggles(); renderPop();
 }
+// ── モード切替（テンプレート / デザインアップロード）──
+function popSetMode(m) {
+  const st = window._popState; st.mode = (m === 'upload') ? 'upload' : 'template';
+  document.querySelectorAll('#storePopView .pop-mode').forEach(b => b.classList.toggle('pop-mode-on', b.dataset.mode === st.mode));
+  const tui = document.getElementById('popTemplateUi'), uui = document.getElementById('popUploadUi');
+  if (tui) tui.style.display = (st.mode === 'template') ? '' : 'none';
+  if (uui) uui.style.display = (st.mode === 'upload') ? '' : 'none';
+  renderPop();
+}
+// テンプレートのサムネイル一覧を生成
+function popBuildTemplates() {
+  const wrap = document.getElementById('popTplWrap'); if (!wrap) return;
+  const st = window._popState;
+  wrap.innerHTML = Object.entries(POP_TPLS).map(([k, t]) => `
+    <button class="pop-tpl ${k === st.template ? 'pop-tpl-on' : ''}" data-tpl="${k}" onclick="popSetTpl('${k}')" title="${t.name}">
+      <span class="pop-tpl-sw" style="background:${t.bgGrad || t.bg}"><i style="background:${t.accent}"></i></span>
+      <span class="pop-tpl-nm">${t.name}</span>
+    </button>`).join('');
+}
+// 装飾トグル（評価スター / Googleブランド）
+function popSyncStyleToggles() {
+  const st = window._popState;
+  const s = document.getElementById('pop-stars'); if (s) s.checked = !!st.stars;
+  const g = document.getElementById('pop-google'); if (g) g.checked = !!st.google;
+}
+function popSetStars(v) { window._popState.stars = !!v; renderPop(); }
+function popSetGoogle(v) { window._popState.google = !!v; renderPop(); }
 function popSetPaper(p) {
   window._popState.paper = p; popSyncTplPaperButtons(); renderPop();
 }
@@ -4097,30 +4219,136 @@ function popLogoUpload(input) {
   r.readAsDataURL(f);
 }
 function popClearLogo() { window._popState.logoData = ''; popRefreshLogoUi(); renderPop(); }
+
+// ── アップロードモード：完成デザイン画像 + QR合成 ──
+function popDesignUpload(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (f.size > 8 * 1024 * 1024) return showToast('画像は8MB以下にしてください', 'error');
+  const r = new FileReader();
+  r.onload = e => { window._popState.designData = e.target.result; popSyncDesignInputs(); renderPop(); showToast('デザインを読み込みました。QRの位置を調整してください', 'success'); };
+  r.readAsDataURL(f);
+}
+function popClearDesign() { window._popState.designData = ''; popSyncDesignInputs(); renderPop(); }
+function popSetDesignFit(v) {
+  window._popState.designFit = v;
+  document.querySelectorAll('#storePopView .pop-fit').forEach(b => b.classList.toggle('pop-fit-on', b.dataset.fit === v));
+  renderPop();
+}
+function popSetDesignFrame(v) { window._popState.designQrFrame = !!v; renderPop(); }
+function popSetDesignQr(k, v) {
+  window._popState.designQr[k] = +v;
+  const e = document.getElementById('popdqv-' + k); if (e) e.textContent = v + '%';
+  const dq = document.getElementById('popDragQr');
+  if (dq) { if (k === 'x') dq.style.left = v + '%'; else if (k === 'y') dq.style.top = v + '%'; else if (k === 'size') dq.style.width = v + '%'; }
+}
+function popBuildDesignControls() {
+  const wrap = document.getElementById('popDesignQrWrap'); if (!wrap) return;
+  const q = window._popState.designQr;
+  const rows = [['x', '横位置', 0, 100], ['y', '縦位置', 0, 100], ['size', 'QRサイズ', 12, 60]];
+  wrap.innerHTML = rows.map(([k, l, mn, mx]) => `
+    <div class="pop-slider">
+      <div class="pop-slabel"><span>${l}</span><span class="pop-sval" id="popdqv-${k}">${q[k]}%</span></div>
+      <input type="range" min="${mn}" max="${mx}" step="1" value="${q[k]}" oninput="popSetDesignQr('${k}',this.value)">
+    </div>`).join('');
+}
+function popSyncDesignInputs() {
+  const st = window._popState;
+  const has = !!st.designData;
+  const lbl = document.getElementById('pop-designLabel'), act = document.getElementById('pop-designActions'), prev = document.getElementById('pop-designThumb');
+  if (lbl) lbl.textContent = has ? 'デザインを変更' : 'デザイン画像をアップロード';
+  if (act) act.style.display = has ? 'flex' : 'none';
+  if (prev) { prev.style.display = has ? 'block' : 'none'; if (has) prev.src = st.designData; }
+  document.querySelectorAll('#storePopView .pop-fit').forEach(b => b.classList.toggle('pop-fit-on', b.dataset.fit === st.designFit));
+  const fr = document.getElementById('pop-designFrame'); if (fr) fr.checked = !!st.designQrFrame;
+}
+// プレビュー上でQRをドラッグして配置
+function popAttachDrag() {
+  const box = document.getElementById('popPreviewBox'), qr = document.getElementById('popDragQr');
+  if (!box || !qr) return;
+  let dragging = false;
+  const apply = (clientX, clientY) => {
+    const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
+    const x = Math.max(0, Math.min(100, Math.round((clientX - r.left) / r.width * 100)));
+    const y = Math.max(0, Math.min(100, Math.round((clientY - r.top) / r.height * 100)));
+    const st = window._popState; st.designQr.x = x; st.designQr.y = y;
+    qr.style.left = x + '%'; qr.style.top = y + '%';
+    const sx = document.getElementById('popdqv-x'); if (sx) sx.textContent = x + '%';
+    const sy = document.getElementById('popdqv-y'); if (sy) sy.textContent = y + '%';
+    const rx = document.querySelector('#popDesignQrWrap input[oninput*="\'x\'"]'); if (rx) rx.value = x;
+    const ry = document.querySelector('#popDesignQrWrap input[oninput*="\'y\'"]'); if (ry) ry.value = y;
+  };
+  qr.addEventListener('pointerdown', e => { dragging = true; try { qr.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault(); });
+  qr.addEventListener('pointermove', e => { if (dragging) apply(e.clientX, e.clientY); });
+  const end = () => { dragging = false; };
+  qr.addEventListener('pointerup', end); qr.addEventListener('pointercancel', end);
+}
+// Canva連携ガイド：Canvaを開く
+function popOpenCanva() {
+  const st = window._popState, paper = POP_PAPERS[st.paper];
+  window.open('https://www.canva.com/create/posters/', '_blank', 'noopener');
+  showToast(`Canvaで${paper.w}×${paper.h}mm相当のポスターを作成→PNGで保存→ここにアップロード`, 'success');
+}
 function popReset() {
   const store = window._popState.store;
   window._popState = popDefaultState(); window._popState.store = store;
-  popSyncTplPaperButtons(); popSyncInputs(); popBuildControls(); renderPop();
+  popBuildTemplates(); popSyncTplPaperButtons(); popSyncInputs(); popBuildControls();
+  popBuildDesignControls(); popSyncStyleToggles(); popSyncDesignInputs(); popSetMode('template');
   showToast('初期状態に戻しました', 'success');
 }
 function popResetFs() { window._popState.fs = { ...POP_FS_DEFAULT }; popBuildControls(); renderPop(); }
 
 function _popEsc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function _popNl2br(s) { return _popEsc(s).replace(/\n/g, '<br>'); }
+// 5つ星（Googleゴールド）
+function _popStarsRow(L) {
+  const sz = L(6.4);
+  const star = `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="#fbbc04" style="margin:0 ${L(0.5)}"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+  return `<div style="display:flex;justify-content:center;align-items:center;margin-bottom:${L(3)}">${star.repeat(5)}</div>`;
+}
+// Googleブランドバッジ（公式4色G）
+function _popGoogleBadge(L, F, fs) {
+  const g = L(5.4);
+  const G = `<svg viewBox="0 0 24 24" width="${g}" height="${g}" style="flex-shrink:0"><path fill="#4285F4" d="M23 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.16c-.27 1.4-1.07 2.59-2.28 3.39v2.82h3.68C21.7 18.98 23 15.92 23 12.27z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.68-2.82c-1.02.69-2.33 1.1-4.25 1.1-3.27 0-6.04-2.21-7.03-5.18H1.16v2.91C3.13 21.03 7.24 24 12 24z"/><path fill="#FBBC05" d="M4.97 14.19c-.25-.75-.4-1.55-.4-2.37s.14-1.62.4-2.37V6.54H1.16C.42 8.09 0 9.99 0 11.82s.42 3.73 1.16 5.28l3.81-2.91z"/><path fill="#EA4335" d="M12 4.75c1.84 0 3.5.63 4.8 1.87l3.6-3.6C18.2 1 15.49 0 12 0 7.24 0 3.13 2.97 1.16 6.54l3.81 2.91C5.96 6.96 8.73 4.75 12 4.75z"/></svg>`;
+  return `<div style="display:inline-flex;align-self:center;align-items:center;gap:${L(2)};background:#fff;border:1px solid #dadce0;border-radius:999px;padding:${L(1.4)} ${L(4)};margin-bottom:${L(3)};box-shadow:0 ${L(0.4)} ${L(1.6)} rgba(0,0,0,.08)">${G}<span style="font-size:${F(fs)};font-weight:700;color:#3c4043;letter-spacing:.02em">Googleクチコミ</span></div>`;
+}
 // L=長さ関数（プレビュー:px / 印刷:mm）, F=フォント関数（プレビュー:px / 印刷:pt）
 function popInnerHtml(L, F) {
   const st = window._popState, c = st.color, paper = POP_PAPERS[st.paper];
   const url = reviewPageUrl();
+
+  // ── アップロードモード：完成デザイン画像 + QR合成 ──
+  if (st.mode === 'upload') {
+    if (!st.designData) {
+      return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:#94a3b8;font-size:${F(9)};text-align:center;padding:${L(10)};box-sizing:border-box;line-height:1.7;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">デザイン画像を<br>アップロードしてください</div>`;
+    }
+    const q = st.designQr;
+    const qrU = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=1&data=' + encodeURIComponent(url);
+    const qrInner = `<img src="${qrU}" alt="QR" style="width:100%;height:auto;display:block;border-radius:${L(1)}">`;
+    const qrBox = st.designQrFrame
+      ? `<div style="background:#fff;padding:${L(2)};border-radius:${L(2.4)};box-shadow:0 ${L(1)} ${L(3.2)} rgba(0,0,0,.3)">${qrInner}</div>`
+      : qrInner;
+    return `<div style="position:relative;width:100%;height:100%;background:#fff;overflow:hidden;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
+      <img src="${st.designData}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:${st.designFit};display:block">
+      <div id="popDragQr" style="position:absolute;left:${q.x}%;top:${q.y}%;width:${q.size}%;transform:translate(-50%,-50%);cursor:move;touch-action:none">${qrBox}</div>
+    </div>`;
+  }
+
+  // ── テンプレートモード ──
+  const bg = st.bgGrad || c.bg;
   const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=' + st.qr.margin + '&data=' + encodeURIComponent(url);
   const logo = (st.logoShow && st.logoData) ? `<img src="${st.logoData}" style="max-width:${L(paper.w * 0.42)};max-height:${L(18)};object-fit:contain;margin:0 auto ${L(3)};display:block">` : '';
+  const stars = st.stars ? _popStarsRow(L) : '';
+  const gbadge = st.google ? _popGoogleBadge(L, F, st.fs.qr) : '';
   const msg = st.message ? `<div style="font-size:${F(st.fs.message)};color:${c.text};opacity:.72;margin-top:${L(3)};line-height:1.5">${_popNl2br(st.message)}</div>` : '';
   const qrW = paper.w * st.qr.size / 100;
   return `
-   <div style="background:${c.bg};color:${c.text};width:100%;height:100%;padding:${L(9)} ${L(7)};text-align:center;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
+   <div style="background:${bg};color:${c.text};width:100%;height:100%;padding:${L(9)} ${L(7)};text-align:center;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
      <div style="display:inline-block;align-self:center;background:${c.accent};color:#fff;font-size:${F(st.fs.catch)};font-weight:700;padding:${L(1.4)} ${L(5)};border-radius:999px;margin-bottom:${L(4)}">${_popEsc(st.catch)}</div>
      ${logo}
+     ${stars}
      <div style="font-size:${F(st.fs.title)};font-weight:800;line-height:1.35;margin-bottom:${L(2)}">${_popNl2br(st.title)}</div>
      <div style="font-size:${F(st.fs.store)};color:${c.text};opacity:.6;margin-bottom:${L(5)}">${_popEsc(st.store)}</div>
+     ${gbadge}
      <div style="background:${c.card};border-radius:${L(4)};padding:${L(6)} ${L(4)};margin:0 auto;width:100%;box-sizing:border-box">
        <div style="height:${L(0.8)};width:${L(14)};background:${c.accent};border-radius:99px;margin:0 auto ${L(3)}"></div>
        <img src="${qrImg}" alt="QR" style="width:${L(qrW)};height:${L(qrW)};display:block;margin:0 auto;border-radius:${L(1.5)};background:#fff">
@@ -4143,6 +4371,7 @@ function renderPop() {
   box.style.borderRadius = '6px';
   box.style.overflow = 'hidden';
   box.innerHTML = popInnerHtml(L, F);
+  if (st.mode === 'upload' && st.designData) popAttachDrag();
   const lab = paper.label;
   const pl = document.getElementById('popPreviewLabel'); if (pl) pl.textContent = lab + ' プレビュー';
   const tp = document.getElementById('popTipPaper'); if (tp) tp.textContent = lab;
