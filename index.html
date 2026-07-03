@@ -2168,6 +2168,14 @@ body.role-viewer [data-edit-action] { display:none !important; }
           </div>
         </div>
         <textarea id="igPostCaption" placeholder="ここにキャプションが表示されます（生成後に自由に編集できます）" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:200px;font-family:inherit;line-height:1.7;margin-top:14px"></textarea>
+        <div style="margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+            <label style="font-size:12px;color:var(--text-sub);font-weight:600">ハッシュタグ</label>
+            <button class="btn btn-outline btn-sm" onclick="genIgHashtags()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで生成</button>
+            <span id="igHashCount" style="font-size:11px;color:var(--text-sub)">適正数の目安：3〜5個（Instagramは最大5個）</span>
+          </div>
+          <textarea id="igHashtags" oninput="updateHashCount('igHashtags','igHashCount')" placeholder="#相模原カフェ #自家焙煎珈琲 #南橋本ランチ" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;resize:vertical;min-height:52px;font-family:inherit;line-height:1.6"></textarea>
+        </div>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="generateIgCaption()">再生成</button>
           <button class="btn btn-success" onclick="publishIgPost()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg>Instagramに投稿（承認の上）</button>
@@ -2464,6 +2472,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
           </div>
           <textarea id="postText" placeholder="投稿内容を入力（または「AIで文章生成」）" oninput="updatePostCount()"></textarea>
           <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google目安150〜300字／Instagram150〜250字）</div>
+
+          <div style="margin:6px 0 2px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+              <label style="font-size:12px;color:var(--text-sub);font-weight:600">ハッシュタグ<span style="font-weight:400">（Instagram投稿にのみ付きます・Google投稿には付きません）</span></label>
+              <button class="btn btn-outline btn-sm" onclick="genPostHashtags()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで生成</button>
+              <span id="postHashCount" style="font-size:11px;color:var(--text-sub)">適正数の目安：3〜5個（Instagramは最大5個）</span>
+            </div>
+            <input id="postHashtags" type="text" oninput="updateHashCount('postHashtags','postHashCount')" placeholder="#相模原ランチ #自家製パスタ #テイクアウト可" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          </div>
 
           <div style="margin:4px 0 8px">
             <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -6345,12 +6362,53 @@ async function generateIgCaption() {
   } catch (e) { ta.value = '生成失敗: ' + e.message; }
 }
 
+// ── ハッシュタグ（Instagram用・最大5個） ──
+const HASHTAG_MAX = 5; // Instagramは2025年12月以降ハッシュタグ最大5個
+// AI出力/入力を「#タグ」だけの1行に正規化（重複除去・最大5個）
+function _cleanHashtags(s, max = HASHTAG_MAX) {
+  const seen = new Set(); const out = [];
+  (String(s || '').match(/#[^\s#　、,]+/g) || []).forEach(t => { const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } });
+  return out.slice(0, max).join(' ');
+}
+// 適正数の表示（3〜5個が目安・最大5個）
+function updateHashCount(inputId, countId) {
+  const el = document.getElementById(inputId), out = document.getElementById(countId);
+  if (!el || !out) return;
+  const n = (el.value.match(/#[^\s#　、,]+/g) || []).length;
+  let color = 'var(--text-sub)', msg;
+  if (n === 0) msg = '適正数の目安：3〜5個（Instagramは最大5個）';
+  else if (n <= HASHTAG_MAX) { color = '#1b9d55'; msg = `${n}個・適正（3〜5個が目安）`; }
+  else { color = '#e5484d'; msg = `${n}個・多すぎます（Instagramは最大${HASHTAG_MAX}個。減らしてください）`; }
+  out.textContent = msg; out.style.color = color;
+}
+// ハッシュタグをAI生成して指定フィールドへ
+async function genHashtagsInto(inputId, countId, noteEl) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const ta = document.getElementById(inputId); if (!ta) return;
+  const note = noteEl ? (document.getElementById(noteEl)?.value || '') : '';
+  const old = ta.value; ta.value = '生成中...';
+  try {
+    const res = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'hashtags', photoNote: note }),
+    });
+    const d = await res.json();
+    ta.value = d.content ? _cleanHashtags(d.content) : old;
+    if (d.error && !d.content) { ta.value = old; showToast(d.error, 'error'); }
+  } catch (e) { ta.value = old; showToast('ハッシュタグ生成に失敗しました', 'error'); }
+  updateHashCount(inputId, countId);
+}
+function genIgHashtags() { return genHashtagsInto('igHashtags', 'igHashCount', 'igPhotoNote'); }
+function genPostHashtags() { return genHashtagsInto('postHashtags', 'postHashCount', 'postGenTopic'); }
+
 async function publishIgPost() {
   if (!_igSelected) return showToast('写真を選択してください', 'error');
   if (window._igConnected !== true) return showToast('この店舗のInstagramが未連携です。連携してから投稿してください。', 'error');
   const caption = document.getElementById('igPostCaption').value.trim();
   if (!caption) return showToast('キャプションを入力してください', 'error');
   if (!confirm('この内容でInstagramに投稿します。よろしいですか？（社外公開アクション）')) return;
+  const tags = _cleanHashtags(document.getElementById('igHashtags')?.value || '');
+  const fullCaption = tags ? `${caption}\n\n${tags}` : caption; // ハッシュタグは本文の下に付ける
   const aspect = document.getElementById('igAspect').value;
   const imageUrl = aspect === 'portrait' ? _igSelected.portraitUrl : _igSelected.squareUrl;
   const sid = currentLocationId ? '&storeId=' + encodeURIComponent(currentLocationId) : '';
@@ -6358,7 +6416,7 @@ async function publishIgPost() {
   try {
     const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageUrl, caption }),
+      body: JSON.stringify({ imageUrl, caption: fullCaption }),
     });
     const data = await res.json();
     if (data.success) showToast('Instagramに投稿しました！');
@@ -8404,9 +8462,13 @@ async function createPost() {
     cta: document.getElementById('postCTA').value,
     ctaUrl: document.getElementById('postCTAUrl').value,
     aspect: document.getElementById('postAspect')?.value || 'portrait',
+    hashtags: document.getElementById('postHashtags')?.value || '',
   });
   showToast(okMsg.join(' ／ '), 'success');
-  if (toGoogle) { document.getElementById('postText').value = ''; updatePostCount(); loadPosts(); }
+  if (toGoogle) {
+    document.getElementById('postText').value = ''; updatePostCount(); loadPosts();
+    const ph = document.getElementById('postHashtags'); if (ph) { ph.value = ''; updateHashCount('postHashtags', 'postHashCount'); }
+  }
 }
 
 // 新規投稿を「予約投稿の管理」に予約保存（期日到来で自動投稿はせず、手動公開の管理用）
@@ -8428,12 +8490,14 @@ async function scheduleNewPost() {
         callToActionUrl: document.getElementById('postCTAUrl').value,
         images: _postImages || [],
         aspect: document.getElementById('postAspect')?.value || 'portrait',
+        hashtags: document.getElementById('postHashtags')?.value || '',
         targetGoogle: document.getElementById('targetGoogle').checked,
         targetInstagram: document.getElementById('targetInstagram').checked,
       }),
     });
     showToast('予約投稿に追加しました（下の「予約投稿の管理」で管理できます）', 'success');
     document.getElementById('postText').value = ''; updatePostCount();
+    const ph = document.getElementById('postHashtags'); if (ph) { ph.value = ''; updateHashCount('postHashtags', 'postHashCount'); }
     document.getElementById('postSchedDate').value = ''; document.getElementById('postSchedTime').value = '';
     if (typeof clearPostImages === 'function') clearPostImages();
     await loadDrafts();
@@ -8459,11 +8523,14 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
   if (toInstagram && window._igConnected !== true) {
     okMsg.push('Instagram：この店舗が未連携のため投稿をスキップしました（連携後に投稿できます）');
   } else if (toInstagram) {
+    // ハッシュタグはInstagramのキャプションにだけ付ける（Google投稿には付けない）
+    const _tags = _cleanHashtags(opts.hashtags || '');
+    const igCaption = _tags ? `${summary}\n\n${_tags}` : summary;
     try {
       const video = (images || []).find(m => m.isVideo);
       if (video) {
         const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: video.url, caption: summary }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: video.url, caption: igCaption }),
         });
         const data = await res.json();
         if (data.creationId) {
@@ -8476,8 +8543,8 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
         // 画像比率の指定（portrait=縦長4:5 / square=正方形1:1）を反映。カルーセルも同じ比率で統一
         const pick = m => (opts.aspect === 'square') ? (m.squareUrl || m.url) : (m.portraitUrl || m.squareUrl || m.url);
         let body;
-        if ((images || []).length >= 2) body = { imageUrls: images.map(pick), caption: summary };
-        else { const m = images[0]; body = { imageUrl: pick(m), caption: summary }; }
+        if ((images || []).length >= 2) body = { imageUrls: images.map(pick), caption: igCaption };
+        else { const m = images[0]; body = { imageUrl: pick(m), caption: igCaption }; }
         const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
@@ -9718,6 +9785,7 @@ async function generateMonthlyPlan() {
 
 let _draftImages = {};      // draftId -> 選択中の画像[]
 let _draftAspect = {};      // draftId -> 'portrait'|'square'（Instagram画像比率）
+let _draftHashtags = {};    // draftId -> ハッシュタグ（Instagramのみ）
 let _draftMediaList = [];    // ライブラリ画像
 
 function _draftStatus(d) {
@@ -9809,7 +9877,7 @@ async function loadDrafts() {
       : '';
     if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">予約投稿はまだありません。新規投稿で「予約する」、または「月間投稿プラン」で作成してください。</p>'; return; }
     _draftImages = {};
-    drafts.forEach(d => { _draftImages[d.id] = d.images || []; _draftAspect[d.id] = d.aspect || 'portrait'; });
+    drafts.forEach(d => { _draftImages[d.id] = d.images || []; _draftAspect[d.id] = d.aspect || 'portrait'; _draftHashtags[d.id] = d.hashtags || ''; });
     listEl.innerHTML = drafts.map(d => { const st = _draftStatus(d); return `
       <div style="border:1px solid ${st.key === 'overdue' ? 'rgba(239,68,68,0.4)' : 'var(--border)'};border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -9908,7 +9976,7 @@ async function publishDraftNow(id) {
   const targets = [toG && 'Google', toI && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
   await saveDraft(id, true);
-  const okMsg = await publishToTargets(summary, imgs, toG, toI, { aspect: _draftAspect[id] || 'portrait' });
+  const okMsg = await publishToTargets(summary, imgs, toG, toI, { aspect: _draftAspect[id] || 'portrait', hashtags: _draftHashtags[id] || '' });
   showToast(okMsg.join(' ／ '), 'success');
 }
 

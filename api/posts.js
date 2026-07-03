@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const b = req.body || {};
-      const { id, summary, scheduledDate, scheduledTime, topicType, callToActionType, callToActionUrl, images, targetGoogle, targetInstagram } = b;
+      const { id, summary, scheduledDate, scheduledTime, topicType, callToActionType, callToActionUrl, images, targetGoogle, targetInstagram, aspect, hashtags } = b;
       const list = await kvGet(key) || [];
       if (id) {
         // 更新（送られたフィールドだけ上書き。未指定の既存値は保持）
@@ -102,6 +102,8 @@ export default async function handler(req, res) {
           ...(callToActionType !== undefined && { callToActionType }),
           ...(callToActionUrl !== undefined && { callToActionUrl }),
           ...(images !== undefined && { images }),
+          ...(aspect !== undefined && { aspect }),
+          ...(hashtags !== undefined && { hashtags }),
           ...(targetGoogle !== undefined && { targetGoogle }),
           ...(targetInstagram !== undefined && { targetInstagram }),
         };
@@ -112,7 +114,8 @@ export default async function handler(req, res) {
           summary, scheduledDate: scheduledDate || '', scheduledTime: scheduledTime || '',
           topicType: topicType || 'STANDARD',
           callToActionType: callToActionType || '', callToActionUrl: callToActionUrl || '',
-          images: images || [], targetGoogle: targetGoogle !== false, targetInstagram: !!targetInstagram,
+          images: images || [], aspect: aspect || 'portrait', hashtags: hashtags || '',
+          targetGoogle: targetGoogle !== false, targetInstagram: !!targetInstagram,
           status: 'scheduled', createdAt: new Date().toISOString(),
         });
       }
