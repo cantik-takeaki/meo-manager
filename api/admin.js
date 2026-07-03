@@ -23,6 +23,49 @@ function generatePassword() {
 // 店名の照合用正規化（fetch-rank/cron-rank共通）
 const _normName = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
 
+// ── 順位取得プロバイダ（既定=SerpApi無料枠 / env RANK_PROVIDER=dataforseo で有料の高精度に差替え） ──
+// 戻り値: { list:[{title,position,rating,reviews,place_id}], error } — 呼び出し側はlistを店名照合して順位を出す。
+// ll = 店舗の実座標（"lat,lng"）。SerpApiのgoogle_localは地点文字列(location)、DataForSEOは座標で計測でき精度が高い。
+async function fetchLocalResults(keyword, { location, ll } = {}) {
+  const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
+  if (provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+    // DataForSEO（有料・座標指定で高精度）。envに認証情報がある時のみ通る＝未設定なら絶対に走らない。
+    try {
+      const auth = Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
+      const task = { language_code: 'ja', keyword, device: 'mobile', os: 'android' };
+      if (ll) task.location_coordinate = ll.replace(/@|z$/g, ''); // "lat,lng,zoom"可 → DataForSEOは "lat,lng,zoom"
+      else task.location_name = location || 'Japan';
+      const r = await fetch('https://api.dataforseo.com/v3/serp/google/maps/live/advanced', {
+        method: 'POST', headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify([task]),
+      });
+      const d = await r.json();
+      const items = d?.tasks?.[0]?.result?.[0]?.items || [];
+      const list = items.filter(x => x.type === 'maps_search').map((x, i) => ({
+        title: x.title, position: x.rank_absolute || (i + 1), rating: x.rating?.value || null, reviews: x.rating?.votes_count || null, place_id: x.place_id || '',
+      }));
+      if (!list.length && d?.tasks?.[0]?.status_message && d.tasks[0].status_code >= 40000) return { error: d.tasks[0].status_message };
+      return { list };
+    } catch (e) { return { error: e.message }; }
+  }
+  // 既定: SerpApi（無料枠）。google_localは location 文字列で計測。
+  const SERPAPI_KEY = process.env.SERPAPI_KEY;
+  if (!SERPAPI_KEY) return { error: 'SERPAPI_KEY未設定' };
+  const call = async (loc) => {
+    const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
+    if (loc) params.set('location', loc);
+    const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+    return r.json();
+  };
+  let data = await call(location);
+  if (data.error && /location/i.test(data.error) && location) data = await call(''); // 不正地点はKWの地域語頼みで再試行
+  if (data.error) return { error: data.error };
+  const list = (data.local_results || []).map((item, i) => ({
+    position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null, place_id: item.place_id || '',
+  }));
+  return { list };
+}
+
 // SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
 async function recordCompRanks(storeId, keyword, selfRank, list) {
   try {
@@ -515,8 +558,9 @@ export default async function handler(req, res) {
     if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) {
       return res.status(401).json({ error: 'unauthorized' });
     }
-    const SERPAPI_KEY = process.env.SERPAPI_KEY;
-    if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
+    const _cronProvider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
+    const _cronUseSerp = !(_cronProvider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    if (_cronUseSerp && !process.env.SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
     // 同日の再実行はスキップ（誤操作・外部からの連打で枠を浪費しない。force=1で強制再実行）
     const last = await kvGet('cron_rank_last');
@@ -552,16 +596,9 @@ export default async function handler(req, res) {
     for (const job of jobs) {
       if (ok + fail >= MAX_CALLS) break;
       try {
-        const callSerp = async (loc) => {
-          const params = new URLSearchParams({ engine: 'google_local', q: job.kw, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
-          if (loc) params.set('location', loc);
-          return fetch(`https://serpapi.com/search.json?${params.toString()}`).then(r => r.json());
-        };
-        let data = await callSerp(job.area ? `${job.area},Japan` : '');
-        if (data.error && /location/i.test(data.error) && job.area) data = await callSerp('');
-        used++; await kvSet(usedKey, used);
-        if (data.error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: data.error }); continue; }
-        const list = data.local_results || [];
+        const { list, error } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
+        if (_cronUseSerp) { used++; await kvSet(usedKey, used); }
+        if (error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error }); continue; }
         const target = _normName(job.st.name);
         let rank = null;
         list.forEach((item, i) => {
@@ -773,55 +810,34 @@ export default async function handler(req, res) {
     return res.json({ history, competitors });
   }
 
-  // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)&storeId=xxx
-  // storeIdを渡すと、同じSERP結果から登録済み競合店舗の順位も同時記録する（追加APIリクエストなし＝SerpApi枠を消費しない）
+  // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&ll=35.6,139.7,14z&store=店舗名(部分一致)&storeId=xxx
+  // storeIdを渡すと、同じ検索結果から登録済み競合店舗の順位も同時記録する（追加APIリクエストなし＝枠を消費しない）
+  // ll(座標)を渡すと店舗の実所在地を基準に計測でき精度が上がる（DataForSEO時は座標計測・SerpApi時は精密location併用）。
   if (req.method === 'GET' && action === 'fetch-rank') {
-    const SERPAPI_KEY = process.env.SERPAPI_KEY;
-    if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
-    const { keyword, location, store, storeId } = req.query;
+    const { keyword, location, ll, store, storeId } = req.query;
     if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
-    // 月間上限ガード（既定=無料枠100・環境変数で変更可）。上限到達で自動停止し課金枠突入を防ぐ。
+    const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
+    const useSerp = !(provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    // SerpApi時のみ月間上限ガード（DataForSEOは従量なので別管理）。上限到達で自動停止し課金枠突入を防ぐ。
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
     const used = await kvGet(usedKey) || 0;
-    if (used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
+    if (useSerp && used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
     try {
-      const callSerp = async (loc) => {
-        const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
-        if (loc) params.set('location', loc);
-        const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
-        return r.json();
-      };
-      let data = await callSerp(location);
-      // 地点が不正（Unsupported location）なら地点なしで自動リトライ（KWに地域が入っていれば十分）
-      if (data.error && /location/i.test(data.error) && location) {
-        data = await callSerp('');
-      }
-      if (data.error) return res.status(502).json({ error: data.error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
-      await kvSet(usedKey, used + 1); // 使用回数を記録
-      const list = data.local_results || [];
-      const norm = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
-      const target = norm(store);
+      const { list, error } = await fetchLocalResults(keyword, { location, ll });
+      if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
+      if (useSerp) await kvSet(usedKey, used + 1); // 使用回数を記録（SerpApiのみ）
+      const target = _normName(store);
       let rank = null, matched = null;
       list.forEach((item, i) => {
         if (rank) return;
-        const t = norm(item.title);
-        if (t && (t.includes(target) || target.includes(t))) {
-          rank = item.position || (i + 1); matched = item.title;
-        }
+        const t = _normName(item.title);
+        if (t && (t.includes(target) || target.includes(t))) { rank = item.position || (i + 1); matched = item.title; }
       });
-      const top = list.slice(0, 20).map((item, i) => ({
-        position: item.position || (i + 1),
-        title: item.title, rating: item.rating || null, reviews: item.reviews || null,
-      }));
-
-      // ── 競合順位の同時記録（同じSERP結果を使うだけ＝SerpApi枠を消費しない） ──
+      const top = list.slice(0, 20).map((item, i) => ({ position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null }));
+      // ── 競合順位の同時記録（同じ検索結果を使うだけ＝枠を消費しない） ──
       const comps = storeId ? await recordCompRanks(storeId, keyword, rank, list) : null;
-
-      return res.json({
-        keyword, location: location || null, rank, matched,
-        found: rank !== null, top, comps, checkedAt: new Date().toISOString(),
-      });
+      return res.json({ keyword, location: location || null, rank, matched, found: rank !== null, top, comps, provider: useSerp ? 'serpapi' : 'dataforseo', checkedAt: new Date().toISOString() });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

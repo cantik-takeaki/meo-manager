@@ -4447,9 +4447,13 @@ async function aiFetchRanks(ev) {
   if (!confirm(`${entries.length}件のキーワードの順位をGoogleマップから取得します。よろしいですか？\n（月間の自動取得回数には上限があります）`)) return;
   window._aiFetching = true;
   const btn = ev?.currentTarget; const btnHtml = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '取得中…'; }
-  // 都道府県は店舗の実所在地から解決（東京固定にしない）。取れなければ area 単体で送り、
-  // SerpApiが不正地点なら backend が地点なしで自動リトライする（KWの地域語で取得可能）。
-  const pref = currentLocation?.storefrontAddress?.administrativeArea || '';
+  // 検索地点は店舗の実所在地から精密化（精度改善）。都道府県＋市区(locality)を使い、KW個別のareaがあれば優先。
+  // さらに店舗の座標(latlng)があればll(緯度経度)も渡し、店舗の実際の位置を基準に計測する（精度向上）。
+  const addr = currentLocation?.storefrontAddress || {};
+  const pref = addr.administrativeArea || '';
+  const city = addr.locality || '';       // 市区町村
+  const gll = currentLocation?.latlng;    // {latitude, longitude}（GBP連携店のみ）
+  const llParam = (gll && gll.latitude && gll.longitude) ? `&ll=${gll.latitude},${gll.longitude},14z` : '';
   const store = currentLocation?.title || '';
   const today = new Date().toISOString().slice(0, 10);
   let ok = 0, fail = 0, firstErr = '';
@@ -4457,9 +4461,10 @@ async function aiFetchRanks(ev) {
   try {
     for (const en of entries) {
       const m = D.meta[en.k] || {};
-      const loc = m.area ? (pref ? `${m.area},${pref},Japan` : `${m.area},Japan`) : '';
+      const spot = m.area || city;          // KW個別のエリア → 無ければ店舗の実市区
+      const loc = spot ? [spot, pref, 'Japan'].filter(Boolean).join(',') : (pref ? `${pref},Japan` : '');
       try {
-        const r = await fetch(`/api/admin?action=fetch-rank&keyword=${encodeURIComponent(en.k)}&store=${encodeURIComponent(store)}&location=${encodeURIComponent(loc)}&storeId=${encodeURIComponent(currentLocationId)}`).then(x => x.json());
+        const r = await fetch(`/api/admin?action=fetch-rank&keyword=${encodeURIComponent(en.k)}&store=${encodeURIComponent(store)}&location=${encodeURIComponent(loc)}${llParam}&storeId=${encodeURIComponent(currentLocationId)}`).then(x => x.json());
         if (r.error) { fail++; if (!firstErr) firstErr = r.error; if (r.overLimit) break; continue; }
         await fetch(`/api/admin?action=rank-input&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: en.k, date: today, rank: r.rank }) });
         ok++;
@@ -5071,6 +5076,8 @@ async function runCompetitorAnalysis() {
   try {
     const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '', storeId: currentLocationId || '' });
     if (loc) p.set('location', loc);
+    const _cll = currentLocation?.latlng; // 店舗座標があれば実所在地基準で計測（精度向上）
+    if (_cll && _cll.latitude && _cll.longitude) p.set('ll', `${_cll.latitude},${_cll.longitude},14z`);
     const d = await fetch('/api/admin?' + p.toString()).then(r => r.json());
     if (d.error) { box.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
     const top = d.top || [];

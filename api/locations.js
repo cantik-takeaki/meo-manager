@@ -167,7 +167,7 @@ export default async function handler(req, res) {
       const clientName = account.accountName || '（名称未設定のアカウント）';
       accounts.push({ id: account.name, name: clientName, type: account.type });
       const locRes = await fetch(
-        `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri,regularHours,phoneNumbers,categories&pageSize=100`,
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri,regularHours,phoneNumbers,categories,latlng&pageSize=100`,
         { headers: { Authorization: `Bearer ${access_token}` } }
       );
       const locData = await locRes.json();
