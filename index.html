@@ -2472,7 +2472,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
               <button class="link-btn" onclick="loadPostImages()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
             </div>
             <div id="postImageList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-          </div>
+            <div id="postAspectRow" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-sub);flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:5px">Instagram画像の比率
+                <select id="postAspect" onchange="updatePostAspectHint()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                  <option value="portrait">縦長 4:5（推奨）</option>
+                  <option value="square">正方形 1:1</option>
+                </select>
+              </label>
+              <span id="postAspectHint" style="background:var(--bg-3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-variant-numeric:tabular-nums">1080 × 1350 px</span>
+            </div>
 
           <div class="form-row">
             <select id="postType">
@@ -8292,6 +8300,7 @@ async function loadPostImages() {
     }).join('');
     if (!list.length) html += '<span style="font-size:11px;color:var(--text-sub);align-self:center">ライブラリに画像なし（＋から追加/生成）</span>';
     box.innerHTML = html;
+    updatePostAspectHint();
   } catch (e) { box.innerHTML = ''; }
 }
 function togglePostImage(m) {
@@ -8300,6 +8309,15 @@ function togglePostImage(m) {
   loadPostImages();
 }
 function clearPostImages() { _postImages = []; loadPostImages(); }
+// 投稿管理：Instagram投稿時の画像比率／実サイズ表示（インスタページと同じ考え方）
+function updatePostAspectHint() {
+  const v = document.getElementById('postAspect')?.value || 'portrait';
+  const hint = document.getElementById('postAspectHint');
+  if (!hint) return;
+  const size = v === 'square' ? '1080 × 1080 px（正方形 1:1）' : '1080 × 1350 px（縦長 4:5）';
+  const n = (_postImages || []).length;
+  hint.textContent = n >= 2 ? `${size}・カルーセル${n}枚` : size;
+}
 
 function updatePostCount() {
   const n = (document.getElementById('postText').value || '').length;
@@ -8341,6 +8359,7 @@ async function createPost() {
     topicType: document.getElementById('postType').value,
     cta: document.getElementById('postCTA').value,
     ctaUrl: document.getElementById('postCTAUrl').value,
+    aspect: document.getElementById('postAspect')?.value || 'portrait',
   });
   showToast(okMsg.join(' ／ '), 'success');
   if (toGoogle) { document.getElementById('postText').value = ''; updatePostCount(); loadPosts(); }
@@ -8364,6 +8383,7 @@ async function scheduleNewPost() {
         callToActionType: document.getElementById('postCTA').value,
         callToActionUrl: document.getElementById('postCTAUrl').value,
         images: _postImages || [],
+        aspect: document.getElementById('postAspect')?.value || 'portrait',
         targetGoogle: document.getElementById('targetGoogle').checked,
         targetInstagram: document.getElementById('targetInstagram').checked,
       }),
@@ -8409,9 +8429,11 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
         } else if (data.success) okMsg.push('Instagram：動画を投稿しました');
         else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
       } else {
+        // 画像比率の指定（portrait=縦長4:5 / square=正方形1:1）を反映。カルーセルも同じ比率で統一
+        const pick = m => (opts.aspect === 'square') ? (m.squareUrl || m.url) : (m.portraitUrl || m.squareUrl || m.url);
         let body;
-        if ((images || []).length >= 2) body = { imageUrls: images.map(m => m.squareUrl || m.url), caption: summary };
-        else { const m = images[0]; body = { imageUrl: m.portraitUrl || m.squareUrl || m.url, caption: summary }; }
+        if ((images || []).length >= 2) body = { imageUrls: images.map(pick), caption: summary };
+        else { const m = images[0]; body = { imageUrl: pick(m), caption: summary }; }
         const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
@@ -9651,6 +9673,7 @@ async function generateMonthlyPlan() {
 }
 
 let _draftImages = {};      // draftId -> 選択中の画像[]
+let _draftAspect = {};      // draftId -> 'portrait'|'square'（Instagram画像比率）
 let _draftMediaList = [];    // ライブラリ画像
 
 function _draftStatus(d) {
@@ -9742,7 +9765,7 @@ async function loadDrafts() {
       : '';
     if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">予約投稿はまだありません。新規投稿で「予約する」、または「月間投稿プラン」で作成してください。</p>'; return; }
     _draftImages = {};
-    drafts.forEach(d => { _draftImages[d.id] = d.images || []; });
+    drafts.forEach(d => { _draftImages[d.id] = d.images || []; _draftAspect[d.id] = d.aspect || 'portrait'; });
     listEl.innerHTML = drafts.map(d => { const st = _draftStatus(d); return `
       <div style="border:1px solid ${st.key === 'overdue' ? 'rgba(239,68,68,0.4)' : 'var(--border)'};border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -9841,7 +9864,7 @@ async function publishDraftNow(id) {
   const targets = [toG && 'Google', toI && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
   await saveDraft(id, true);
-  const okMsg = await publishToTargets(summary, imgs, toG, toI);
+  const okMsg = await publishToTargets(summary, imgs, toG, toI, { aspect: _draftAspect[id] || 'portrait' });
   showToast(okMsg.join(' ／ '), 'success');
 }
 
