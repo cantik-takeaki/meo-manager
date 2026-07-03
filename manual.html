@@ -149,6 +149,8 @@
     .page{padding:0 9mm}
     .cover .hero{padding:16mm 12mm 26mm}
     .cover .body{padding:0 12mm 8mm}
+    /* PDF/印刷ではグラデ文字(background-clip:text)が黒い矩形になるため単色に上書き */
+    .cover h1{background:none !important; -webkit-background-clip:border-box !important; background-clip:border-box !important; -webkit-text-fill-color:#152238 !important; color:#152238 !important}
     table.t,.call,.step,.kpi,.title-card,.logo-card,figure.shot img,.use{box-shadow:none}
     h2.sec,h3.sub,h4{page-break-after:avoid; break-after:avoid}
     .step,.call,table.t,.kpi,.use,figure.shot{page-break-inside:avoid; break-inside:avoid}
