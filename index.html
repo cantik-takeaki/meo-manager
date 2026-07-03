@@ -1132,20 +1132,25 @@ body {
       </div>
 
       <div class="card" id="insightsCard" style="display:none">
-        <div class="card-header">
-          <div class="card-title">インサイト（直近3ヶ月）</div>
-          <div style="display:flex;align-items:center;gap:8px">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
+          <div class="card-title" id="insightsTitle">インサイト（直近3ヶ月）</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px" id="insMonthTabs">
+              <button class="pop-tab pop-tab-on" data-mo="3" onclick="loadInsights(3)" style="flex:none;padding:4px 12px;font-size:12px">3ヶ月</button>
+              <button class="pop-tab" data-mo="6" onclick="loadInsights(6)" style="flex:none;padding:4px 12px;font-size:12px">6ヶ月</button>
+              <button class="pop-tab" data-mo="12" onclick="loadInsights(12)" style="flex:none;padding:4px 12px;font-size:12px">12ヶ月</button>
+            </div>
             <div class="card-sub" id="insightsStore"></div>
             <button class="btn btn-primary btn-sm" onclick="analyzeInsightAnomaly()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>AI異常検知・傾向分析</button>
           </div>
         </div>
         <div class="stats-grid" id="insightsGrid">
-          <div class="stat-card"><div class="stat-label">表示回数（合計）</div><div class="stat-value blue" id="insImpressions">—</div></div>
-          <div class="stat-card"><div class="stat-label">マップ表示</div><div class="stat-value" id="insMaps">—</div></div>
-          <div class="stat-card"><div class="stat-label">検索表示</div><div class="stat-value" id="insSearch">—</div></div>
-          <div class="stat-card"><div class="stat-label">電話</div><div class="stat-value gold" id="insCalls">—</div></div>
-          <div class="stat-card"><div class="stat-label">ルート検索</div><div class="stat-value green" id="insDir">—</div></div>
-          <div class="stat-card"><div class="stat-label">サイト訪問</div><div class="stat-value" id="insWeb">—</div></div>
+          <div class="stat-card"><div class="stat-label">表示回数（合計）</div><div class="stat-value blue" id="insImpressions">—</div><div class="ins-yoy" id="insImpressionsYoy"></div></div>
+          <div class="stat-card"><div class="stat-label">マップ表示</div><div class="stat-value" id="insMaps">—</div><div class="ins-yoy" id="insMapsYoy"></div></div>
+          <div class="stat-card"><div class="stat-label">検索表示</div><div class="stat-value" id="insSearch">—</div><div class="ins-yoy" id="insSearchYoy"></div></div>
+          <div class="stat-card"><div class="stat-label">電話</div><div class="stat-value gold" id="insCalls">—</div><div class="ins-yoy" id="insCallsYoy"></div></div>
+          <div class="stat-card"><div class="stat-label">ルート検索</div><div class="stat-value green" id="insDir">—</div><div class="ins-yoy" id="insDirYoy"></div></div>
+          <div class="stat-card"><div class="stat-label">サイト訪問</div><div class="stat-value" id="insWeb">—</div><div class="ins-yoy" id="insWebYoy"></div></div>
         </div>
         <div id="insightAnomaly" style="display:none;margin-top:12px"></div>
         <div id="insightsNote" class="card-sub" style="margin-top:8px"></div>
@@ -5985,7 +5990,7 @@ async function replyToComment(commentId) {
 }
 
 // ─── インサイト（ダッシュボード概況） ───
-async function loadInsights() {
+async function loadInsights(months) {
   const card = document.getElementById('insightsCard');
   const alertCard = document.getElementById('alertsCard');
   if (!currentLocation) { if (card) card.style.display = 'none'; return; }
@@ -5997,18 +6002,25 @@ async function loadInsights() {
     return;
   }
 
+  const mo = [3, 6, 12].includes(months) ? months : (window._insMonths || 3);
+  window._insMonths = mo;
+  document.querySelectorAll('#insMonthTabs .pop-tab').forEach(b => b.classList.toggle('pop-tab-on', parseInt(b.dataset.mo, 10) === mo));
+  const titleEl = document.getElementById('insightsTitle');
+  if (titleEl) titleEl.textContent = `インサイト（直近${mo}ヶ月）`;
+
   const storeEl = document.getElementById('insightsStore');
   if (storeEl) storeEl.textContent = currentLocation.title || '';
   const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
 
   try {
-    const res = await fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${sid}`);
+    const res = await fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${sid}&months=${mo}&yoy=1`);
     const data = await res.json();
+    const YOY_IDS = { insImpressions: 'impressions', insMaps: 'mapsImpressions', insSearch: 'searchImpressions', insCalls: 'calls', insDir: 'directionRequests', insWeb: 'websiteClicks' };
     if (data.error || data.pending) {
       // API未承認等 → カードは出すが注記
       card.style.display = '';
       document.getElementById('insightsNote').textContent = 'インサイトはGoogle Business Profile APIの承認後に表示されます。';
-      ['insImpressions','insMaps','insSearch','insCalls','insDir','insWeb'].forEach(id => document.getElementById(id).textContent = '—');
+      ['insImpressions','insMaps','insSearch','insCalls','insDir','insWeb'].forEach(id => { document.getElementById(id).textContent = '—'; const y = document.getElementById(id + 'Yoy'); if (y) y.innerHTML = ''; });
     } else {
       const s = data.summary || {};
       window._insightMetrics = s; // AI異常検知用に保持
@@ -6021,6 +6033,18 @@ async function loadInsights() {
       document.getElementById('insCalls').textContent = fmt(s.calls);
       document.getElementById('insDir').textContent = fmt(s.directionRequests);
       document.getElementById('insWeb').textContent = fmt(s.websiteClicks);
+      // 前年比（同じ長さの前年同期間。12ヶ月選択時はAPIの履歴上限(18ヶ月)を超えるため非表示）
+      const py = data.yoySummary;
+      Object.entries(YOY_IDS).forEach(([id, key]) => {
+        const el = document.getElementById(id + 'Yoy');
+        if (!el) return;
+        if (!py || mo > 6) { el.innerHTML = mo > 6 ? '' : ''; return; }
+        const prev = py[key] || 0, cur = s[key] || 0;
+        if (!prev) { el.innerHTML = '<span style="font-size:11px;color:var(--text-muted)">前年比 —</span>'; return; }
+        const pct = Math.round(((cur - prev) / prev) * 100);
+        const up = pct >= 0;
+        el.innerHTML = `<span style="font-size:11px;font-weight:700;color:${up ? '#10b981' : 'var(--red)'}">前年比 ${up ? '+' : ''}${pct}%</span>`;
+      });
     }
     const anom = document.getElementById('insightAnomaly'); if (anom) { anom.style.display = 'none'; anom.innerHTML = ''; }
   } catch (e) {

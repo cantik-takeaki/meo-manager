@@ -12,19 +12,20 @@ function parseCookies(req) {
 }
 
 // 直近Nヶ月の日付レンジ
-function monthRange(months = 3) {
+function monthRange(months = 3, offsetMonths = 0) {
   const end = new Date();
-  const start = new Date();
+  end.setMonth(end.getMonth() - offsetMonths);
+  const start = new Date(end);
   start.setMonth(start.getMonth() - months);
   const f = (d) => ({ year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() });
   return { start: f(start), end: f(end) };
 }
 
 // ── インサイト（パフォーマンス）取得 ──
-async function fetchInsights(access_token, locationName) {
+async function fetchInsights(access_token, locationName, months = 3, yoy = false) {
   const m = String(locationName).match(/locations\/[^/]+/);
   const locPath = m ? m[0] : locationName;
-  const { start, end } = monthRange(3);
+  const { start, end } = monthRange(months);
   const metrics = [
     'BUSINESS_IMPRESSIONS_DESKTOP_MAPS',
     'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH',
@@ -71,8 +72,9 @@ async function fetchInsights(access_token, locationName) {
   const searchImpressions =
     (totals.BUSINESS_IMPRESSIONS_DESKTOP_SEARCH || 0) + (totals.BUSINESS_IMPRESSIONS_MOBILE_SEARCH || 0);
 
-  return {
+  const result = {
     range: { start, end },
+    months,
     summary: {
       impressions: mapsImpressions + searchImpressions,
       mapsImpressions,
@@ -85,6 +87,42 @@ async function fetchInsights(access_token, locationName) {
     totals,
     series,
   };
+
+  // 前年同期間との比較（GBP Performance APIは過去18ヶ月まで→6ヶ月以内の期間のみ前年比が取れる）
+  if (yoy && months <= 6) {
+    try {
+      const py = monthRange(months, 12);
+      const p2 = new URLSearchParams();
+      metrics.forEach((mt) => p2.append('dailyMetrics', mt));
+      p2.set('dailyRange.start_date.year', py.start.year);
+      p2.set('dailyRange.start_date.month', py.start.month);
+      p2.set('dailyRange.start_date.day', py.start.day);
+      p2.set('dailyRange.end_date.year', py.end.year);
+      p2.set('dailyRange.end_date.month', py.end.month);
+      p2.set('dailyRange.end_date.day', py.end.day);
+      const r2 = await fetch(`https://businessprofileperformance.googleapis.com/v1/${locPath}:fetchMultiDailyMetricsTimeSeries?${p2.toString()}`, { headers: { Authorization: `Bearer ${access_token}` } });
+      const d2 = await r2.json();
+      if (!d2.error) {
+        const t2 = {};
+        for (const mts of d2.multiDailyMetricTimeSeries || []) {
+          for (const dm of mts.dailyMetricTimeSeries || []) {
+            let sum = 0;
+            (dm.timeSeries?.datedValues || []).forEach((p) => { sum += Number(p.value || 0); });
+            t2[dm.dailyMetric] = (t2[dm.dailyMetric] || 0) + sum;
+          }
+        }
+        const pMaps = (t2.BUSINESS_IMPRESSIONS_DESKTOP_MAPS || 0) + (t2.BUSINESS_IMPRESSIONS_MOBILE_MAPS || 0);
+        const pSearch = (t2.BUSINESS_IMPRESSIONS_DESKTOP_SEARCH || 0) + (t2.BUSINESS_IMPRESSIONS_MOBILE_SEARCH || 0);
+        result.yoySummary = {
+          impressions: pMaps + pSearch, mapsImpressions: pMaps, searchImpressions: pSearch,
+          calls: t2.CALL_CLICKS || 0, websiteClicks: t2.WEBSITE_CLICKS || 0,
+          directionRequests: t2.BUSINESS_DIRECTION_REQUESTS || 0, conversations: t2.BUSINESS_CONVERSATIONS || 0,
+        };
+      }
+    } catch (e) { /* 前年比が取れなくても本体は返す */ }
+  }
+
+  return result;
 }
 
 export default async function handler(req, res) {
@@ -96,8 +134,9 @@ export default async function handler(req, res) {
   // インサイト取得モード
   if (action === 'insights') {
     if (!locationName) return res.status(400).json({ error: 'locationName必須' });
+    const _mo = [3, 6, 12].includes(parseInt(req.query.months, 10)) ? parseInt(req.query.months, 10) : 3;
     try {
-      return res.json(await fetchInsights(access_token, locationName));
+      return res.json(await fetchInsights(access_token, locationName, _mo, req.query.yoy === '1'));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
