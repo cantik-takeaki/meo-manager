@@ -429,6 +429,15 @@ body {
 .pop-fit-on { border-color:var(--accent); color:var(--accent); background:rgba(46,143,240,.06); box-shadow:0 0 0 1px var(--accent) inset; }
 .pop-thumb { width:100%; max-height:120px; object-fit:contain; border-radius:8px; border:1px solid var(--border); margin-top:8px; background:var(--bg-3); }
 .pop-steps { font-size:12px; color:var(--text-sub); line-height:1.9; padding-left:18px; margin:6px 0 0; }
+.pop-saved-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.pop-saved-card { border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--bg-2); transition:border-color .15s; }
+.pop-saved-card:hover { border-color:var(--accent); }
+.pop-saved-thumb { display:block; width:100%; aspect-ratio:3/4; border:none; padding:0; background:var(--bg-3); cursor:pointer; }
+.pop-saved-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.pop-saved-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 8px; }
+.pop-saved-nm { font-size:11px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pop-saved-del { border:none; background:none; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:6px; flex-shrink:0; line-height:0; }
+.pop-saved-del:hover { color:#ef4444; background:rgba(239,68,68,.1); }
 
 /* ─── 順位管理 / 順位レポート ─── */
 .rk-card { background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:16px 14px; text-align:center; }
@@ -1744,6 +1753,14 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <!-- ▼ デザインをアップロード ▼ -->
             <div id="popUploadUi" style="display:none">
               <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                  <div class="card-title" style="font-size:13px">保存したデザイン</div>
+                  <button class="btn btn-outline btn-sm" onclick="popLoadSavedTpls()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>更新</button>
+                </div>
+                <div id="popSavedWrap" class="pop-saved-grid" style="display:none"></div>
+                <div id="popSavedEmpty" style="font-size:12px;color:var(--text-muted);text-align:center;line-height:1.7;padding:14px 6px">まだ保存デザインはありません。<br>下でデザインを読み込み「テンプレートとして保存」すると、ここから全店舗でワンクリック再利用できます（QRは店舗ごとに自動）。</div>
+              </div>
+              <div class="card">
                 <div class="card-header"><div class="card-title" style="font-size:13px">デザイン画像</div></div>
                 <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">Canvaなどで作った完成デザイン（ポスター・POP）を読み込み、QRコードを重ねて印刷できます。用紙の比率に合わせた画像がおすすめです。</p>
                 <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--border-active);border-radius:10px;padding:22px;cursor:pointer;color:var(--text-sub);font-size:13px">
@@ -1759,6 +1776,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
                   </div>
                   <button class="btn btn-outline btn-sm" onclick="popClearDesign()">削除</button>
                 </div>
+                <button id="popSaveTplBtn" class="btn btn-primary btn-sm" style="display:none;width:100%;margin-top:10px" onclick="popSaveAsTemplate()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>このデザインをテンプレートとして保存</button>
               </div>
               <div class="card">
                 <div class="card-header"><div class="card-title" style="font-size:13px">用紙サイズ</div></div>
@@ -4089,7 +4107,7 @@ function popDefaultState() {
     logoShow: true, logoData: '',
     qr: { size: 52, margin: 4, text: 'スマートフォンのカメラで\nQRコードを読み取ってください' },
     // アップロードモード（完成デザイン画像 + QR合成）
-    designData: '', designFit: 'cover', designQrFrame: true,
+    designData: '', _savedPublicId: '', designFit: 'cover', designQrFrame: true,
     designQr: { x: 50, y: 80, size: 32 },
   };
 }
@@ -4117,6 +4135,7 @@ async function showStorePop(idx) {
   popSyncDesignInputs();
   popTab('basic');
   popSetMode(st.mode || 'template');
+  popLoadSavedTpls();
 }
 
 function popTab(name) {
@@ -4225,10 +4244,10 @@ function popDesignUpload(input) {
   const f = input.files && input.files[0]; if (!f) return;
   if (f.size > 8 * 1024 * 1024) return showToast('画像は8MB以下にしてください', 'error');
   const r = new FileReader();
-  r.onload = e => { window._popState.designData = e.target.result; popSyncDesignInputs(); renderPop(); showToast('デザインを読み込みました。QRの位置を調整してください', 'success'); };
+  r.onload = e => { const st = window._popState; st.designData = e.target.result; st._savedPublicId = ''; popSyncDesignInputs(); renderPop(); showToast('デザインを読み込みました。QRの位置を調整してください', 'success'); };
   r.readAsDataURL(f);
 }
-function popClearDesign() { window._popState.designData = ''; popSyncDesignInputs(); renderPop(); }
+function popClearDesign() { const st = window._popState; st.designData = ''; st._savedPublicId = ''; popSyncDesignInputs(); renderPop(); }
 function popSetDesignFit(v) {
   window._popState.designFit = v;
   document.querySelectorAll('#storePopView .pop-fit').forEach(b => b.classList.toggle('pop-fit-on', b.dataset.fit === v));
@@ -4258,6 +4277,7 @@ function popSyncDesignInputs() {
   if (lbl) lbl.textContent = has ? 'デザインを変更' : 'デザイン画像をアップロード';
   if (act) act.style.display = has ? 'flex' : 'none';
   if (prev) { prev.style.display = has ? 'block' : 'none'; if (has) prev.src = st.designData; }
+  const sb = document.getElementById('popSaveTplBtn'); if (sb) sb.style.display = has ? 'block' : 'none';
   document.querySelectorAll('#storePopView .pop-fit').forEach(b => b.classList.toggle('pop-fit-on', b.dataset.fit === st.designFit));
   const fr = document.getElementById('pop-designFrame'); if (fr) fr.checked = !!st.designQrFrame;
 }
@@ -4287,6 +4307,93 @@ function popOpenCanva() {
   const st = window._popState, paper = POP_PAPERS[st.paper];
   window.open('https://www.canva.com/create/posters/', '_blank', 'noopener');
   showToast(`Canvaで${paper.w}×${paper.h}mm相当のポスターを作成→PNGで保存→ここにアップロード`, 'success');
+}
+
+// ── 保存デザインテンプレ（Canva/アップロード画像を再利用）──
+// 画像はCloudinaryに保管しURLをKVへ。全店舗共通・QRは店舗ごとに自動で正しくなる。
+window._popSavedTpls = window._popSavedTpls || [];
+async function popLoadSavedTpls() {
+  try {
+    const d = await fetch('/api/admin?action=pop-templates').then(r => r.json());
+    window._popSavedTpls = Array.isArray(d.templates) ? d.templates : [];
+  } catch (e) { window._popSavedTpls = []; }
+  popRenderSavedTpls();
+}
+function popRenderSavedTpls() {
+  const wrap = document.getElementById('popSavedWrap'); if (!wrap) return;
+  const list = window._popSavedTpls || [];
+  const empty = document.getElementById('popSavedEmpty');
+  if (empty) empty.style.display = list.length ? 'none' : '';
+  wrap.style.display = list.length ? 'grid' : 'none';
+  wrap.innerHTML = list.map(t => `
+    <div class="pop-saved-card">
+      <button class="pop-saved-thumb" onclick="popApplySavedTpl('${t.id}')" title="${_popEsc(t.name)}を使う">
+        <img src="${t.url}" alt="${_popEsc(t.name)}" loading="lazy">
+      </button>
+      <div class="pop-saved-meta">
+        <span class="pop-saved-nm" title="${_popEsc(t.name)}">${_popEsc(t.name)}</span>
+        <button class="pop-saved-del" onclick="popDeleteSavedTpl('${t.id}')" title="削除"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
+      </div>
+    </div>`).join('');
+}
+function popApplySavedTpl(id) {
+  const t = (window._popSavedTpls || []).find(x => x.id === id); if (!t) return;
+  const st = window._popState;
+  st.mode = 'upload';
+  st.designData = t.url;
+  st._savedPublicId = t.publicId || '';
+  st.designFit = (t.designFit === 'contain') ? 'contain' : 'cover';
+  st.designQrFrame = t.designQrFrame !== false;
+  const q = t.designQr || {};
+  st.designQr = { x: q.x ?? 50, y: q.y ?? 80, size: q.size ?? 32 };
+  popSetMode('upload');
+  popBuildDesignControls(); popSyncDesignInputs();
+  renderPop();
+  showToast('保存デザインを読み込みました', 'success');
+}
+async function popDeleteSavedTpl(id) {
+  if (!confirm('この保存デザインを一覧から削除しますか？')) return;
+  try {
+    await fetch('/api/admin?action=pop-templates&id=' + encodeURIComponent(id), { method: 'DELETE' });
+    window._popSavedTpls = (window._popSavedTpls || []).filter(t => t.id !== id);
+    popRenderSavedTpls();
+    showToast('削除しました', 'success');
+  } catch (e) { showToast('削除に失敗しました', 'error'); }
+}
+async function popSaveAsTemplate() {
+  const st = window._popState;
+  if (!st.designData) return showToast('先にデザイン画像をアップロードしてください', 'error');
+  const name = prompt('保存するデザイン名を入力してください', st.store ? (st.store + ' 口コミPOP') : '口コミPOPデザイン');
+  if (name === null) return;
+  const nm = (name || '').trim() || '無題のデザイン';
+  const btn = document.getElementById('popSaveTplBtn');
+  const restore = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
+  try {
+    let url = st.designData, publicId = st._savedPublicId || '', width = 0, height = 0;
+    // dataURL（新規アップロード画像）はCloudinaryへ。既存のCloudinary URLならそのまま使う。
+    if (/^data:/.test(st.designData)) {
+      const up = await fetch('/api/posts?action=media&storeId=' + encodeURIComponent('_pop_templates'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: st.designData, note: 'POPデザイン', noCrop: true }),
+      }).then(r => r.json());
+      if (!up || !up.item || !up.item.url) throw new Error(up && up.error ? up.error : 'アップロード失敗');
+      url = up.item.url; publicId = up.item.publicId || ''; width = up.item.width || 0; height = up.item.height || 0;
+      st.designData = url; st._savedPublicId = publicId; // 以後はCloudinary URLを使用
+    }
+    const save = await fetch('/api/admin?action=pop-templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nm, url, publicId, width, height, designFit: st.designFit, designQrFrame: st.designQrFrame, designQr: st.designQr }),
+    }).then(r => r.json());
+    if (!save || !save.success) throw new Error(save && save.error ? save.error : '保存失敗');
+    window._popSavedTpls = save.templates || [];
+    popRenderSavedTpls();
+    showToast('「' + nm + '」を保存しました。次回から再利用できます', 'success');
+  } catch (e) {
+    showToast('保存に失敗しました: ' + (e && e.message ? e.message : e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = restore; }
+  }
 }
 function popReset() {
   const store = window._popState.store;

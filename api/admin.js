@@ -328,6 +328,43 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 口コミPOP: 保存デザインテンプレ（Canva/アップロード画像を再利用） ──
+  // 画像はCloudinary(/api/posts?action=media)に保管し、ここにはURL＋QR配置などのメタのみ。全店舗共通。
+  if (action === 'pop-templates') {
+    const key = 'pop_templates';
+    if (req.method === 'GET') return res.json({ templates: await kvGet(key) || [] });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      if (!b.url) return res.status(400).json({ error: '画像URL必須' });
+      const q = b.designQr || {};
+      const clamp = (v, mn, mx, dflt) => { const n = Number(v); return Number.isFinite(n) ? Math.max(mn, Math.min(mx, n)) : dflt; };
+      const item = {
+        id: b.id || ('pop' + Date.now().toString(36)),
+        name: String(b.name || '無題のデザイン').slice(0, 80),
+        url: String(b.url).slice(0, 600),
+        publicId: String(b.publicId || '').slice(0, 300),
+        width: Number(b.width) || 0,
+        height: Number(b.height) || 0,
+        designFit: (b.designFit === 'contain') ? 'contain' : 'cover',
+        designQrFrame: b.designQrFrame !== false,
+        designQr: { x: clamp(q.x, 0, 100, 50), y: clamp(q.y, 0, 100, 80), size: clamp(q.size, 8, 80, 32) },
+        createdAt: new Date().toISOString(),
+      };
+      const list = await kvGet(key) || [];
+      const idx = list.findIndex(t => t.id === item.id);
+      if (idx >= 0) list[idx] = { ...list[idx], ...item }; else list.unshift(item);
+      const trimmed = list.slice(0, 60); // 暴走防止の上限
+      await kvSet(key, trimmed);
+      return res.json({ success: true, template: item, templates: trimmed });
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const list = (await kvGet(key) || []).filter(t => t.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, templates: list });
+    }
+  }
+
   // ── 一覧から非表示（重複・無関係なGBPリスティングを隠す。Google本体は一切変更しない） ──
   // hidden_locations に locId を貯め、ピッカーの既定表示から除外する。戻す(on:false)も可能。
   if (action === 'hidden') {
