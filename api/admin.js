@@ -19,6 +19,38 @@ function generatePassword() {
   return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+// 店名の照合用正規化（fetch-rank/cron-rank共通）
+const _normName = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
+
+// SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
+async function recordCompRanks(storeId, keyword, selfRank, list) {
+  try {
+    const registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
+    if (!registered.length) return null;
+    const comps = registered.map(c => {
+      let cRank = null, cMatched = null;
+      const cnPlace = String(c.placeId || '').trim();
+      const cn = _normName(c.name);
+      list.forEach((item, i) => {
+        if (cRank) return;
+        if (cnPlace && item.place_id && item.place_id === cnPlace) { cRank = item.position || (i + 1); cMatched = item.title; return; }
+        const t = _normName(item.title);
+        if (cn && t && (t.includes(cn) || cn.includes(t))) { cRank = item.position || (i + 1); cMatched = item.title; }
+      });
+      return { id: c.id, name: c.name, rank: cRank, matched: cMatched };
+    });
+    const histKey = `comp_history_${storeId}`;
+    const hist = await kvGet(histKey) || [];
+    const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
+    const entry = { date, keyword, self: selfRank, comps: comps.map(c => ({ id: c.id, rank: c.rank })) };
+    const dup = hist.findIndex(h => h.date === date && h.keyword === keyword);
+    if (dup >= 0) hist[dup] = entry; else hist.push(entry);
+    while (hist.length > 800) hist.shift();
+    await kvSet(histKey, hist);
+    return comps;
+  } catch (e) { return null; } // 競合記録の失敗で本体を落とさない
+}
+
 // メール送信（Resend・無料枠）。RESEND_API_KEY未設定なら false（＝送信スキップ・KV保存は継続）。
 async function sendMail(to, subject, html) {
   const key = process.env.RESEND_API_KEY;
@@ -425,6 +457,128 @@ export default async function handler(req, res) {
     return res.json({ month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
   }
 
+  // ── 順位の定期自動取得（Vercel Cron: 毎週月曜3時JST = 0 18 * * 0 UTC）──
+  // 安全設計: 優先度「A」の有効KWのみ自動計測。無料枠の20%を手動用に温存し、残枠が尽きたら自動停止。
+  // 1回の実行はMAX_CALLS件まで（関数実行時間の上限内に収める）。CRON_SECRET設定時はBearer認証必須。
+  if (req.method === 'GET' && action === 'cron-rank') {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const SERPAPI_KEY = process.env.SERPAPI_KEY;
+    if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
+    // 同日の再実行はスキップ（誤操作・外部からの連打で枠を浪費しない。force=1で強制再実行）
+    const last = await kvGet('cron_rank_last');
+    if (last && last.date === today && req.query.force !== '1') {
+      return res.json({ skipped: '本日はすでに実行済みです', last });
+    }
+    const ym = new Date().toISOString().slice(0, 7);
+    const usedKey = `serpapi_usage_${ym}`;
+    let used = await kvGet(usedKey) || 0;
+    const reserve = Math.ceil(SERPAPI_LIMIT * 0.2); // 手動取得用に2割温存
+    const budget = Math.max(0, SERPAPI_LIMIT - reserve - used);
+    const MAX_CALLS = Math.min(budget, 20);
+    // 対象店舗（GBP管理店＋手動登録）
+    const managed = await kvGet('managed_locations') || [];
+    const manual = await kvGet('admin_stores') || [];
+    const stores = [];
+    const seen = new Set();
+    for (const m of managed) { const sid = String(m.locId || '').replace(/\//g, '_'); if (sid && !seen.has(sid)) { seen.add(sid); stores.push({ storeId: sid, name: m.title || '' }); } }
+    for (const s of manual) { if (s.storeId && !seen.has(s.storeId)) { seen.add(s.storeId); stores.push({ storeId: s.storeId, name: s.storeName || '' }); } }
+    // 計測ジョブ＝優先度A・有効のKWのみ
+    const jobs = [];
+    for (const st of stores) {
+      if (!st.name) continue;
+      const rk = await kvGet(`rankings_${st.storeId}`) || {};
+      const meta = rk.meta || {};
+      (rk.keywords || []).forEach(kw => {
+        const m = meta[kw] || {};
+        if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '' });
+      });
+    }
+    let ok = 0, fail = 0;
+    const processed = [];
+    for (const job of jobs) {
+      if (ok + fail >= MAX_CALLS) break;
+      try {
+        const callSerp = async (loc) => {
+          const params = new URLSearchParams({ engine: 'google_local', q: job.kw, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
+          if (loc) params.set('location', loc);
+          return fetch(`https://serpapi.com/search.json?${params.toString()}`).then(r => r.json());
+        };
+        let data = await callSerp(job.area ? `${job.area},Japan` : '');
+        if (data.error && /location/i.test(data.error) && job.area) data = await callSerp('');
+        used++; await kvSet(usedKey, used);
+        if (data.error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: data.error }); continue; }
+        const list = data.local_results || [];
+        const target = _normName(job.st.name);
+        let rank = null;
+        list.forEach((item, i) => {
+          if (rank) return;
+          const t = _normName(item.title);
+          if (t && (t.includes(target) || target.includes(t))) rank = item.position || (i + 1);
+        });
+        // rankings履歴へ保存（rank-input相当）
+        const ex = await kvGet(`rankings_${job.st.storeId}`) || { history: [], keywords: [] };
+        ex.keywords = ex.keywords || [];
+        let ki = ex.keywords.indexOf(job.kw);
+        if (ki < 0) { ex.keywords.push(job.kw); ki = ex.keywords.length - 1; }
+        let entry = ex.history.find(h => h.date === today);
+        if (!entry) { entry = { date: today, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
+        entry.rankings = entry.rankings || [];
+        entry.rankings[ki] = (Number.isFinite(rank) && rank >= 1) ? rank : null;
+        entry.recordedAt = new Date().toISOString();
+        ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        if (ex.history.length > 60) ex.history = ex.history.slice(-60);
+        await kvSet(`rankings_${job.st.storeId}`, ex);
+        // 競合順位も同時記録（追加APIコストなし）
+        await recordCompRanks(job.st.storeId, job.kw, rank, list);
+        ok++;
+        processed.push({ store: job.st.name, kw: job.kw, rank });
+      } catch (e) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: e.message }); }
+    }
+    const summary = {
+      at: new Date().toISOString(), date: today,
+      targets: jobs.length, ok, fail,
+      capped: jobs.length > MAX_CALLS ? `対象${jobs.length}件のうち${MAX_CALLS}件で停止（実行時間と残枠の保護）` : null,
+      budgetStopped: budget <= 0 ? '残枠が手動温存分(20%)に達したため自動計測を停止しました' : null,
+      used, limit: SERPAPI_LIMIT, processed,
+    };
+    await kvSet('cron_rank_last', summary);
+
+    // 週次サマリーメール（RESEND設定時のみ・設定ページでOFF可）
+    try {
+      const notifyPref = await kvGet('notify_weekly');
+      if (notifyPref !== false && (ok + fail) > 0) {
+        const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
+        if (to) {
+          const rows = processed.map(p => `<tr><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.store}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.kw}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.error ? '取得失敗' : (p.rank ? p.rank + '位' : '圏外')}</td></tr>`).join('');
+          await sendMail(to, `【ラクラクMEO】週次順位レポート（${today}）`,
+            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">週次の順位自動計測が完了しました</h2>
+            <p>計測 ${ok}件成功 / ${fail}件失敗（今月のAPI使用 ${used}/${SERPAPI_LIMIT}回）</p>
+            ${rows ? `<table style="border-collapse:collapse;font-size:13px"><tr><th style="padding:4px 10px;text-align:left">店舗</th><th style="padding:4px 10px;text-align:left">キーワード</th><th style="padding:4px 10px;text-align:left">順位</th></tr>${rows}</table>` : ''}
+            ${summary.capped ? `<p style="color:#b45309">${summary.capped}</p>` : ''}
+            ${summary.budgetStopped ? `<p style="color:#b91c1c">${summary.budgetStopped}</p>` : ''}
+            <p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで詳細を見る →</a></p></div>`);
+        }
+      }
+    } catch (e) { /* メール失敗で本体を落とさない */ }
+
+    return res.json(summary);
+  }
+
+  // ── 週次サマリーメールのON/OFF（設定ページ） ──
+  if (action === 'notify-pref') {
+    if (req.method === 'GET') {
+      const v = await kvGet('notify_weekly');
+      return res.json({ enabled: v !== false, available: !!process.env.RESEND_API_KEY });
+    }
+    if (req.method === 'POST') {
+      await kvSet('notify_weekly', !!(req.body || {}).enabled);
+      return res.json({ success: true });
+    }
+  }
+
   // GET /api/admin?action=comp-history&storeId=xxx — 競合順位の自動記録履歴（fetch-rankが同時記録したもの）
   if (req.method === 'GET' && action === 'comp-history') {
     const { storeId } = req.query;
@@ -477,35 +631,7 @@ export default async function handler(req, res) {
       }));
 
       // ── 競合順位の同時記録（同じSERP結果を使うだけ＝SerpApi枠を消費しない） ──
-      let comps = null;
-      if (storeId) {
-        try {
-          const registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
-          if (registered.length) {
-            comps = registered.map(c => {
-              let cRank = null, cMatched = null;
-              const cnPlace = String(c.placeId || '').trim();
-              const cn = norm(c.name);
-              list.forEach((item, i) => {
-                if (cRank) return;
-                if (cnPlace && item.place_id && item.place_id === cnPlace) { cRank = item.position || (i + 1); cMatched = item.title; return; }
-                const t = norm(item.title);
-                if (cn && t && (t.includes(cn) || cn.includes(t))) { cRank = item.position || (i + 1); cMatched = item.title; }
-              });
-              return { id: c.id, name: c.name, rank: cRank, matched: cMatched };
-            });
-            // 履歴へ保存（同日・同KWは上書き。最大800件で古い順に間引き）
-            const histKey = `comp_history_${storeId}`;
-            const hist = await kvGet(histKey) || [];
-            const date = new Date().toISOString().slice(0, 10);
-            const entry = { date, keyword, self: rank, comps: comps.map(c => ({ id: c.id, rank: c.rank })) };
-            const dup = hist.findIndex(h => h.date === date && h.keyword === keyword);
-            if (dup >= 0) hist[dup] = entry; else hist.push(entry);
-            while (hist.length > 800) hist.shift();
-            await kvSet(histKey, hist);
-          }
-        } catch (e) { /* 競合記録の失敗で本体の順位取得を落とさない */ }
-      }
+      const comps = storeId ? await recordCompRanks(storeId, keyword, rank, list) : null;
 
       return res.json({
         keyword, location: location || null, rank, matched,

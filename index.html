@@ -2575,6 +2575,18 @@ body {
         </div>
       </div>
 
+      <!-- 通知 -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>通知</div></div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">週次順位レポートメール</div>
+            <div class="set-row-sub" id="setNotifyHint">毎週月曜の順位自動計測（優先度Aキーワード）の結果を管理者メールに送ります。</div>
+          </div>
+          <label class="tgl"><input type="checkbox" id="setNotify" onchange="toggleNotify(this)"><span class="tgl-track"></span></label>
+        </div>
+      </div>
+
       <!-- 店舗 -->
       <div class="card" style="max-width:720px">
         <div class="card-header">
@@ -2675,6 +2687,7 @@ body {
           </select>
         </label>
       </div>
+      <div class="rk-hint" style="margin-top:8px">優先度「A」のキーワードは<b>毎週月曜の早朝に順位を自動計測</b>します（月間の取得枠内・残り2割は手動用に温存）。B/Cは手動または「AIで順位取得」で計測してください。</div>
       <label class="rk-fl" style="margin-top:14px">メモ
         <textarea id="kwEditMemo" rows="2" placeholder="例：競合店が弱いキーワード、GBP投稿に活用" class="ed-in" style="resize:vertical"></textarea>
       </label>
@@ -2898,6 +2911,14 @@ async function loadSettings() {
     else if (!me.twofaAvailable) twHint.textContent = 'メール送信（RESEND_API_KEY）が未設定のため現在は利用できません。設定すると有効化できます。';
     else twHint.textContent = 'ログイン時、登録メールに届く6桁の認証コードの入力を求めます。';
   }
+  // 通知（週次レポートメール）
+  try {
+    const np = await fetch('/api/admin?action=notify-pref').then(r => r.json());
+    const nt = document.getElementById('setNotify');
+    const nh = document.getElementById('setNotifyHint');
+    if (nt) { nt.checked = !!np.enabled && !!np.available; nt.disabled = !np.available; }
+    if (nh && !np.available) nh.textContent = 'メール送信（RESEND_API_KEY）が未設定のため現在は利用できません。設定すると週次レポートが届くようになります。';
+  } catch (e) {}
   // 店舗数
   const stInfo = document.getElementById('setStoreInfo');
   if (stInfo) {
@@ -2938,6 +2959,19 @@ async function saveProfileName() {
       const ini = document.getElementById('userInitial'); if (ini) ini.textContent = (d.name.trim()[0] || 'C').toUpperCase();
     } else showToast(d.error || '変更できませんでした', 'error');
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+async function toggleNotify(el) {
+  const enabled = el.checked;
+  try {
+    const r = await fetch('/api/admin?action=notify-pref', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) showToast(enabled ? '週次レポートメールを有効にしました' : '週次レポートメールを無効にしました', 'success');
+    else { el.checked = !enabled; showToast(d.error || '変更できませんでした', 'error'); }
+  } catch (e) { el.checked = !enabled; showToast('通信エラー: ' + e.message, 'error'); }
 }
 
 async function toggleTwofa(el) {
