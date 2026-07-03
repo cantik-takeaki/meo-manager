@@ -3,6 +3,7 @@
     "api/**/*.js": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/admin?action=cron-rank", "schedule": "0 18 * * 0" }
+    { "path": "/api/admin?action=cron-rank", "schedule": "0 18 * * 0" },
+    { "path": "/api/admin?action=cron-tamper", "schedule": "0 18 * * *" }
   ]
 }

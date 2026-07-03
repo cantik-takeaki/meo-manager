@@ -1,6 +1,6 @@
 // api/admin.js — 店舗登録・順位入力（統合）
 import { kvGet, kvSet, kvDel } from './_kv.js';
-import { getMasterInfo } from './_tokens.js';
+import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
 
 function parseCookies(req) {
   const c = {};
@@ -22,6 +22,31 @@ function generatePassword() {
 
 // 店名の照合用正規化（fetch-rank/cron-rank共通）
 const _normName = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
+
+// ── 改ざん検知の照合（cron-tamper用・store-settings.jsと同一ロジック） ──
+const _normG = (s) => String(s || '').replace(/[\s　・\-―ー（）()]/g, '').toLowerCase();
+const _normP = (s) => String(s || '').replace(/[^0-9]/g, '');
+const _normU = (s) => String(s || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+const _loose = (a, b) => { a = _normG(a); b = _normG(b); return !a || !b || a === b || a.includes(b) || b.includes(a); };
+async function fetchCurrentGbpInfo(locationName, token) {
+  const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
+  if (!locPart) return { error: 'no_location' };
+  const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,phoneNumbers,storefrontAddress,categories,websiteUri`, { headers: { Authorization: `Bearer ${token}` } });
+  const d = await r.json();
+  if (d.error) return { error: d.error.status || d.error.message || 'api_error' };
+  const addr = d.storefrontAddress ? [...(d.storefrontAddress.addressLines || []), d.storefrontAddress.locality, d.storefrontAddress.administrativeArea, d.storefrontAddress.postalCode].filter(Boolean).join(' ') : '';
+  return { current: { title: d.title || '', phone: d.phoneNumbers?.primaryPhone || '', address: addr, category: d.categories?.primaryCategory?.displayName || '', url: d.websiteUri || '' } };
+}
+function diffGbpBaseline(saved, current) {
+  const diffs = [];
+  const chk = (f, label, eq) => { const s = saved[f], c = current[f]; if (s && c && !eq(s, c)) diffs.push({ field: label, saved: s, current: c }); };
+  chk('title', '店舗名', _loose);
+  chk('phone', '電話番号', (a, b) => _normP(a) === _normP(b) || !_normP(a) || !_normP(b));
+  chk('address', '住所', _loose);
+  chk('category', 'カテゴリ', _loose);
+  chk('url', '公式URL', (a, b) => _normU(a) === _normU(b));
+  return diffs;
+}
 
 // ── 順位取得プロバイダ（既定=SerpApi無料枠 / env RANK_PROVIDER=dataforseo で有料の高精度に差替え） ──
 // 戻り値: { list:[{title,position,rating,reviews,place_id}], error } — 呼び出し側はlistを店名照合して順位を出す。
@@ -652,6 +677,61 @@ export default async function handler(req, res) {
       }
     } catch (e) { /* メール失敗で本体を落とさない */ }
 
+    return res.json(summary);
+  }
+
+  // ── 改ざん検知の定期自動巡回（Vercel Cron: 毎日3時JST = 0 18 * * * UTC）──
+  // 正規情報(baseline)を保存済みの管理店を毎日GBPと自動照合→変化があればアラート記録＋メール通知。
+  if (req.method === 'GET' && action === 'cron-tamper') {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const last = await kvGet('cron_tamper_last');
+    if (last && last.date === today && req.query.force !== '1') return res.json({ skipped: '本日はすでに実行済みです', last });
+    const masterToken = await getMasterToken();
+    const managed = await kvGet('managed_locations') || [];
+    let checked = 0, changed = 0, pending = 0;
+    const changes = [];
+    for (const m of managed) {
+      const locId = String(m.locId || '').replace(/\//g, '_');
+      if (!locId) continue;
+      const saved = await kvGet(`settings_${locId}`);
+      if (!saved || !saved.info) continue; // 正規情報が未保存の店はスキップ
+      const locationName = m.locId || m.locationName || '';
+      const token = m.storeId ? (await getAccessToken(m.storeId)) || masterToken : masterToken;
+      if (!token || !locationName) { pending++; continue; }
+      try {
+        const got = await fetchCurrentGbpInfo(locationName, token);
+        if (got.error) { pending++; continue; }
+        const diffs = diffGbpBaseline(saved.info, got.current);
+        const now = new Date().toISOString();
+        if (diffs.length) {
+          const alerts = saved.alerts || [];
+          alerts.unshift({ detectedAt: now, diffs, auto: true });
+          if (alerts.length > 20) alerts.length = 20;
+          await kvSet(`settings_${locId}`, { ...saved, alerts, lastCheckedAt: now });
+          changed++;
+          changes.push({ store: m.title || locId, diffs });
+        } else {
+          await kvSet(`settings_${locId}`, { ...saved, lastCheckedAt: now });
+        }
+        checked++;
+      } catch (e) { pending++; }
+    }
+    const summary = { at: new Date().toISOString(), date: today, checked, changed, pending };
+    await kvSet('cron_tamper_last', summary);
+    // 変化を検知したらメール通知（RESEND設定時・通知ONのみ）
+    try {
+      if (changed > 0 && (await kvGet('notify_weekly')) !== false) {
+        const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
+        if (to) {
+          const rows = changes.map(c => `<div style="margin-bottom:8px"><b>${c.store}</b><ul style="margin:2px 0">${c.diffs.map(d => `<li>${d.field}: 「${d.saved}」→「${d.current}」</li>`).join('')}</ul></div>`).join('');
+          await sendMail(to, `【ラクラクMEO】ビジネス情報の変更を検知（${today}）`,
+            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">GBPビジネス情報の変更を検知しました</h2><p>${changed}店舗で正規情報との差分を検出しました。心当たりのない変更は改ざんの可能性があります。</p>${rows}<p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで確認する →</a></p></div>`);
+        }
+      }
+    } catch (e) { /* メール失敗で本体を落とさない */ }
     return res.json(summary);
   }
 
