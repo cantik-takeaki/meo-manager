@@ -1,0 +1,16 @@
+{
+  "name": "ラクラクMEO",
+  "short_name": "ラクラクMEO",
+  "description": "店舗集客をまるごと、カンタンに。MEO/Googleビジネスプロフィール運用支援",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#12294a",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
