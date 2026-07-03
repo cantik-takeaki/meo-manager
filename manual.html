@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ラクラクMEO 製品マニュアル</title>
+<link rel="icon" href="/favicon-32.png" sizes="32x32">
+<style>
+  :root{
+    --accent:#2e8ff0; --accent-deep:#1b5fc9; --accent-ink:#0f4aa8;
+    --accent-soft:#eaf3fe; --accent-soft2:#f3f8ff;
+    --ink:#14202e; --ink2:#33475b; --sub:#657688; --line:#e6ecf3;
+    --bg:#ffffff; --bg2:#f5f9fd;
+    --ok:#1b9d55; --ok-soft:#e9f8ef;
+    --warn:#d9820f; --warn-soft:#fdf3e5;
+    --danger:#e5484d; --danger-soft:#fdecec;
+    --shadow:0 6px 28px rgba(20,50,90,.08);
+    --shadow-sm:0 2px 10px rgba(20,50,90,.06);
+    --grad:linear-gradient(135deg,#2e8ff0 0%,#1b5fc9 100%);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:#eef3f9; color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+    line-height:1.9; font-size:15px; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  .doc{max-width:860px; margin:0 auto; background:var(--bg); box-shadow:0 4px 50px rgba(15,35,70,.10)}
+  .page{padding:60px 68px}
+  ::selection{background:var(--accent-soft); color:var(--accent-ink)}
+
+  /* ===== ツールバー ===== */
+  .toolbar{position:sticky; top:0; z-index:20; background:rgba(255,255,255,.9); backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--line); padding:10px 22px; display:flex; align-items:center; gap:12px}
+  .toolbar img{height:22px; display:block}
+  .toolbar .tag{font-size:11px; font-weight:800; color:var(--accent-deep); background:var(--accent-soft); padding:3px 9px; border-radius:20px; letter-spacing:.03em}
+  .toolbar .sp{flex:1}
+  .toolbar button{border:1px solid var(--line); background:#fff; border-radius:9px; padding:7px 14px; cursor:pointer; font-size:12.5px; font-weight:700; color:var(--ink); display:inline-flex; align-items:center; gap:7px; transition:.15s}
+  .toolbar button:hover{border-color:var(--accent); color:var(--accent-deep); box-shadow:var(--shadow-sm)}
+  .toolbar button svg{width:15px;height:15px}
+
+  /* ===== 表紙 ===== */
+  .cover{position:relative; overflow:hidden; padding:0}
+  .cover .hero{position:relative; background:var(--grad); padding:52px 68px 120px; overflow:hidden}
+  .cover .hero svg.deco{position:absolute; inset:0; width:100%; height:100%; opacity:.16}
+  .cover .logo-card{position:relative; display:inline-flex; background:#fff; border-radius:16px; padding:20px 30px; box-shadow:0 10px 40px rgba(0,20,60,.22)}
+  .cover .logo-card img{height:60px; display:block}
+  .cover .kicker{position:relative; margin-top:34px; color:#dcebff; font-size:13px; font-weight:700; letter-spacing:.24em}
+  .cover .body{position:relative; margin-top:-72px; padding:0 68px 60px}
+  .cover .title-card{background:#fff; border-radius:20px; box-shadow:var(--shadow); padding:40px 44px 36px; border:1px solid var(--line)}
+  .cover h1{font-size:52px; font-weight:900; margin:0; letter-spacing:.02em; line-height:1.12;
+    background:linear-gradient(120deg,#14202e 30%,#1b5fc9); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent}
+  .cover .lead{font-size:18px; color:var(--ink2); margin:14px 0 0; font-weight:600}
+  .cover .rule{width:64px; height:5px; border-radius:3px; background:var(--grad); margin:0 0 22px}
+  .meta{border-collapse:separate; border-spacing:0; width:100%; margin-top:34px; font-size:14px; border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .meta td{padding:15px 20px; border-bottom:1px solid var(--line)}
+  .meta tr:last-child td{border-bottom:none}
+  .meta td:first-child{color:var(--sub); width:160px; background:var(--bg2); font-weight:600}
+  .meta td:last-child{font-weight:700}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; background:var(--accent-soft); color:var(--accent-ink); padding:2px 9px; border-radius:6px; font-size:13px; letter-spacing:.01em}
+  .fine{color:var(--sub); font-size:12.5px; margin:26px 4px 0; line-height:1.85}
+
+  /* ===== 見出し ===== */
+  h2.sec{font-size:28px; font-weight:900; margin:0 0 6px; letter-spacing:.01em; display:flex; align-items:center; gap:14px}
+  h2.sec .u{display:block; height:4px; border-radius:2px; background:var(--grad); margin:6px 0 26px; width:70px}
+  .secwrap{margin-bottom:2px}
+  .chapno{display:inline-flex; align-items:center; justify-content:center; min-width:44px; height:44px; padding:0 10px; background:var(--grad); color:#fff; border-radius:12px; font-size:19px; font-weight:900; box-shadow:0 4px 14px rgba(43,120,220,.35); flex-shrink:0}
+  .chapno.g{background:linear-gradient(135deg,#8a9bb0,#5c6f86); box-shadow:0 4px 14px rgba(110,130,155,.35)}
+  h3.sub{font-size:19px; font-weight:800; margin:36px 0 12px; padding-left:14px; border-left:5px solid var(--accent); line-height:1.4}
+  h4{font-size:15.5px; font-weight:800; margin:24px 0 8px; color:var(--accent-ink)}
+  p{margin:11px 0}
+  b,strong{font-weight:800}
+  a{color:var(--accent-deep); text-decoration:none}
+  ul,ol{margin:12px 0; padding-left:26px}
+  li{margin:7px 0}
+  ol{counter-reset:oli}
+  .lead-p{font-size:16px; color:var(--ink2)}
+
+  /* ===== テーブル ===== */
+  table.t{border-collapse:separate; border-spacing:0; width:100%; margin:18px 0; font-size:14px; border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:var(--shadow-sm)}
+  table.t th{background:var(--grad); color:#fff; text-align:left; padding:13px 16px; font-weight:700; font-size:13.5px; letter-spacing:.01em}
+  table.t td{padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top}
+  table.t tr:nth-child(even) td{background:var(--accent-soft2)}
+  table.t tr:last-child td{border-bottom:none}
+  table.t td:first-child{font-weight:600}
+
+  /* ===== コールアウト ===== */
+  .call{position:relative; border-radius:13px; padding:15px 18px 15px 52px; margin:18px 0; font-size:14px; border:1px solid; box-shadow:var(--shadow-sm)}
+  .call .ci{position:absolute; left:16px; top:15px; width:22px; height:22px}
+  .call .ct{font-weight:800; margin-bottom:3px}
+  .call p{margin:4px 0}
+  .call.tip{background:var(--ok-soft); border-color:#bfe8cf} .call.tip .ct{color:#137a41} .call.tip .ci{color:var(--ok)}
+  .call.warn{background:var(--warn-soft); border-color:#f3ddb4} .call.warn .ct{color:#a8640a} .call.warn .ci{color:var(--warn)}
+  .call.check{background:var(--accent-soft); border-color:#cfe4fb} .call.check .ct{color:var(--accent-ink)} .call.check .ci{color:var(--accent)}
+  .call.point{background:var(--danger-soft); border-color:#f6cccd} .call.point .ct{color:#b4292e} .call.point .ci{color:var(--danger)}
+  .call.note{background:var(--bg2); border-color:var(--line)} .call.note .ct{color:var(--sub)} .call.note .ci{color:#8496a8}
+
+  /* ===== 目次 ===== */
+  .toc a{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; margin:8px 0; background:var(--bg2); border-radius:11px; color:var(--ink); font-size:14.5px; font-weight:600; border:1px solid transparent; transition:.15s}
+  .toc a:hover{border-color:var(--accent); background:var(--accent-soft); transform:translateX(3px)}
+  .toc a.big{background:linear-gradient(135deg,var(--accent-soft),var(--accent-soft2)); font-weight:800; border-color:#dcebfb}
+  .toc .lft{display:flex; align-items:center; gap:11px}
+  .toc .n{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; background:var(--grad); color:#fff; border-radius:8px; font-size:13px; font-weight:800; flex-shrink:0}
+  .toc .n.g{background:linear-gradient(135deg,#8a9bb0,#5c6f86)}
+  .toc .arrow{color:var(--accent)}
+  .toc .arrow svg{width:16px;height:16px;display:block}
+  .toc .grp{margin:24px 0 8px; font-size:11.5px; letter-spacing:.16em; color:var(--sub); font-weight:800}
+
+  /* ===== ステップカード ===== */
+  .steps{position:relative; margin:18px 0}
+  .step{display:flex; gap:16px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 20px; margin:0 0 4px; align-items:flex-start; box-shadow:var(--shadow-sm)}
+  .step .badge{background:var(--grad); color:#fff; font-size:12px; font-weight:800; border-radius:9px; padding:6px 11px; flex-shrink:0; margin-top:2px; letter-spacing:.03em; box-shadow:0 3px 10px rgba(43,120,220,.3)}
+  .step .st-body{flex:1}
+  .step h4{margin:0 0 4px; color:var(--ink); font-size:15.5px}
+  .step p{margin:2px 0; font-size:14px; color:var(--ink2)}
+  .ref{color:var(--accent-deep); font-weight:700; white-space:nowrap}
+  .arrow-down{display:flex; justify-content:center; color:var(--accent); margin:2px 0}
+  .arrow-down svg{width:18px;height:18px}
+
+  /* ===== チェックリスト ===== */
+  .clist{list-style:none; padding:0; margin:16px 0}
+  .clist li{display:flex; gap:12px; padding:11px 2px; border-bottom:1px dashed var(--line); font-size:14.5px; align-items:flex-start}
+  .clist li svg{width:19px;height:19px;color:var(--accent);flex-shrink:0;margin-top:2px}
+
+  /* ===== 部品 ===== */
+  .pill{display:inline-block; padding:3px 11px; border-radius:20px; font-size:12px; font-weight:800; background:var(--accent-soft); color:var(--accent-ink)}
+  .pill.free{background:var(--ok-soft); color:#137a41}
+  .grade{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:8px;color:#fff;font-weight:900;font-size:14px;box-shadow:var(--shadow-sm)}
+  .kpi{display:flex; gap:14px; flex-wrap:wrap; margin:16px 0}
+  .kpi .box{flex:1; min-width:158px; background:linear-gradient(160deg,#fff,var(--bg2)); border-radius:13px; padding:15px 17px; border:1px solid var(--line); box-shadow:var(--shadow-sm)}
+  .kpi .box .k{font-size:12px; color:var(--sub); font-weight:700; letter-spacing:.02em} .kpi .box .v{font-size:16px; font-weight:900; margin-top:4px; color:var(--ink)}
+  hr.soft{border:none; border-top:1px solid var(--line); margin:32px 0}
+  .foot{text-align:center; color:var(--sub); font-size:12px; margin-top:44px; padding-top:22px; border-top:1px solid var(--line)}
+
+  @media (max-width:700px){
+    .page{padding:36px 24px}
+    .cover .hero{padding:34px 24px 96px} .cover .body{padding:0 24px 44px}
+    .cover .title-card{padding:28px 24px}
+    .cover h1{font-size:36px} h2.sec{font-size:22px} .chapno{min-width:38px;height:38px;font-size:16px}
+  }
+  /* ===== 印刷（PDF化） ===== */
+  @media print{
+    body{background:#fff; font-size:11px; line-height:1.68}
+    .doc{max-width:none; box-shadow:none}
+    .toolbar{display:none}
+    .page{padding:0 9mm}
+    .cover .hero{padding:16mm 12mm 26mm; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+    .cover .body{padding:0 12mm 10mm}
+    table.t,.call,.step,.kpi,.title-card,.logo-card{box-shadow:none}
+    h2.sec,h3.sub,h4{page-break-after:avoid; break-after:avoid}
+    .step,.call,table.t,.kpi{page-break-inside:avoid; break-inside:avoid}
+    .pagebreak{page-break-before:always}
+    a{color:var(--ink)}
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+    @page{margin:14mm 0}
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <img src="/logo-mark.png" alt="ラクラクMEO">
+  <span class="tag">製品マニュアル Ver 1.0.0</span>
+  <span class="sp"></span>
+  <button onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>PDFとして保存 / 印刷</button>
+</div>
+
+<div class="doc">
+
+<!-- ============ 表紙 ============ -->
+<div class="cover">
+  <div class="hero">
+    <svg class="deco" viewBox="0 0 860 340" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#fff" stroke-width="2">
+      <path d="M-20 60 H900 M-20 130 H900 M-20 210 H900 M-20 285 H900"/>
+      <path d="M120 -20 V360 M300 -20 V360 M520 -20 V360 M700 -20 V360"/>
+      <circle cx="700" cy="130" r="26" stroke-width="3"/><circle cx="700" cy="130" r="6" fill="#fff" stroke="none"/>
+      <circle cx="300" cy="210" r="18" stroke-width="3"/><circle cx="300" cy="210" r="5" fill="#fff" stroke="none"/>
+      <path d="M120 60 L300 210 L520 130 L700 130" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+    </svg>
+    <div class="logo-card"><img src="/logo.png" alt="ラクラクMEO"></div>
+    <div class="kicker">GOOGLE ビジネスプロフィール 運用支援システム</div>
+  </div>
+  <div class="body">
+    <div class="title-card">
+      <div class="rule"></div>
+      <h1>製品マニュアル</h1>
+      <p class="lead">はじめてでも、カンタンに。Googleマップ集客を、AIでまるごと。</p>
+      <table class="meta">
+        <tr><td>Version</td><td>Ver 1.0.0</td></tr>
+        <tr><td>作成日</td><td>2026年7月3日</td></tr>
+        <tr><td>提供</td><td>株式会社cantik</td></tr>
+        <tr><td>対象サービス</td><td><span class="mono">https://meo.cantik.co.jp</span></td></tr>
+        <tr><td>対象読者</td><td>店舗スタッフ・管理者・運営担当者</td></tr>
+      </table>
+      <p class="fine">本マニュアルは「ラクラクMEO」をご利用いただく方を対象とした操作説明書です。記載内容は Ver 1.0.0 時点のものです。機能の追加・改善に伴い、内容が更新される場合があります。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ アイコン凡例 ============ -->
+<div class="page">
+<section class="secwrap">
+  <h2 class="sec">本マニュアルで使うアイコン</h2><span class="u"></span>
+  <p class="lead-p">大切な情報は、以下のボックスで色分けして強調しています。</p>
+
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">ヒント（TIPS）</div><p>便利な使い方・効率化のコツ。</p></div>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">注意（WARNING）</div><p>間違えやすい点・トラブルを防ぐための注意事項。</p></div>
+  <div class="call check"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 11-5.9-9.1"/><path d="M22 4 12 14.01l-3-3"/></svg><div class="ct">確認（CHECK）</div><p>操作が正しく完了したかの確認ポイント。</p></div>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">重要（POINT）</div><p>必ず覚えておくべき重要事項。</p></div>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">補足（NOTE）</div><p>知っておくと役立つ補足情報。</p></div>
+</section>
+</div>
+
+<!-- ============ 目次 ============ -->
+<div class="page pagebreak">
+<section class="secwrap">
+  <h2 class="sec">目次</h2><span class="u"></span>
+  <div class="toc">
+    <a href="#intro" class="big"><span class="lft">はじめに</span><span class="arrow">▸</span></a>
+    <a href="#quickstart" class="big"><span class="lft">まず最初にやること（クイックスタート）</span><span class="arrow">▸</span></a>
+    <a href="#cycle" class="big"><span class="lft">運用サイクル（毎日・毎週・毎月やること）</span><span class="arrow">▸</span></a>
+    <div class="grp">基本機能</div>
+    <a href="#c1"><span class="lft"><span class="n">1</span>ログイン</span><span class="arrow">▸</span></a>
+    <a href="#c2"><span class="lft"><span class="n">2</span>ダッシュボード</span><span class="arrow">▸</span></a>
+    <a href="#c3"><span class="lft"><span class="n">3</span>AIコンサル（週次タスク・グレード）</span><span class="arrow">▸</span></a>
+    <a href="#c4"><span class="lft"><span class="n">4</span>店舗管理・対策キーワード</span><span class="arrow">▸</span></a>
+    <a href="#c5"><span class="lft"><span class="n">5</span>Google連携（GBP接続）</span><span class="arrow">▸</span></a>
+    <a href="#c6"><span class="lft"><span class="n">6</span>Google口コミ返信（AI）</span><span class="arrow">▸</span></a>
+    <a href="#c7"><span class="lft"><span class="n">7</span>AI投稿（GBP・Instagram）</span><span class="arrow">▸</span></a>
+    <a href="#c8"><span class="lft"><span class="n">8</span>投稿画像作成</span><span class="arrow">▸</span></a>
+    <a href="#c9"><span class="lft"><span class="n">9</span>GBPインサイト</span><span class="arrow">▸</span></a>
+    <a href="#c10"><span class="lft"><span class="n">10</span>順位計測</span><span class="arrow">▸</span></a>
+    <a href="#c11"><span class="lft"><span class="n">11</span>競合分析</span><span class="arrow">▸</span></a>
+    <a href="#c12"><span class="lft"><span class="n">12</span>改ざん検知</span><span class="arrow">▸</span></a>
+    <a href="#c13"><span class="lft"><span class="n">13</span>月次レポート・クライアント配布</span><span class="arrow">▸</span></a>
+    <div class="grp">管理者向け</div>
+    <a href="#c14"><span class="lft"><span class="n g">14</span>クライアント→店舗の2階層管理</span><span class="arrow">▸</span></a>
+    <a href="#c15"><span class="lft"><span class="n g">15</span>ユーザー・権限（ロール）管理</span><span class="arrow">▸</span></a>
+    <a href="#c16"><span class="lft"><span class="n g">16</span>AIプロンプト管理</span><span class="arrow">▸</span></a>
+    <a href="#c17"><span class="lft"><span class="n g">17</span>システムステータス・デモモード</span><span class="arrow">▸</span></a>
+    <div class="grp">巻末資料</div>
+    <a href="#faq"><span class="lft">よくある質問（FAQ）</span><span class="arrow">▸</span></a>
+    <a href="#trouble"><span class="lft">困ったときは（トラブルシューティング）</span><span class="arrow">▸</span></a>
+    <a href="#justthis" class="big"><span class="lft">迷ったらこれだけ</span><span class="arrow">▸</span></a>
+    <a href="#glossary"><span class="lft">用語集</span><span class="arrow">▸</span></a>
+    <a href="#changelog"><span class="lft">更新履歴・お問い合わせ</span><span class="arrow">▸</span></a>
+  </div>
+</section>
+</div>
+
+<!-- ============ はじめに ============ -->
+<div class="page pagebreak">
+<section id="intro" class="secwrap">
+  <h2 class="sec">はじめに</h2><span class="u"></span>
+
+  <h3 class="sub">ラクラクMEOとは</h3>
+  <p><b>ラクラクMEO</b> は、Googleビジネスプロフィール（GBP）の運用を AI で支援するクラウド型の管理システムです。株式会社cantikが提供しています。</p>
+  <p>Googleマップやスマホ検索で「<b>渋谷 美容院</b>」「<b>相模原 ランチ</b>」のように検索したとき、地図の上位に表示される店舗は、来店・電話・予約が大きく増えます。この「Googleマップ上での表示順位を高める取り組み」を <b>MEO（Map Engine Optimization）</b> と呼びます。</p>
+  <p>ラクラクMEOは、複数店舗のMEO業務——<b>口コミ返信・投稿・順位計測・レポート作成</b>——を1つの画面に集約し、AIの力で効率よく、確かな成果につなげる運用環境を、<span class="pill free">無料</span> でご提供します。</p>
+
+  <h3 class="sub">このシステムで解決できること</h3>
+  <table class="t">
+    <tr><th>これまでの課題</th><th>ラクラクMEOでの解決</th></tr>
+    <tr><td>複数店舗のGBPを個別に管理するのが大変</td><td>1画面で全店舗を一元管理</td></tr>
+    <tr><td>口コミへの返信に時間がかかる</td><td>AIが返信文を自動生成（外国語の口コミにも同じ言語で返信）</td></tr>
+    <tr><td>Googleマップでの順位が把握しにくい</td><td>キーワード別の順位推移を自動集計・グラフ化</td></tr>
+    <tr><td>投稿や画像づくりが続かない</td><td>AIが投稿文を生成、投稿画像もブラウザ内で無料作成</td></tr>
+    <tr><td>何の施策をすべきか分からない</td><td>AIコンサルが S〜D のグレード評価と週次タスクを提示</td></tr>
+    <tr><td>月次報告書の作成に手間がかかる</td><td>AI分析つき月次レポートを自動生成し、クライアントにも配布</td></tr>
+    <tr><td>競合との差が見えない</td><td>順位計測時に競合店舗の順位も同時記録して可視化</td></tr>
+  </table>
+
+  <h3 class="sub">ラクラクMEOならではの強み</h3>
+  <div class="kpi">
+    <div class="box"><div class="k">SNS連携</div><div class="v">Instagram 投稿・DM対応</div></div>
+    <div class="box"><div class="k">画像生成</div><div class="v">投稿画像をブラウザ内で作成</div></div>
+    <div class="box"><div class="k">AIO対応</div><div class="v">AI検索時代の可視化</div></div>
+    <div class="box"><div class="k">料金</div><div class="v"><span class="pill free">無料でご提供</span></div></div>
+  </div>
+
+  <h3 class="sub">このマニュアルの使い方</h3>
+  <table class="t">
+    <tr><th>ご利用ロール</th><th>主に参照する章</th></tr>
+    <tr><td>店舗スタッフ（editor）</td><td>クイックスタート／1〜13章／FAQ</td></tr>
+    <tr><td>管理者（admin）</td><td>全章</td></tr>
+    <tr><td>システム管理者（super_admin）</td><td>全章（特に14〜17章）</td></tr>
+    <tr><td>閲覧のみ（viewer）</td><td>1〜11章（操作不可の機能あり）</td></tr>
+  </table>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>わからない用語が出てきたら、巻末の「用語集」をご確認ください。</p></div>
+
+  <h3 class="sub">ロール（権限）について</h3>
+  <p>本システムでは、ユーザーごとに「ロール（権限）」が設定されており、ロールによって操作できる機能が異なります。</p>
+  <table class="t">
+    <tr><th>ロール</th><th>表示名</th><th>主な用途</th></tr>
+    <tr><td><span class="mono">super_admin</span></td><td>システム管理者</td><td>全機能を操作できる最上位権限。運営会社（cantik）が使用</td></tr>
+    <tr><td><span class="mono">admin</span></td><td>管理者</td><td>店舗・ユーザー・チームを管理する</td></tr>
+    <tr><td><span class="mono">editor</span></td><td>編集者</td><td>担当店舗の口コミ返信・投稿作成・レポート出力を行う</td></tr>
+    <tr><td><span class="mono">viewer</span></td><td>閲覧者</td><td>データの確認のみ。編集・操作はできない</td></tr>
+  </table>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">POINT</div><p>ロールによって見える画面・押せるボタンが異なります。「ボタンが押せない」ときは、まずご自身のロールをご確認ください（→ 15章）。</p></div>
+</section>
+</div>
+
+<!-- ============ クイックスタート ============ -->
+<div class="page pagebreak">
+<section id="quickstart" class="secwrap">
+  <h2 class="sec">クイックスタート</h2><span class="u"></span>
+  <p class="lead-p">初期設定は、上から順に進めれば <b>約15〜20分</b> で完了します。STEP 1〜4 は初日に済ませるのがおすすめです。</p>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">POINT</div><p>各ステップの詳しい操作は「→ 参照章」に記載しています。このページは全体の流れをつかむ地図としてお使いください。</p></div>
+
+  <div class="steps">
+    <div class="step"><span class="badge">STEP 1</span><div class="st-body"><h4>ログインする</h4><p>案内メールのメールアドレスとパスワードで <span class="mono">https://meo.cantik.co.jp</span> にログインします。<span class="ref">→ 1章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 2</span><div class="st-body"><h4>Google連携を設定する</h4><p>店舗のGoogleビジネスプロフィールとラクラクMEOを接続します。口コミ・投稿・インサイトの取得に必須です。<span class="ref">→ 5章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 3</span><div class="st-body"><h4>管理する店舗を選ぶ</h4><p>店舗管理で、運用対象の店舗を選抜（登録）します。<span class="ref">→ 4章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 4</span><div class="st-body"><h4>対策キーワードを登録する</h4><p>順位を測りたい検索キーワード（例：「相模原 ランチ」）を登録します。「地域名 × 業種・メニュー」の組み合わせがおすすめです。<span class="ref">→ 4章・10章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 5</span><div class="st-body"><h4>順位の自動取得を待つ</h4><p>順位は<b>毎週月曜の早朝（3:00頃）</b>に自動取得されます。登録した週の翌月曜からデータが表示され始めます。<span class="ref">→ 10章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 6</span><div class="st-body"><h4>口コミ返信・AI投稿を始める</h4><p>届いた口コミにAIの返信案で返信し、AI投稿文で Google・Instagram 投稿を始めます。<span class="ref">→ 6章・7章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 7</span><div class="st-body"><h4>AIコンサルで次の一手を決める</h4><p>AIコンサルのグレード評価と週次タスクが、日々の運用の道しるべになります。<span class="ref">→ 3章</span></p></div></div>
+    <div class="arrow-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+    <div class="step"><span class="badge">STEP 8</span><div class="st-body"><h4>月次レポートで振り返る</h4><p>毎月月初にAI月次レポートを生成し、1ヶ月の成果を振り返ります。クライアントにも配布できます。<span class="ref">→ 13章</span></p></div></div>
+  </div>
+
+  <h3 class="sub">スタートチェックリスト</h3>
+  <ul class="clist">
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>ログインし、パスワードを自分だけのものに変更した</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>Google連携（GBP接続）が完了している</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>運用する店舗を店舗管理で選んだ</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>対策キーワードを2〜5個登録した</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>GBP最適化チェックで「未入力」項目を確認した</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>口コミにAIで返信してみた</li>
+    <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/></svg>AI投稿を1本作成・下書き保存した</li>
+  </ul>
+</section>
+</div>
+
+<!-- ============ 運用サイクル ============ -->
+<div class="page pagebreak">
+<section id="cycle" class="secwrap">
+  <h2 class="sec">運用サイクル</h2><span class="u"></span>
+  <p class="lead-p">MEOは「続けること」で効果が育ちます。以下のリズムを目安にしてください。</p>
+  <table class="t">
+    <tr><th>頻度</th><th>やること</th><th>参照</th></tr>
+    <tr><td><b>毎日</b></td><td>新着口コミにAIで返信する／DM（Instagram）を確認する</td><td>6章・7章</td></tr>
+    <tr><td><b>週2〜3回</b></td><td>AI投稿（GBP・Instagram）を作成して投稿する</td><td>7章・8章</td></tr>
+    <tr><td><b>毎週</b></td><td>順位の変化を確認する／AIコンサルの週次タスクをこなす</td><td>10章・3章</td></tr>
+    <tr><td><b>毎月</b></td><td>月次レポートを生成し、クライアントに共有する</td><td>13章</td></tr>
+    <tr><td><b>随時</b></td><td>改ざん検知の通知を確認する／GBP最適化チェックの未入力を埋める</td><td>12章・4章</td></tr>
+  </table>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>「毎日やること」は数分で終わります。まずは<b>口コミ返信を毎日</b>の習慣にすると、評価とマップ順位の両方に効いてきます。</p></div>
+</section>
+</div>
+
+<!-- ============ 1. ログイン ============ -->
+<div class="page pagebreak">
+<section id="c1" class="secwrap">
+  <h2 class="sec"><span class="chapno">1</span>ログイン</h2><span class="u"></span>
+  <h3 class="sub">ログイン方法</h3>
+  <ol>
+    <li>ブラウザ（Google Chrome推奨）で <span class="mono">https://meo.cantik.co.jp</span> を開きます。</li>
+    <li>案内された<b>メールアドレス</b>と<b>パスワード</b>を入力します。</li>
+    <li>「ログイン」を押すとダッシュボードが表示されます。</li>
+  </ol>
+  <div class="call check"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 11-5.9-9.1"/><path d="M22 4 12 14.01l-3-3"/></svg><div class="ct">CHECK</div><p>ログインできると、左側にメニュー（ダッシュボード・口コミ・店舗管理など）が並んだ画面が表示されます。</p></div>
+
+  <h3 class="sub">2段階認証（設定されている場合）</h3>
+  <p>セキュリティのため、2段階認証（ワンタイムコード）が有効な場合があります。ログイン後にメールで届く<b>6桁のコード</b>を入力してください。</p>
+
+  <h3 class="sub">パスワードを忘れたとき</h3>
+  <p>ログインできない場合は、システム管理者（cantik）までご連絡ください。安全な手順でパスワードを再発行します。</p>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">WARNING</div><p>パスワードは推測されにくいものに変更し、他人と共有しないでください。スタッフごとにアカウントを分けたい場合は管理者に依頼してください（→ 15章）。</p></div>
+
+  <h3 class="sub">スマホでアプリのように使う（PWA）</h3>
+  <p>ラクラクMEOはスマホのホーム画面に追加して、アプリのように使えます。</p>
+  <ul>
+    <li><b>iPhone（Safari）</b>：共有ボタン →「ホーム画面に追加」</li>
+    <li><b>Android（Chrome）</b>：メニュー →「アプリをインストール」/「ホーム画面に追加」</li>
+  </ul>
+</section>
+</div>
+
+<!-- ============ 2. ダッシュボード ============ -->
+<div class="page pagebreak">
+<section id="c2" class="secwrap">
+  <h2 class="sec"><span class="chapno">2</span>ダッシュボード</h2><span class="u"></span>
+  <p>ログイン直後に表示される画面です。担当店舗の状態がひと目で分かります。</p>
+  <h3 class="sub">表示される主な情報</h3>
+  <table class="t">
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>店舗の切り替え</td><td>画面上部で、表示する店舗を選びます。以降のすべての画面が、選んだ店舗のデータになります。</td></tr>
+    <tr><td>口コミの状況</td><td>平均評価・件数・未返信の口コミ数</td></tr>
+    <tr><td>インサイト概要</td><td>表示回数・電話・ルート検索・サイト遷移などの主要指標</td></tr>
+    <tr><td>順位のサマリー</td><td>登録キーワードの現在順位と前回比</td></tr>
+    <tr><td>AIコンサルのグレード</td><td>店舗のMEO状態を S〜D で評価（→ 3章）</td></tr>
+  </table>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">POINT</div><p>まず<b>画面上部で店舗を選ぶ</b>のが基本操作です。「データが出ない」ときは、店舗が選ばれているか確認してください。</p></div>
+  <h3 class="sub">最新データへの更新</h3>
+  <p>各ページには<b>更新ボタン</b>があり、最新のGoogleデータを取り直せます。数字が古いと感じたら押してください。</p>
+</section>
+</div>
+
+<!-- ============ 3. AIコンサル ============ -->
+<div class="page pagebreak">
+<section id="c3" class="secwrap">
+  <h2 class="sec"><span class="chapno">3</span>AIコンサル</h2><span class="u"></span>
+  <p>「何をすればいいか分からない」を解消する機能です。AIが店舗のMEO状態を採点し、次にやるべきことを具体的に示します。</p>
+
+  <h3 class="sub">総合グレード（S〜D）</h3>
+  <p>口コミ・返信率・投稿頻度・GBP情報の充実度・順位などから、店舗の総合状態を評価します。</p>
+  <p style="margin-top:14px">
+    <span class="grade" style="background:linear-gradient(135deg,#1b9d55,#12703d)">S</span>&nbsp;
+    <span class="grade" style="background:linear-gradient(135deg,#3aa856,#2b8544)">A</span>&nbsp;
+    <span class="grade" style="background:linear-gradient(135deg,#e0a021,#c1861a)">B</span>&nbsp;
+    <span class="grade" style="background:linear-gradient(135deg,#e0820f,#bd6d0c)">C</span>&nbsp;
+    <span class="grade" style="background:linear-gradient(135deg,#e5484d,#c0272c)">D</span>
+    &nbsp;&nbsp;<span style="color:var(--sub);font-size:13px;font-weight:700">← 良い　　改善が必要 →</span>
+  </p>
+
+  <h3 class="sub">週次タスク</h3>
+  <p>AIが「今週やるべき改善アクション」を、具体的なタスクとして提示します。例：</p>
+  <ul>
+    <li>未返信の口コミ3件に返信する</li>
+    <li>GBPに新しい写真を3枚追加する</li>
+    <li>「地域名＋メニュー」の投稿を1本作成する</li>
+  </ul>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>週次タスクを上から順にこなすだけで、自然とMEOの基本施策が回ります。迷ったら、まずここを見てください。</p></div>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>AIが生成する文章は下書きです。<b>公開前に必ず内容を確認</b>してください。</p></div>
+</section>
+</div>
+
+<!-- ============ 4. 店舗管理 ============ -->
+<div class="page pagebreak">
+<section id="c4" class="secwrap">
+  <h2 class="sec"><span class="chapno">4</span>店舗管理・対策キーワード</h2><span class="u"></span>
+
+  <h3 class="sub">管理する店舗を選ぶ</h3>
+  <p>Google連携したアカウントには、多数の店舗が含まれることがあります。ラクラクMEOでは、<b>運用対象の店舗だけを「管理店舗」として選抜</b>して表示します。</p>
+  <ol>
+    <li>「店舗管理」を開きます。</li>
+    <li>店舗ピッカーで、運用する店舗をオンにします（同名店舗は住所で見分けられます）。</li>
+    <li>選んだ店舗だけが、ダッシュボードや各画面に表示されます。</li>
+  </ol>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>全店舗を自動表示しないのは、無関係な店舗（他オーナーの登録など）が混ざるのを防ぐためです。</p></div>
+
+  <h3 class="sub">対策キーワードの登録</h3>
+  <p>順位を測定・改善したい検索キーワードを登録します。</p>
+  <table class="t">
+    <tr><th>おすすめの型</th><th>例</th></tr>
+    <tr><td>地域名 × 業種</td><td>相模原 美容院／橋本 整体</td></tr>
+    <tr><td>地域名 × メニュー</td><td>相模原 カット／渋谷 ランチ</td></tr>
+    <tr><td>地域名 × 悩み・目的</td><td>町田 肩こり／横浜 デート ディナー</td></tr>
+  </table>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>キーワードは<b>3〜10個</b>が目安です。カードに「適正な個数」の目安も表示されます。多すぎると、1つ1つの対策が薄まります。</p></div>
+
+  <h3 class="sub">GBP最適化チェック</h3>
+  <p>Googleビジネスプロフィールの「埋めるべき情報」が、どれだけ入力済みかを診断します。未入力の項目には、<b>Googleのどこで設定するか</b>のヒントが表示されます（例：サブカテゴリの設定場所など）。上から順に埋めていくと、GBPの充実度＝MEOの土台が整います。</p>
+  <div class="call check"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 11-5.9-9.1"/><path d="M22 4 12 14.01l-3-3"/></svg><div class="ct">CHECK</div><p>「未入力」がゼロに近づくほど、Googleからの評価・表示機会が増えます。</p></div>
+</section>
+</div>
+
+<!-- ============ 5. Google連携 ============ -->
+<div class="page pagebreak">
+<section id="c5" class="secwrap">
+  <h2 class="sec"><span class="chapno">5</span>Google連携（GBP接続）</h2><span class="u"></span>
+  <p>口コミ・投稿・インサイトを扱うために、店舗のGoogleビジネスプロフィールとラクラクMEOを接続します。<b>最初に必ず行う設定</b>です。</p>
+  <h3 class="sub">接続の手順</h3>
+  <ol>
+    <li>「Google連携」または設定画面を開きます。</li>
+    <li>「Googleと連携する」を押し、<b>GBPを管理しているGoogleアカウント</b>でログインします。</li>
+    <li>アクセス許可の画面で「許可」を選びます。</li>
+    <li>連携が完了すると、そのアカウントで管理している店舗が読み込まれます。</li>
+  </ol>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">WARNING</div><p>連携するのは、必ず<b>その店舗のGBPオーナー／管理者権限を持つGoogleアカウント</b>です。権限のないアカウントでは、口コミ返信や投稿ができません。</p></div>
+  <div class="call check"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.1V12a10 10 0 11-5.9-9.1"/><path d="M22 4 12 14.01l-3-3"/></svg><div class="ct">CHECK</div><p>連携できていれば、店舗管理に店舗が並び、口コミ・インサイトが表示されます。</p></div>
+</section>
+</div>
+
+<!-- ============ 6. 口コミ ============ -->
+<div class="page pagebreak">
+<section id="c6" class="secwrap">
+  <h2 class="sec"><span class="chapno">6</span>Google口コミ返信（AI）</h2><span class="u"></span>
+  <p>届いた口コミの確認と返信を、AIの支援つきで行えます。</p>
+
+  <h3 class="sub">口コミの確認</h3>
+  <ul>
+    <li>星の分布グラフで、評価のバランスがひと目で分かります。</li>
+    <li>各口コミには、投稿日・返信済みかどうか・返信日が表示されます。</li>
+    <li>未返信の口コミを優先して対応しましょう。</li>
+  </ul>
+
+  <h3 class="sub">AIで返信する</h3>
+  <ol>
+    <li>返信したい口コミの「AIで返信」を押します。</li>
+    <li>口コミの内容と評価（ポジティブ／ネガティブ）に合わせた返信案が生成されます。</li>
+    <li>内容を確認し、必要なら手直しして「返信する」で投稿します（社外公開のため、内容確認は必須）。</li>
+  </ol>
+
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS　外国語の口コミにも対応</div><p>英語・中国語・韓国語・タイ語などの口コミには、<b>同じ言語で自然な返信</b>を生成します。インバウンド店舗でも、そのまま使えます。</p></div>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">POINT</div><p>AIの返信文は下書きです。店名や事実関係に誤りがないか<b>必ず確認してから公開</b>してください。ネガティブな口コミほど、丁寧な確認をおすすめします。</p></div>
+</section>
+</div>
+
+<!-- ============ 7. AI投稿 ============ -->
+<div class="page pagebreak">
+<section id="c7" class="secwrap">
+  <h2 class="sec"><span class="chapno">7</span>AI投稿（GBP・Instagram）</h2><span class="u"></span>
+  <p>Googleビジネスプロフィールへの投稿と、Instagramへの投稿・DM対応が行えます。</p>
+
+  <h3 class="sub">AI投稿文の生成</h3>
+  <ol>
+    <li>投稿画面で、伝えたいこと（新メニュー・キャンペーンなど）を入力します。</li>
+    <li>「AIで生成」を押すと、投稿文の案が作られます。</li>
+    <li>内容を確認して、投稿または下書き保存します。</li>
+  </ol>
+
+  <h3 class="sub">Instagram連携</h3>
+  <p>Instagram（プロアカウント）と連携すると、フィード投稿の作成や、DMの確認・返信が行えます。連携方法はシステム管理者にご確認ください。</p>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">WARNING　社外公開は承認のうえで</div><p>Google・Instagramへの<b>投稿／写真追加／DM送信</b>は、社外に公開されるアクションです。内容を確認し、必要な承認を得てから実行してください。</p></div>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS　景表法チェック</div><p>投稿文に「日本一」「必ず治る」などの<b>景品表示法・薬機法で問題になりやすい表現</b>が含まれると、NGワードチェッカーが警告します。安心して発信できます。</p></div>
+</section>
+</div>
+
+<!-- ============ 8. 投稿画像作成 ============ -->
+<div class="page pagebreak">
+<section id="c8" class="secwrap">
+  <h2 class="sec"><span class="chapno">8</span>投稿画像作成</h2><span class="u"></span>
+  <p>投稿用の画像を、ブラウザの中だけで（追加費用なしで）作成できます。写真ライブラリの写真や、お店のロゴを組み合わせられます。</p>
+
+  <h3 class="sub">画像を作る基本の流れ</h3>
+  <ol>
+    <li>写真ライブラリで写真をアップロードします（スマホ写真は自動でリサイズ）。</li>
+    <li>写真の「生成」ボタン、または「画像を生成」から作成画面を開きます。</li>
+    <li>「基本」タブでテンプレートと見出し・サブテキスト・店名を入れます。見出し等は<b>AIボタンで自動生成</b>できます。</li>
+    <li>「画像」タブで背景写真・ロゴを設定します。</li>
+    <li>「ライブラリに保存」で完成画像を保存し、そのまま投稿に使えます。</li>
+  </ol>
+
+  <h3 class="sub">テンプレート</h3>
+  <table class="t">
+    <tr><th>テンプレート</th><th>特徴</th></tr>
+    <tr><td>スタンダード</td><td>下グラデ・万能</td></tr>
+    <tr><td>エレガント</td><td>白セリフ・上品</td></tr>
+    <tr><td>マガジン</td><td>英字大・雑誌風</td></tr>
+    <tr><td>明朝見出し</td><td>和風・上質</td></tr>
+    <tr><td>筆太ゴシック</td><td>力強い・縦書き向き</td></tr>
+    <tr><td><b>文字なし</b></td><td>写真のみ（ロゴだけを載せたいときに）</td></tr>
+  </table>
+
+  <h3 class="sub">背景写真の調整</h3>
+  <p>取り込んだ写真は<b>元の縦横比のまま</b>表示されます。「画像」タブのスライダーで大きさを変え、プレビュー上で<b>写真をドラッグ</b>して位置を調整できます（文字のない場所をドラッグ）。縮小すると写真全体が枠に収まり、余白は自動でぼかして埋まります。</p>
+
+  <h3 class="sub">ロゴを載せる</h3>
+  <ol>
+    <li>「画像」タブの「ロゴ」で「ロゴ画像を選ぶ」を押します（透過PNG推奨）。</li>
+    <li>大きさ・透明度をスライダーで調整します。</li>
+    <li>四隅・中央のボタン、またはプレビュー上のドラッグで位置を決めます。</li>
+  </ol>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>「文字なし」テンプレ＋ロゴにすると、写真にロゴだけを重ねた洗練された投稿画像が作れます。</p></div>
+
+  <h3 class="sub">写真ライブラリの整理（一括削除）</h3>
+  <p>不要な写真は、まとめて削除できます。</p>
+  <ol>
+    <li>「選択して削除」を押すと、選択モードになります。</li>
+    <li>消したい写真をタップして選びます（「すべて選択」も可）。</li>
+    <li>「選択した写真を削除」で一括削除します。</li>
+  </ol>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">WARNING</div><p>削除した写真は元に戻せません。投稿に使用中の写真がないか、ご確認ください。</p></div>
+</section>
+</div>
+
+<!-- ============ 9. インサイト ============ -->
+<div class="page pagebreak">
+<section id="c9" class="secwrap">
+  <h2 class="sec"><span class="chapno">9</span>GBPインサイト</h2><span class="u"></span>
+  <p>Googleビジネスプロフィールの実際の反響（見られた回数・行動された回数）を確認できます。</p>
+  <table class="t">
+    <tr><th>指標</th><th>意味</th></tr>
+    <tr><td>表示回数（マップ／検索）</td><td>店舗がGoogleマップ・検索で表示された回数</td></tr>
+    <tr><td>電話</td><td>プロフィールから電話ボタンが押された回数</td></tr>
+    <tr><td>ルート検索</td><td>経路案内が開かれた回数</td></tr>
+    <tr><td>サイト遷移</td><td>ウェブサイトのリンクが押された回数</td></tr>
+  </table>
+  <h3 class="sub">期間の切り替え・前年比</h3>
+  <p>表示期間を<b>3ヶ月・6ヶ月・12ヶ月</b>で切り替えられます。さらに<b>前年同期比</b>で、去年と比べて伸びているかを確認できます。</p>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>施策（口コミ返信・投稿・写真追加）を始めた月を境に、表示回数や行動数が伸びているかを見ると、効果が実感できます。</p></div>
+</section>
+</div>
+
+<!-- ============ 10. 順位管理 ============ -->
+<div class="page pagebreak">
+<section id="c10" class="secwrap">
+  <h2 class="sec"><span class="chapno">10</span>順位計測</h2><span class="u"></span>
+  <p>登録した対策キーワードで、Googleマップ上の自店舗の順位を自動で計測・記録します。</p>
+  <h3 class="sub">自動取得のタイミング</h3>
+  <p>順位は<b>毎週月曜の早朝（3:00頃）に自動取得</b>されます。手動での取得も可能です。取得のたびに履歴として蓄積され、推移がグラフで見られます。</p>
+  <h3 class="sub">精度について</h3>
+  <p>計測は店舗の所在地（住所・座標）を基準に行うため、実際の検索により近い順位を取得します。</p>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>Googleマップの順位は、検索する人の現在地・端末・履歴によって変動します。表示される順位は「その地点・その時点での目安」とお考えください。日々の細かな上下より、<b>数週間の傾向</b>を見るのが大切です。</p></div>
+</section>
+</div>
+
+<!-- ============ 11. 競合分析 ============ -->
+<div class="page pagebreak">
+<section id="c11" class="secwrap">
+  <h2 class="sec"><span class="chapno">11</span>競合分析</h2><span class="u"></span>
+  <p>順位を計測する際、同じキーワードで表示される<b>競合店舗の順位も同時に記録</b>します。追加の手間や費用はかかりません。</p>
+  <ul>
+    <li>自店舗が競合と比べて何位にいるかが分かります。</li>
+    <li>上位の競合がどんな店舗かを把握し、口コミ数・写真・投稿頻度などの差を埋める施策につなげられます。</li>
+  </ul>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>「競合は口コミが200件あるのに、自店は30件」——このような差が見えると、次の施策（口コミ獲得の声かけなど）が明確になります。</p></div>
+</section>
+</div>
+
+<!-- ============ 12. 改ざん検知 ============ -->
+<div class="page pagebreak">
+<section id="c12" class="secwrap">
+  <h2 class="sec"><span class="chapno">12</span>改ざん検知</h2><span class="u"></span>
+  <p>Googleビジネスプロフィールは、第三者による「勝手な編集提案」で、電話番号や営業時間が書き換わってしまうことがあります。ラクラクMEOは、<b>GBPの情報を毎日自動でスナップショット</b>し、前回との差分をチェックします。</p>
+  <h3 class="sub">仕組み</h3>
+  <ul>
+    <li>正しい情報（正規のNAP：店名・住所・電話）を基準として保存します。</li>
+    <li>毎日、現在のGBP情報と基準を照合し、変わっていれば検知します。</li>
+    <li>意図しない変更を早期に発見し、修正できます。</li>
+  </ul>
+  <div class="call warn"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><div class="ct">WARNING</div><p>電話番号・住所・営業時間の勝手な変更は、機会損失に直結します。検知が出たら、早めにGBPをご確認ください。</p></div>
+</section>
+</div>
+
+<!-- ============ 13. 月次レポート ============ -->
+<div class="page pagebreak">
+<section id="c13" class="secwrap">
+  <h2 class="sec"><span class="chapno">13</span>月次レポート・クライアント配布</h2><span class="u"></span>
+  <p>1ヶ月の成果を、AI分析つきのレポートに自動でまとめます。報告書づくりの手間を、大きく減らせます。</p>
+  <h3 class="sub">レポートに含まれる内容</h3>
+  <ul>
+    <li>インサイトの推移（表示・電話・ルート・サイト遷移）</li>
+    <li>口コミの増減・平均評価・返信状況</li>
+    <li>順位の推移</li>
+    <li>AIによる<b>要約・良かった点・改善点・次のアクション</b></li>
+  </ul>
+  <h3 class="sub">クライアントへの配布</h3>
+  <p>専用の閲覧ページ（レポート）を、<b>パスワードつき</b>でクライアントに共有できます。クライアントは編集できず、成果の確認だけができます。</p>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>毎月同じフォーマットで届くレポートは、クライアントの安心感と継続率につながります。</p></div>
+</section>
+</div>
+
+<!-- ============ 14. 2階層管理 ============ -->
+<div class="page pagebreak">
+<section id="c14" class="secwrap">
+  <h2 class="sec"><span class="chapno g">14</span>クライアント→店舗の2階層管理</h2><span class="u"></span>
+  <p>代理店運用向けに、<b>クライアント（企業）ごと</b>に店舗をまとめて管理できます。</p>
+  <ul>
+    <li>店舗を「どのクライアントの店舗か」で分類できます。</li>
+    <li>クライアント単位で店舗を絞り込み、担当分だけを見渡せます。</li>
+    <li>多店舗・多クライアントを扱う代理店運用でも、混在を防げます。</li>
+  </ul>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>この機能は主に管理者（admin／super_admin）が使用します。</p></div>
+</section>
+</div>
+
+<!-- ============ 15. ロール管理 ============ -->
+<div class="page pagebreak">
+<section id="c15" class="secwrap">
+  <h2 class="sec"><span class="chapno g">15</span>ユーザー・権限（ロール）管理</h2><span class="u"></span>
+  <p>スタッフごとにアカウントを作り、権限（ロール）を割り当てられます。</p>
+  <h3 class="sub">ユーザーを追加する</h3>
+  <ol>
+    <li>設定のチーム管理を開きます（super_adminのみ）。</li>
+    <li>メールアドレスと初期パスワード、ロール（admin／editor／viewer）を指定して追加します。</li>
+    <li>追加されたユーザーは、そのメール・パスワードでログインできます。</li>
+  </ol>
+  <h3 class="sub">ロール別にできること</h3>
+  <table class="t">
+    <tr><th>操作</th><th>super_admin</th><th>admin</th><th>editor</th><th>viewer</th></tr>
+    <tr><td>データの閲覧</td><td>○</td><td>○</td><td>○</td><td>○</td></tr>
+    <tr><td>口コミ返信・投稿・レポート出力</td><td>○</td><td>○</td><td>○</td><td>—</td></tr>
+    <tr><td>店舗・クライアント管理</td><td>○</td><td>○</td><td>—</td><td>—</td></tr>
+    <tr><td>ユーザー・権限管理</td><td>○</td><td>—</td><td>—</td><td>—</td></tr>
+  </table>
+  <div class="call point"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11a8 8 0 10-16 0c0 6.5 8 11 8 11z"/><circle cx="12" cy="11" r="3"/></svg><div class="ct">POINT</div><p>「ボタンが押せない・メニューが出ない」ときは、多くの場合ロールが原因です。権限が必要な場合は、管理者に依頼してください。</p></div>
+</section>
+</div>
+
+<!-- ============ 16. AIプロンプト管理 ============ -->
+<div class="page pagebreak">
+<section id="c16" class="secwrap">
+  <h2 class="sec"><span class="chapno g">16</span>AIプロンプト管理</h2><span class="u"></span>
+  <p>AIが文章を生成する際の「指示（プロンプト）」を、管理者がカスタマイズできます。</p>
+  <ul>
+    <li>口コミ返信・投稿文・レポートなど、種類ごとに追加指示を与えられます。</li>
+    <li>例：「必ず『ご来店ありがとうございます』から始める」「絵文字は使わない」など、ブランドのトーンを反映できます。</li>
+  </ul>
+  <div class="call tip"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0012 2z"/></svg><div class="ct">TIPS</div><p>クライアントの雰囲気に合わせてトーンを固定しておくと、誰が操作しても文章の質が揃います。</p></div>
+</section>
+</div>
+
+<!-- ============ 17. システムステータス ============ -->
+<div class="page pagebreak">
+<section id="c17" class="secwrap">
+  <h2 class="sec"><span class="chapno g">17</span>システムステータス・デモモード</h2><span class="u"></span>
+  <h3 class="sub">システムステータス</h3>
+  <p>Google連携・AI・順位計測など、各機能の接続状態を一覧で確認できます。「動かない」ときの原因の切り分けに使います。</p>
+  <h3 class="sub">デモモード（営業用サンプル店舗）</h3>
+  <p>実店舗のデータがなくても、サンプル店舗で全機能の動きを見せられます。導入前の説明・営業デモにご活用ください。</p>
+</section>
+</div>
+
+<!-- ============ FAQ ============ -->
+<div class="page pagebreak">
+<section id="faq" class="secwrap">
+  <h2 class="sec">よくある質問（FAQ）</h2><span class="u"></span>
+  <h4>Q. 料金はかかりますか？</h4>
+  <p>A. ラクラクMEOは無料でご利用いただけます。AI・順位計測も、無料の範囲でご提供しています。</p>
+  <h4>Q. 順位が表示されません。</h4>
+  <p>A. 順位は登録の翌週月曜早朝に自動取得されます。登録直後は「これから取得」の状態です。手動取得も可能です（→ 10章）。</p>
+  <h4>Q. 口コミ返信や投稿は、すぐGoogleやInstagramに公開されますか？</h4>
+  <p>A. 「返信する」「投稿する」を押した時点で公開されます。それまでは下書きです。<b>公開前に内容を必ず確認</b>してください。</p>
+  <h4>Q. 外国語の口コミにも返信できますか？</h4>
+  <p>A. できます。英語・中国語・韓国語・タイ語などを判定し、同じ言語で返信案を作成します（→ 6章）。</p>
+  <h4>Q. ボタンが押せない／画面が出ないのはなぜ？</h4>
+  <p>A. ロール（権限）による制限の可能性が高いです。ご自身のロールを確認し、必要なら管理者に依頼してください（→ 15章）。</p>
+  <h4>Q. 取り込んだ写真が切れて表示されます。</h4>
+  <p>A. 投稿画像作成では、写真は元の比率のまま表示され、枠に合わせて中央が表示されます。「画像」タブのサイズ・ドラッグで、見せたい部分を調整してください（→ 8章）。</p>
+  <h4>Q. パソコンをスリープにしても、処理は進みますか？</h4>
+  <p>A. 順位取得・改ざん検知などの自動処理はサーバー側（クラウド）で動くため、お使いのPCの状態に関係なく実行されます。</p>
+</section>
+</div>
+
+<!-- ============ トラブルシューティング ============ -->
+<div class="page pagebreak">
+<section id="trouble" class="secwrap">
+  <h2 class="sec">困ったときは</h2><span class="u"></span>
+  <table class="t">
+    <tr><th>症状</th><th>確認・対処</th></tr>
+    <tr><td>ログインできない</td><td>メール・パスワードを再確認。2段階認証のコード入力漏れがないか。解決しなければ管理者へ。</td></tr>
+    <tr><td>店舗が表示されない</td><td>Google連携が完了しているか（→5章）。店舗管理で管理対象に選んでいるか（→4章）。</td></tr>
+    <tr><td>口コミ・インサイトが出ない</td><td>画面上部で店舗を選んでいるか。連携アカウントに権限があるか。更新ボタンを押す。</td></tr>
+    <tr><td>順位が「—」のまま</td><td>登録直後は未取得。翌週月曜まで待つか、手動取得する。</td></tr>
+    <tr><td>投稿画像が保存できない</td><td>背景写真によっては保存できない場合があります。別の写真を選ぶか、Chromeでお試しください。</td></tr>
+    <tr><td>ボタンが押せない</td><td>ロール（権限）の制限。管理者に確認（→15章）。</td></tr>
+  </table>
+</section>
+</div>
+
+<!-- ============ 迷ったらこれだけ ============ -->
+<div class="page pagebreak">
+<section id="justthis" class="secwrap">
+  <h2 class="sec">迷ったらこれだけ</h2><span class="u"></span>
+  <p class="lead-p">忙しくて全部はできない——そんなときは、この3つだけ続けてください。効果の大きい順です。</p>
+  <div class="steps">
+    <div class="step"><span class="badge" style="background:linear-gradient(135deg,#1b9d55,#12703d)">1</span><div class="st-body"><h4>口コミに毎日返信する</h4><p>新しい口コミにAIで返信するだけ。評価とマップ順位の両方に効く、最も費用対効果の高い施策です。</p></div></div>
+    <div class="step"><span class="badge">2</span><div class="st-body"><h4>週に2〜3回、投稿する</h4><p>AI投稿文＋投稿画像作成で数分。Googleに「動いている店舗」と認識されます。</p></div></div>
+    <div class="step"><span class="badge" style="background:linear-gradient(135deg,#1b5fc9,#0f4aa8)">3</span><div class="st-body"><h4>AIコンサルの週次タスクをこなす</h4><p>次に何をすべきかは、AIが教えてくれます。上から順にやるだけで、MEOが前に進みます。</p></div></div>
+  </div>
+</section>
+</div>
+
+<!-- ============ 用語集 ============ -->
+<div class="page pagebreak">
+<section id="glossary" class="secwrap">
+  <h2 class="sec">用語集</h2><span class="u"></span>
+  <table class="t">
+    <tr><th>用語</th><th>意味</th></tr>
+    <tr><td>MEO</td><td>Map Engine Optimization。Googleマップでの表示順位を高める取り組み。</td></tr>
+    <tr><td>GBP</td><td>Googleビジネスプロフィール。店舗のGoogle上の情報ページ。</td></tr>
+    <tr><td>NAP</td><td>店名（Name）・住所（Address）・電話（Phone）。基本情報の総称。</td></tr>
+    <tr><td>インサイト</td><td>GBPの反響データ（表示回数・電話・ルート検索など）。</td></tr>
+    <tr><td>対策キーワード</td><td>順位を上げたい検索語。「地域名×業種」など。</td></tr>
+    <tr><td>ロール</td><td>ユーザーの権限。super_admin／admin／editor／viewer。</td></tr>
+    <tr><td>AIO</td><td>AI検索・生成AI（AI Overview など）に取り上げられるための最適化。</td></tr>
+    <tr><td>PWA</td><td>ウェブをアプリのようにホーム画面に追加して使える仕組み。</td></tr>
+  </table>
+</section>
+</div>
+
+<!-- ============ 更新履歴 ============ -->
+<div class="page pagebreak">
+<section id="changelog" class="secwrap">
+  <h2 class="sec">更新履歴・お問い合わせ</h2><span class="u"></span>
+  <h3 class="sub">更新履歴</h3>
+  <table class="t">
+    <tr><th>Version</th><th>日付</th><th>主な変更</th></tr>
+    <tr><td>Ver 1.0.0</td><td>2026-07-03</td><td>製品マニュアル初版。投稿画像作成（背景調整・文字なしテンプレ・ロゴ挿入・写真の一括削除）を反映。</td></tr>
+  </table>
+  <h3 class="sub">お問い合わせ</h3>
+  <p>操作方法・不具合・ご要望は、担当窓口までご連絡ください。</p>
+  <table class="t">
+    <tr><td style="width:160px">提供元</td><td>株式会社cantik</td></tr>
+    <tr><td>サービスURL</td><td><span class="mono">https://meo.cantik.co.jp</span></td></tr>
+    <tr><td>連絡先</td><td><span class="mono">cantik.co.jp@gmail.com</span></td></tr>
+  </table>
+  <div class="call note"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="ct">NOTE</div><p>アプリ内の各画面からも、該当箇所のヘルプへ移動できます。まずはアプリ内ヘルプもご活用ください。</p></div>
+  <div class="foot">© 2026 株式会社cantik ／ ラクラクMEO 製品マニュアル Ver 1.0.0</div>
+</section>
+</div>
+
+</div>
+</body>
+</html>
