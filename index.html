@@ -587,6 +587,10 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         設定
       </button>
+      <a class="nav-item" href="/help.html" target="_blank" rel="noopener" style="text-decoration:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        使い方ガイド
+      </a>
 
       <div class="sidebar-section">店舗切替</div>
       <div class="store-list" id="storeList">
@@ -615,6 +619,7 @@ body {
     <div id="topbarTitle" style="font-weight:700;font-size:16px;color:var(--text)">ダッシュボード</div>
     <div class="topbar-user" style="display:flex;align-items:center;gap:10px">
       <span id="topbarUpdated" style="font-size:12px;color:var(--text-sub);white-space:nowrap"></span>
+      <button class="btn btn-outline btn-sm" id="topbarHelpBtn" onclick="openPanelHelp()" title="この画面の使い方ガイドを開く"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>使い方</button>
       <button class="btn btn-outline btn-sm" id="topbarRefreshBtn" onclick="refreshCurrentPanel(this)" title="このページを最新のデータに更新"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
       <span id="gbpConnectState"></span>
     </div>
@@ -8088,6 +8093,20 @@ function refreshCurrentPanel(btn) {
   }
   switchPanel(name); // 各ページのローダーを再実行（同じページのまま最新化）
   showToast('最新のデータに更新しています…', 'success');
+}
+
+// 現在のパネルに対応した使い方ガイド(help.html)のセクションを新しいタブで開く
+const PANEL_HELP_ANCHOR = {
+  dashboard: 'dashboard', clients: 'client-report', stores: 'stores', reviews: 'reviews',
+  posts: 'posts', instagram: 'posts', citation: 'gbp-optimize', aio: 'gbp-optimize',
+  protection: 'gbp-optimize', knowledge: 'start', rankmgr: 'keywords', rankreport: 'report',
+  settings: 'settings',
+};
+function openPanelHelp() {
+  let name = 'dashboard';
+  try { name = sessionStorage.getItem('rakuraku_panel') || 'dashboard'; } catch (e) {}
+  const anchor = PANEL_HELP_ANCHOR[name] || 'start';
+  window.open('/help.html#' + anchor, '_blank', 'noopener');
 }
 
 function showPanel(name, el) {
