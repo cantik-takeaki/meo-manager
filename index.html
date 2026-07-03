@@ -2465,13 +2465,18 @@ body {
       <div class="card" id="draftsCard">
         <div class="card-header" style="flex-wrap:wrap;gap:8px">
           <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>予約投稿の管理</div>
-          <div style="display:flex;gap:10px;align-items:center;margin-left:auto">
+          <div style="display:flex;gap:10px;align-items:center;margin-left:auto;flex-wrap:wrap">
             <span id="draftsSummary" style="font-size:12px;color:var(--text-sub)"></span>
+            <div style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px">
+              <button class="pop-tab pop-tab-on" id="draftViewList" onclick="setDraftView('list')" style="flex:none;padding:4px 12px;font-size:12px">リスト</button>
+              <button class="pop-tab" id="draftViewCal" onclick="setDraftView('calendar')" style="flex:none;padding:4px 12px;font-size:12px">カレンダー</button>
+            </div>
             <button class="btn btn-outline btn-sm" onclick="loadDrafts()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/></svg>更新</button>
           </div>
         </div>
         <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">新規投稿で「予約する」または月間プランで作成した投稿がここに入ります。期日は目安で、公開は「今すぐ投稿」で手動です（自動投稿はされません）。<b style="color:var(--red)">期日超過</b>は未投稿のまま日付を過ぎた投稿です。</p>
         <div id="draftsAlert"></div>
+        <div id="draftsCalendar" style="display:none"></div>
         <div id="draftsList"></div>
       </div>
 
@@ -9101,6 +9106,61 @@ function _draftStatus(d) {
   if (d.scheduledDate === today) return { key: 'today', label: '本日公開予定', color: '#d97706' };
   return { key: 'future', label: '予定', color: 'var(--accent)' };
 }
+// 予約投稿の表示切替（リスト/カレンダー）
+let _draftView = 'list';
+function setDraftView(v) {
+  _draftView = v;
+  document.getElementById('draftViewList')?.classList.toggle('pop-tab-on', v === 'list');
+  document.getElementById('draftViewCal')?.classList.toggle('pop-tab-on', v === 'calendar');
+  const cal = document.getElementById('draftsCalendar');
+  const list = document.getElementById('draftsList');
+  if (cal) cal.style.display = v === 'calendar' ? 'block' : 'none';
+  if (list) list.style.display = v === 'calendar' ? 'none' : 'block';
+  if (v === 'calendar') renderDraftCalendar();
+}
+let _calYm = null; // 'YYYY-MM'
+function calMonthMove(diff) {
+  const [y, m] = (_calYm || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+  const d = new Date(y, m - 1 + diff, 1);
+  _calYm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  renderDraftCalendar();
+}
+function renderDraftCalendar() {
+  const box = document.getElementById('draftsCalendar');
+  if (!box) return;
+  const drafts = window._draftsCache || [];
+  const ym = _calYm || new Date().toISOString().slice(0, 7);
+  _calYm = ym;
+  const [y, m] = ym.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const startDow = first.getDay(); // 0=日
+  const today = new Date().toISOString().slice(0, 10);
+  const byDate = {};
+  drafts.forEach(d => { if (d.scheduledDate) (byDate[d.scheduledDate] = byDate[d.scheduledDate] || []).push(d); });
+  let cells = '';
+  for (let i = 0; i < startDow; i++) cells += '<div style="min-height:74px"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const ds = `${ym}-${String(day).padStart(2, '0')}`;
+    const items = byDate[ds] || [];
+    const isToday = ds === today;
+    cells += `<div style="min-height:74px;border:1px solid ${isToday ? 'var(--accent)' : 'var(--border)'};border-radius:8px;padding:5px 6px;${isToday ? 'background:rgba(46,143,240,0.05)' : ''}">
+      <div style="font-size:11px;font-weight:${isToday ? '800' : '600'};color:${isToday ? 'var(--accent)' : 'var(--text-sub)'}">${day}</div>
+      ${items.slice(0, 3).map(d => { const st = _draftStatus(d); return `<div title="${escapeHtml((d.content || '').slice(0, 60))}" onclick="setDraftView('list');setTimeout(()=>document.getElementById('draftdate-${d.id}')?.scrollIntoView({block:'center'}),60)" style="font-size:10px;background:${st.color};color:#fff;border-radius:5px;padding:1px 5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer">${d.scheduledTime ? d.scheduledTime + ' ' : ''}${escapeHtml((d.content || '投稿').slice(0, 10))}</div>`; }).join('')}
+      ${items.length > 3 ? `<div style="font-size:10px;color:var(--text-sub);margin-top:2px">他${items.length - 3}件</div>` : ''}
+    </div>`;
+  }
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <button class="btn btn-outline btn-sm" onclick="calMonthMove(-1)">← 前月</button>
+      <div style="font-weight:800;font-size:14px">${y}年${m}月</div>
+      <button class="btn btn-outline btn-sm" onclick="calMonthMove(1)">次月 →</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;color:var(--text-sub);text-align:center;margin-bottom:4px"><div style="color:var(--red)">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div style="color:var(--accent)">土</div></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${cells}</div>
+    <p style="font-size:11px;color:var(--text-sub);margin-top:8px">バッジをクリックするとリスト表示で該当の投稿へ移動します。色: <span style="color:var(--red)">赤=期日超過</span>／<span style="color:#d97706">黄=本日</span>／<span style="color:var(--accent)">青=予定</span></p>`;
+}
+
 async function loadDrafts() {
   if (!currentLocation) return;
   const storeId = currentLocation.storeId || '';
@@ -9114,6 +9174,8 @@ async function loadDrafts() {
     let drafts = draftsData.drafts || [];
     // 期日の近い順（未設定は末尾）
     drafts = drafts.slice().sort((a, b) => (a.scheduledDate || '9999').localeCompare(b.scheduledDate || '9999') || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
+    window._draftsCache = drafts;
+    if (_draftView === 'calendar') renderDraftCalendar();
     _draftMediaList = mediaData.media || [];
     // サマリー＋期日超過アラート
     const cnt = { today: 0, overdue: 0, future: 0 };
