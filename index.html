@@ -5492,8 +5492,8 @@ function renderMedia() {
       const pid = String(m.publicId).replace(/'/g, "\\'");
       const check = on ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
       return `
-    <div onclick="toggleMediaSel('${pid}')" style="position:relative;border-radius:8px;overflow:hidden;border:2px solid ${on ? 'var(--accent)' : 'var(--border)'};aspect-ratio:1;cursor:pointer">
-      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;${on ? 'opacity:.7' : ''}">
+    <div onclick="toggleMediaSel('${pid}')" style="position:relative;border-radius:8px;overflow:hidden;border:2px solid ${on ? 'var(--accent)' : 'var(--border)'};aspect-ratio:1;cursor:pointer;background:#eef1f5">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.url || m.squareUrl)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;display:block;${on ? 'opacity:.7' : ''}">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
       <div style="position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:${on ? 'var(--accent)' : 'rgba(0,0,0,0.35)'};display:flex;align-items:center;justify-content:center">${check}</div>
     </div>`;
@@ -5501,8 +5501,8 @@ function renderMedia() {
     return;
   }
   g.innerHTML = _mediaList.map((m, i) => `
-    <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1">
-      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.squareUrl || m.url)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;cursor:pointer" onclick="${m.isVideo ? `pickPhoto(${i})` : `genFromPhoto(${i})`}" title="${m.isVideo ? 'クリックで選択' : 'クリックでこの写真から画像生成'}">
+    <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;background:#eef1f5">
+      <img src="${m.isVideo ? (m.thumbnailUrl || m.url) : (m.url || m.squareUrl)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;display:block;cursor:pointer" onclick="${m.isVideo ? `pickPhoto(${i})` : `genFromPhoto(${i})`}" title="${m.isVideo ? 'クリックで選択' : 'クリックでこの写真から画像生成'}">
       ${m.isVideo ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div style="background:rgba(0,0,0,0.5);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div></div>' : ''}
       ${m.isVideo ? '' : `<button onclick="event.stopPropagation();genFromPhoto(${i})" title="この写真で画像生成" style="position:absolute;bottom:4px;left:4px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:700;line-height:1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>生成</button>`}
       ${m.isVideo ? '' : `<button onclick="event.stopPropagation();postPhotoToGbp(${i})" title="Googleビジネスプロフィールに写真を追加" style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;line-height:1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Google</button>`}
@@ -5555,23 +5555,39 @@ async function bulkDeleteMedia() {
 }
 
 // スマホ写真をブラウザ側でリサイズ（アップロード軽量化・関数の本文制限対策）
-function resizeImage(file, maxSize) {
-  return new Promise((resolve, reject) => {
+async function resizeImage(file, maxSize) {
+  // 縦横比は保ったまま最大maxSizeに収める（クロップしない）。EXIF回転を尊重してスマホ縦写真が横向きにならないようにする。
+  const fit = (iw, ih) => {
+    let w = iw, h = ih;
+    if (w > maxSize || h > maxSize) {
+      if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+      else { w = Math.round(w * maxSize / h); h = maxSize; }
+    }
+    return { w: w || 1, h: h || 1 };
+  };
+  const draw = (src, w, h) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(src, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  };
+  // 1) createImageBitmap（EXIF自動補正あり）を優先＝回転が確実に正しくなる
+  if (window.createImageBitmap) {
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const { w, h } = fit(bmp.width, bmp.height);
+      const uri = draw(bmp, w, h);
+      if (bmp.close) bmp.close();
+      return uri;
+    } catch (e) { /* 非対応環境はフォールバックへ */ }
+  }
+  // 2) フォールバック：<img>（多くのブラウザはEXIFを適用）
+  return await new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
     reader.onload = e => { img.src = e.target.result; };
     reader.onerror = reject;
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > maxSize || height > maxSize) {
-        if (width > height) { height = Math.round(height * maxSize / width); width = maxSize; }
-        else { width = Math.round(width * maxSize / height); height = maxSize; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
+    img.onload = () => { const { w, h } = fit(img.naturalWidth || img.width, img.naturalHeight || img.height); resolve(draw(img, w, h)); };
     img.onerror = reject;
     reader.readAsDataURL(file);
   });
