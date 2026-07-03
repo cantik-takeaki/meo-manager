@@ -566,6 +566,28 @@ ${infoBlock}
 - 前置き・締めの挨拶は不要。3見出しの箇条書きのみ出力`;
   }
 
+  // GBPの「ビジネスの説明」（750字以内・対策KWを自然に織り込む・説明文の手入力頼み解消）
+  if (type === 'gbp_description') {
+    prompt = `あなたはMEO（Googleマップ集客）専門のライターです。Googleビジネスプロフィールの「ビジネスの説明」欄に載せる紹介文を書いてください。
+
+【店舗情報】
+- 店名: ${knowledge.storeName || storeName}
+- 業種: ${knowledge.category || '不明'}
+- 地域/アクセス: ${[knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ') || '不明'}
+- 強み・特徴: ${strengths || '未設定'}
+- 提供サービス: ${services || '未設定'}
+${knowledge.serviceArea ? `- 対応エリア: ${knowledge.serviceArea}` : ''}
+${knowledge.targetCustomer ? `- ターゲット: ${knowledge.targetCustomer}` : ''}
+
+【ルール】
+- 全体で400〜700文字（GBPの上限750文字以内を厳守）
+- 冒頭の1文で「どこで・何を提供する店か」が伝わるようにする（地域名＋業種を自然に含める）
+- 実在の情報のみ使う。架空のメニュー・実績・受賞歴を作らない。誇大表現・効果の断定・「No.1」「日本一」等は使わない
+- URL・電話番号・記号の羅列・絵文字は入れない（GBPガイドライン）
+- 2〜3段落で読みやすく。です・ます調
+- 説明文のみを出力（見出し・前置きなし）`;
+  }
+
   // AIコンサル: 週次タスク＋総評＋来月予測（構造化JSON・ぐるっとMEO対抗）
   if (type === 'weekly_tasks') {
     const c = req.body.consul || {};
@@ -1006,7 +1028,7 @@ ${topText || 'データなし'}
   }
 
   // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
-  const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption'];
+  const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
   if (seoWeave && _seoTypes.includes(type)) prompt += seoWeave;
 
   if (!prompt) return res.status(400).json({ error: '不明なtype' });

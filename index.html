@@ -2344,6 +2344,7 @@ body {
             <option value="product_desc">商品・サービス説明（GBP商品登録）</option>
             <option value="qa_generate">よくある質問（Q&amp;A）</option>
             <option value="hp_content">ホームページのコンテンツ</option>
+            <option value="gbp_description">GBP ビジネスの説明文（750字以内）</option>
             <option value="photo_caption">写真の説明</option>
             <option value="post">GBP投稿文</option>
             <option value="catchcopy">キャッチコピー</option>
@@ -2352,6 +2353,15 @@ body {
           <button class="btn btn-primary btn-sm" id="scGenBtn" onclick="scGenerate(event)">生成</button>
         </div>
         <div id="scResult" style="margin-top:12px"></div>
+      </div>
+
+      <!-- 景表法・薬機法チェッカー（cantik本業知見・機械検出） -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>景表法・薬機法チェック</div></div>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">投稿文・説明文・チラシ原稿などを貼り付けると、「No.1」「必ず」「完治」等のリスク表現を機械検出し、言い換え例を提示します。AI生成文にも自動で同じチェックがかかります。</p>
+        <textarea id="kbCheckInput" placeholder="チェックしたい文章を貼り付けてください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.7"></textarea>
+        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="kbRunManualCheck()">チェックする</button></div>
+        <div id="kbCheckResult"></div>
       </div>
 
       <div class="card">
@@ -4373,10 +4383,48 @@ async function addAllPlannerKw(ev) {
   if (btn) { btn.disabled = false; btn.textContent = '対策キーワードに全部追加'; }
 }
 
+// ── 景表法・薬機法NGワードチェッカー（機械検出・cantik本業知見） ──
+const KB_NG_RULES = [
+  { re: /(No\.?\s?1|ナンバー\s?ワン|日本一|業界(第?一|トップ)|地域(一番|No\.?1)|世界一)/gi, level: 'high', reason: 'No.1表示は客観的な調査の根拠と出典（調査機関・時期）の表記が必要です（優良誤認のおそれ）', suggest: '根拠を併記するか「地域で多くの方に選ばれています」等へ' },
+  { re: /(必ず|確実に|絶対(に)?)(?![^。]*(ではありません|とは限り))/g, level: 'high', reason: '効果・結果の断定表現は優良誤認のおそれがあります', suggest: '「〜が期待できます」「〜を目指します」' },
+  { re: /(完全|完璧|唯一|100\s?[%％])/g, level: 'high', reason: '絶対的表現は客観的根拠がない限り使えません', suggest: '具体的な事実・数値（根拠つき）に置き換え' },
+  { re: /(治る|治り(ます)?|完治|即効|効果を保証|若返(る|り)|シミが(消え|なくな)|痩せ(る|られる)こと?(を|は)?(保証|約束))/g, level: 'high', reason: '医療・美容の効能を断定する表現は薬機法・景表法のリスクがあります', suggest: '「〜のケアをサポート」「〜を目指す施術」等へ' },
+  { re: /(最高|最安(値)?|最速|最大級|業界最)/g, level: 'mid', reason: '最上級表現は客観的根拠の併記が必要です', suggest: '根拠を併記するか「〜に自信があります」等へ' },
+  { re: /((満足度|リピート率|成功率)\s?\d{2,3}\s?[%％])/g, level: 'mid', reason: '数値実績は調査の一次データ（時期・母数・調査方法）の根拠が必要です', suggest: '「2026年自社調べ・n=120」のように根拠を併記' },
+];
+function kbCheckText(text) {
+  const findings = [];
+  const t = String(text || '');
+  KB_NG_RULES.forEach(rule => {
+    const seen = new Set();
+    let m;
+    const re = new RegExp(rule.re.source, rule.re.flags);
+    while ((m = re.exec(t)) !== null) {
+      const w = m[0];
+      if (!seen.has(w)) { seen.add(w); findings.push({ word: w, level: rule.level, reason: rule.reason, suggest: rule.suggest }); }
+      if (re.lastIndex === m.index) re.lastIndex++;
+    }
+  });
+  return findings;
+}
+function kbFindingsHtml(findings) {
+  if (!findings.length) return `<div style="font-size:12px;color:var(--accent-2);margin-top:8px">${ICO_OK}景表法・薬機法のリスク語は検出されませんでした（機械チェック）</div>`;
+  return `<div style="margin-top:8px;padding:10px 12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:8px">
+    <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">景表法・薬機法チェック: ${findings.length}件のリスク語を検出しました。公開前に修正・根拠の確認をしてください</div>
+    ${findings.map(f => `<div style="font-size:12px;line-height:1.7;margin-bottom:6px">${ICO_DOT(f.level === 'high' ? 'var(--red)' : '#f59e0b')}<b>「${escapeHtml(f.word)}」</b> — ${escapeHtml(f.reason)}<br><span style="color:var(--text-sub);margin-left:14px">言い換え例: ${escapeHtml(f.suggest)}</span></div>`).join('')}
+    <div style="font-size:11px;color:var(--text-sub)">※機械検出の参考情報です。最終判断は内容と根拠をご確認ください（医療・美容系は特に厳格に）。</div>
+  </div>`;
+}
+function kbRunManualCheck() {
+  const t = document.getElementById('kbCheckInput')?.value || '';
+  if (!t.trim()) return showToast('チェックする文章を貼り付けてください', 'error');
+  document.getElementById('kbCheckResult').innerHTML = kbFindingsHtml(kbCheckText(t));
+}
+
 // ── AIでMEOコンテンツを作成（対策キーワード反映）──
 function scOnType() {
   const t = document.getElementById('scType').value, inp = document.getElementById('scInput');
-  const ph = { product_desc: '（任意）商品・サービス名', qa_generate: '（Q&Aは店舗情報から自動生成）', hp_content: '（任意）HPのセクション名（例：トップの紹介文）', photo_caption: '写真の内容・伝えたいこと', post: '（任意）投稿のテーマ・伝えたいこと', catchcopy: '（任意）切り口の指定' };
+  const ph = { product_desc: '（任意）商品・サービス名', qa_generate: '（Q&Aは店舗情報から自動生成）', hp_content: '（任意）HPのセクション名（例：トップの紹介文）', photo_caption: '写真の内容・伝えたいこと', post: '（任意）投稿のテーマ・伝えたいこと', catchcopy: '（任意）切り口の指定', gbp_description: '（GBPの説明文は店舗情報から自動生成されます）' };
   if (inp) inp.placeholder = ph[t] || '';
 }
 async function scGenerate(ev) {
@@ -4399,7 +4447,8 @@ async function scGenerate(ev) {
     const kwNote = (window._kwData?.keywords || []).filter(k => k && window._kwData.meta?.[k]?.enabled !== false).length
       ? '<div style="font-size:11px;color:var(--accent-2);margin-bottom:6px">✓ この店舗の対策キーワードを反映しました</div>' : '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">※対策キーワード未登録のため一般的な内容で生成しました</div>';
     res.innerHTML = kwNote + `<textarea readonly style="width:100%;min-height:150px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;line-height:1.8;resize:vertical">${escapeHtml(txt)}</textarea>
-      <div style="text-align:right;margin-top:6px"><button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.value);showToast('コピーしました','success')">コピー</button></div>`;
+      <div style="text-align:right;margin-top:6px"><button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.value);showToast('コピーしました','success')">コピー</button></div>`
+      + (d.content ? kbFindingsHtml(kbCheckText(txt)) : '');
   } catch (e) { res.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">生成に失敗しました: ${escapeHtml(e.message)}</div>`; }
   if (btn) { btn.disabled = false; btn.textContent = bh; }
 }
