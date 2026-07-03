@@ -564,6 +564,36 @@ ${infoBlock}
 - 前置き・締めの挨拶は不要。3見出しの箇条書きのみ出力`;
   }
 
+  // AIコンサル: 週次タスク＋総評＋来月予測（構造化JSON・ぐるっとMEO対抗）
+  if (type === 'weekly_tasks') {
+    const c = req.body.consul || {};
+    const rv = c.reviewStats || {};
+    const reviewLine = rv.totalCount != null
+      ? `平均★${rv.averageRating || 0} / 累計${rv.totalCount || 0}件 / 未返信${rv.unrepliedCount || 0}件`
+      : '未連携（口コミ未取得）';
+    const rankLine = (c.rankings && c.rankings.length)
+      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '圏外'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前回比${r.diff > 0 ? '+' : ''}${r.diff}）` : ''}`).join('、')
+      : '未計測';
+    prompt = `あなたはMEO（Googleマップ集客）の専門コンサルタントです。
+以下の店舗データを分析し、「今週やるべき具体的なタスク」と「来月の見通し」をJSONで出力してください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || '不明'}
+【MEOグレード】${c.grade || '?'}（スコア${c.score != null ? c.score : '?'}/100）
+【未対応・弱い項目】${(c.missing || []).join('、') || 'なし'}
+【口コミ】${reviewLine}
+【キーワード順位】${rankLine}
+
+【出力ルール】
+- 以下のJSONのみを出力（説明・前置き・コードフェンスなし）
+{"summary":"現状の総評を2〜3文。何が強く何がボトルネックか","tasks":[{"name":"具体的なタスク名（何をどうするか明確に）","minutes":15,"effect":"実施した場合に期待できる改善","priority":"high"}],"forecast":{"comment":"来月の見通しを1〜2文","focusKeywords":["重点対策すべきキーワード最大3個"],"priorityActions":["来月の優先改善アクション2〜3個"]}}
+- tasksは3〜5個。priorityは high/mid/low。minutesは実施の目安時間（分・数値）
+- タスクは「未対応・弱い項目」と「下落キーワード」への対処を最優先に、この店で今週実行できる具体的な行動にする（一般論にしない）
+- 未返信口コミがあれば必ずタスクに含める
+- 効果・順位・集客数を断定や捏造しない（「〜が期待できます」程度）
+- 架空のキャンペーンやサービスを提案しない`;
+  }
+
   // 媒体登録状況・AIO/LLMO/GEOの「やることリスト」助言（現状をふまえて次の一手を提示）
   if (type === 'advice') {
     const topic = req.body.topic;
@@ -989,8 +1019,8 @@ ${topText || 'データなし'}
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: type === 'keyword_ideas' ? 1800 : 500,
-        temperature: type === 'keyword_ideas' ? 0.55 : 0.85,
+        max_tokens: type === 'keyword_ideas' ? 1800 : type === 'weekly_tasks' ? 1100 : 500,
+        temperature: type === 'keyword_ideas' ? 0.55 : type === 'weekly_tasks' ? 0.5 : 0.85,
         top_p: 0.9,
       }),
     });

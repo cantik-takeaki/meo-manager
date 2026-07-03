@@ -4829,26 +4829,9 @@ async function runCompetitorAnalysis() {
   } catch (e) { box.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">分析に失敗しました</div>'; }
 }
 
-// ─── ダッシュボード：MEO診断（スコアは機械算出・助言はAI） ───
-async function loadDiagnosis() {
-  const card = document.getElementById('meoDiagCard');
-  if (!currentLocationId) { if (card) card.style.display = 'none'; return; }
-  card.style.display = 'block';
-  document.getElementById('meoDiagStore').textContent = currentLocation?.title || '';
-
-  let k = {}, rk = {};
-  try { k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
-  try { rk = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
-  const gbpConnected = currentLocation?._type === 'gbp' || currentLocation?.gbpConnected;
-  let rv = {};
-  if (gbpConnected && currentLocation?.name) {
-    try {
-      const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
-      const r = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${sid}`).then(r => r.json());
-      rv = r.stats || {};
-    } catch (e) {}
-  }
-  // キーワードは対策キーワード（旧ナレッジ欄の統合先）＋旧ナレッジ欄の合算で判定
+// ─── MEO診断の共通ロジック（ダッシュボード診断とAIコンサルで共用・重複ハードコード解消） ───
+// フォーム充足だけでなくGBP実データ（カテゴリ/サイト）と順位実績も加点に含める（見かけ倒しスコアの是正）
+function _meoDiag(k, rk, rv, gbpConnected, loc) {
   const kw = (k.keywords || []).filter(Boolean);
   const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
   const kwCount = new Set([...kw, ...rkKw]).size;
@@ -4868,14 +4851,59 @@ async function loadDiagnosis() {
     { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
     { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0 },
   ];
+  // GBP実データ項目（連携店舗のみ・GBP最適化チェックと同じ実データ判定）
+  if (loc && (loc._type === 'gbp' || loc.gbpConnected || loc.storefrontAddress)) {
+    const cats = loc.categories || {};
+    items.push(
+      { label: 'GBPメインカテゴリ', w: 6, ok: !!cats.primaryCategory },
+      { label: 'GBPサブカテゴリ', w: 6, ok: !!(cats.additionalCategories && cats.additionalCategories.length) },
+      { label: 'GBPウェブサイト', w: 4, ok: !!loc.websiteUri },
+    );
+  }
+  // 順位実績（最新計測でTOP10圏内が1つでもあるか）
+  const hist = rk.history || [];
+  const lastR = hist[hist.length - 1];
+  const anyTop10 = !!(lastR && (lastR.rankings || []).some(r => { const n = parseInt(r, 10); return Number.isFinite(n) && n >= 1 && n <= 10; }));
+  items.push({ label: 'TOP10キーワード', w: 8, ok: anyTop10 });
   const total = items.reduce((s, i) => s + i.w, 0);
   const earned = items.reduce((s, i) => s + (i.ok ? i.w : 0), 0);
   const score = Math.round((earned / total) * 100);
+  const grade = score >= 90 ? 'S' : score >= 80 ? 'A' : score >= 65 ? 'B' : score >= 50 ? 'C' : 'D';
+  const GRADE_INFO = {
+    S: { color: '#10b981', label: '非常に良好', advice: '現状維持・口コミ返信を継続' },
+    A: { color: 'var(--accent)', label: '良好', advice: '週次タスクを継続実施' },
+    B: { color: 'var(--gold)', label: '平均的・改善の余地あり', advice: '週次タスクを優先実施' },
+    C: { color: '#f97316', label: '要改善', advice: '未対応項目から対策を実施' },
+    D: { color: 'var(--red)', label: '要緊急対応', advice: '基本設定から早急に整備' },
+  };
+  return { items, score, grade, gradeInfo: GRADE_INFO[grade], kwCount };
+}
+
+// ─── ダッシュボード：MEO診断（スコアは機械算出・助言はAI） ───
+async function loadDiagnosis() {
+  const card = document.getElementById('meoDiagCard');
+  if (!currentLocationId) { if (card) card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('meoDiagStore').textContent = currentLocation?.title || '';
+
+  let k = {}, rk = {};
+  try { k = await fetch(`/api/knowledge?locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
+  try { rk = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); } catch (e) {}
+  const gbpConnected = currentLocation?._type === 'gbp' || currentLocation?.gbpConnected;
+  let rv = {};
+  if (gbpConnected && currentLocation?.name) {
+    try {
+      const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+      const r = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${sid}`).then(r => r.json());
+      rv = r.stats || {};
+    } catch (e) {}
+  }
+  const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, currentLocation);
 
   document.getElementById('meoScoreNum').textContent = score;
-  const lbl = score >= 80 ? '良好' : score >= 60 ? '改善の余地あり' : '要改善';
-  const col = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--gold)' : 'var(--red)';
-  const le = document.getElementById('meoScoreLabel'); le.textContent = lbl; le.style.color = col;
+  const le = document.getElementById('meoScoreLabel');
+  le.innerHTML = `<span style="display:inline-block;min-width:26px;padding:1px 8px;border-radius:7px;background:${gradeInfo.color};color:#fff;font-weight:900;margin-right:6px">${grade}</span>${gradeInfo.label}`;
+  le.style.color = gradeInfo.color;
   document.getElementById('meoChecklist').innerHTML = items.map(i =>
     `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? '✅' : '⬜'} ${i.label}</div>`
   ).join('');
@@ -6862,6 +6890,27 @@ function populateConsulSelect() {
   if (cur) sel.value = cur;
 }
 
+// 週次タスクの完了チェック（localStorage・週が変わるとリセット）
+function _isoWeek() {
+  const d = new Date();
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return t.getUTCFullYear() + '-W' + String(Math.ceil(((t - y0) / 864e5 + 1) / 7)).padStart(2, '0');
+}
+function _consulDone(locId) {
+  try { return JSON.parse(localStorage.getItem(`consul_done_${locId}_${_isoWeek()}`) || '[]'); } catch (e) { return []; }
+}
+function toggleConsulTask(locId, i, el) {
+  const key = `consul_done_${locId}_${_isoWeek()}`;
+  let arr = _consulDone(locId);
+  if (el.checked) { if (!arr.includes(i)) arr.push(i); } else arr = arr.filter(x => x !== i);
+  try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {}
+  const row = el.closest('tr');
+  if (row) row.style.opacity = el.checked ? 0.55 : 1;
+}
+
 async function runAiConsul() {
   const sel = document.getElementById('consulSelect');
   const idx = parseInt(sel?.value, 10);
@@ -6872,7 +6921,7 @@ async function runAiConsul() {
   if (intro) intro.style.display = 'none';
   const box = document.getElementById('consulResult');
   box.style.display = '';
-  box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-sub);font-size:13px">🧠 「${escapeHtml(loc.title || '')}」を分析中…（10秒ほどかかります）</div>`;
+  box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-sub);font-size:13px">「${escapeHtml(loc.title || '')}」を分析中…（10秒ほどかかります）</div>`;
   try {
     // ① データ収集（ナレッジ・口コミ・順位を並行取得）
     const gbpConnected = loc._type === 'gbp' || loc.gbpConnected;
@@ -6884,75 +6933,92 @@ async function runAiConsul() {
       fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({ history: [], keywords: [] })),
     ]);
     const rv = (rvData && rvData.stats) || {};
-    // キーワードは対策キーワード（旧ナレッジ欄の統合先）＋旧ナレッジ欄の合算で判定
-    const kw = (k.keywords || []).filter(Boolean);
-    const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
-    const kwCount = new Set([...kw, ...rkKw]).size;
-    // ② MEO健康診断（loadDiagnosisと同一の14項目・重み）
-    const items = [
-      { label: '店名', w: 6, ok: !!k.storeName },
-      { label: '業種カテゴリ', w: 6, ok: !!k.category },
-      { label: '住所', w: 6, ok: !!k.address },
-      { label: '電話番号', w: 6, ok: !!k.phone },
-      { label: '営業時間', w: 6, ok: !!k.businessHours },
-      { label: '店舗説明', w: 6, ok: !!k.description },
-      { label: '強み・特徴', w: 8, ok: !!k.strengths },
-      { label: '提供サービス', w: 8, ok: !!k.services },
-      { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
-      { label: 'キーワード設定', w: 8, ok: kwCount >= 3 },
-      { label: 'GBP連携', w: 10, ok: !!gbpConnected },
-      { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
-      { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
-      { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0 },
-    ];
-    const total = items.reduce((s, i) => s + i.w, 0);
-    const earned = items.reduce((s, i) => s + (i.ok ? i.w : 0), 0);
-    const score = Math.round((earned / total) * 100);
-    const lbl = score >= 80 ? '良好' : score >= 60 ? '改善の余地あり' : '要改善';
-    const col = score >= 80 ? 'var(--accent-2)' : score >= 60 ? 'var(--gold)' : 'var(--red)';
-    // 最新の順位（あれば）。history[].rankingsはrk.keywordsにindex対応なので、そちらを正とする
+    // ② MEO診断（loadDiagnosisと共通ロジック・グレードS〜D）
+    const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, loc);
+    // ③ 順位分析（最新と前回の差分。history[].rankingsはrk.keywordsにindex対応）
     const hist = rk.history || [];
     const lastR = hist[hist.length - 1];
-    const rankSrc = (rk.keywords && rk.keywords.length) ? rk.keywords : kw;
-    const rankings = rankSrc.map((w, i) => ({ keyword: w, rank: lastR ? (parseInt(lastR.rankings?.[i], 10) || null) : null }));
-    // ③ AI助言（既存diagnosisタイプを再利用）
+    const prevR = hist[hist.length - 2];
+    const rankSrc = (rk.keywords && rk.keywords.length) ? rk.keywords : (k.keywords || []).filter(Boolean);
+    const rankings = rankSrc.map((w, i) => {
+      const cur = lastR ? (parseInt(lastR.rankings?.[i], 10) || null) : null;
+      const prev = prevR ? (parseInt(prevR.rankings?.[i], 10) || null) : null;
+      return { keyword: w, rank: cur, diff: (Number.isFinite(cur) && Number.isFinite(prev)) ? prev - cur : null }; // diff>0=上昇
+    });
+    const ups = rankings.filter(r => Number.isFinite(r.diff) && r.diff > 0).sort((a, b) => b.diff - a.diff);
+    const downs = rankings.filter(r => Number.isFinite(r.diff) && r.diff < 0).sort((a, b) => a.diff - b.diff);
+    // ④ AIに週次タスク＋総評＋来月予測を生成させる（構造化JSON）
     const d = await fetch('/api/generate-content', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        locationId: locId, type: 'diagnosis',
-        diagnosis: {
-          score,
-          filled: items.filter(i => i.ok).map(i => i.label),
+        locationId: locId, type: 'weekly_tasks',
+        consul: {
+          grade, score,
           missing: items.filter(i => !i.ok).map(i => i.label),
-          reviewStats: rv, rankings,
+          reviewStats: rv,
+          rankings: rankings.map(r => ({ keyword: r.keyword, rank: r.rank, diff: r.diff })),
         },
       }),
     }).then(r => r.json()).catch(() => ({}));
-    // ④ 3セクションに整形（■優先課題/■やるべき施策 → 改善ポイント、■上位表示のための行動 → 優先アクション）
-    const txt = d.content || '';
-    const grab = (name) => {
-      const m = txt.match(new RegExp('■' + name + '([\\s\\S]*?)(?=■|$)'));
-      return m ? m[1].trim() : '';
-    };
-    const kaizen = [grab('優先課題'), grab('やるべき施策')].filter(Boolean).join('\n');
-    const action = grab('上位表示のための行動');
+    let ai = null;
+    try {
+      const t = d.content || '';
+      const s = t.indexOf('{'), e = t.lastIndexOf('}');
+      if (s !== -1 && e !== -1) ai = JSON.parse(t.slice(s, e + 1));
+    } catch (e) {}
+    const tasks = (ai?.tasks || []).slice(0, 5);
+    const done = _consulDone(locId);
+    const PRIO = { high: { dot: 'var(--red)', label: '高' }, mid: { dot: '#f97316', label: '中' }, low: { dot: 'var(--gold)', label: '低' } };
     const missChips = items.filter(i => !i.ok).map(i => `<span style="font-size:11px;background:rgba(245,158,11,0.12);color:var(--gold);padding:2px 9px;border-radius:999px">${i.label}</span>`).join(' ');
-    const sec = (title, body) => body ? `
-      <div style="border:1px solid var(--border);border-radius:12px;padding:16px;flex:1;min-width:240px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">${title}</div>
-        <div style="font-size:13px;line-height:1.9;white-space:pre-wrap">${escapeHtml(body)}</div>
-      </div>` : '';
+    const rankChip = (r, up) => `<span style="font-size:12px;background:${up ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)'};color:${up ? '#10b981' : 'var(--red)'};padding:3px 10px;border-radius:999px;font-weight:600">${escapeHtml(r.keyword)} ${r.rank}位（${up ? '↑' : '↓'}${Math.abs(r.diff)}）</span>`;
+
     box.innerHTML = `
       <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">
         <div style="border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;min-width:170px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:6px">🩺 MEO健康診断</div>
-          <div style="font-size:42px;font-weight:900;color:${col};line-height:1.1">${score}</div>
-          <div style="font-size:12px;color:${col};font-weight:700">${lbl}</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">達成 ${items.filter(i => i.ok).length}/${items.length}項目</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">MEO総合グレード</div>
+          <div style="width:64px;height:64px;border-radius:16px;background:${gradeInfo.color};color:#fff;font-size:38px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto">${grade}</div>
+          <div style="font-size:12px;color:${gradeInfo.color};font-weight:700;margin-top:6px">${gradeInfo.label}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">スコア ${score}/100 ・ 達成 ${items.filter(i => i.ok).length}/${items.length}</div>
         </div>
-        ${sec('💡 改善ポイント', kaizen || txt || '分析結果を取得できませんでした')}
-        ${sec('🚀 優先アクション', action)}
+        <div style="border:1px solid var(--border);border-radius:12px;padding:16px;flex:1;min-width:260px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px">AIコメント（総評）</div>
+          <div style="font-size:13px;line-height:1.9">${escapeHtml(ai?.summary || '分析結果を取得できませんでした。再度お試しください。')}</div>
+          <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${ups.slice(0, 4).map(r => rankChip(r, true)).join('')}
+            ${downs.slice(0, 4).map(r => rankChip(r, false)).join('')}
+            ${(!ups.length && !downs.length) ? '<span style="font-size:12px;color:var(--text-sub)">順位の前回比データはまだありません（2回以上計測すると表示されます）</span>' : ''}
+          </div>
+        </div>
       </div>
+
+      ${tasks.length ? `
+      <div style="border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:14px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">今週やること（週次タスク）</div>
+        <p style="font-size:11px;color:var(--text-sub);margin-bottom:10px">優先度の高いものを1つ完了させるだけでも十分です。チェックは今週の間保存されます。</p>
+        <div style="overflow-x:auto"><table class="summary-table" style="min-width:560px">
+          <thead><tr><th style="width:44px">完了</th><th style="width:56px">優先度</th><th style="text-align:left">タスク</th><th style="width:70px">目安</th><th style="text-align:left">期待効果</th></tr></thead>
+          <tbody>${tasks.map((t, i) => {
+            const p = PRIO[t.priority] || PRIO.mid;
+            const chk = done.includes(i);
+            return `<tr style="${chk ? 'opacity:0.55' : ''}">
+              <td><input type="checkbox" ${chk ? 'checked' : ''} onchange="toggleConsulTask('${escapeHtml(locId)}',${i},this)" style="width:16px;height:16px;cursor:pointer"></td>
+              <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700"><span style="width:10px;height:10px;border-radius:50%;background:${p.dot};display:inline-block"></span>${p.label}</span></td>
+              <td style="text-align:left;font-size:13px;font-weight:600">${escapeHtml(t.name || '')}</td>
+              <td style="font-size:12px;color:var(--text-sub)">${Number.isFinite(+t.minutes) ? t.minutes + '分' : '—'}</td>
+              <td style="text-align:left;font-size:12px;color:var(--text-sub)">${escapeHtml(t.effect || '')}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>` : ''}
+
+      ${ai?.forecast ? `
+      <div style="border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:14px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">AI予測（来月の見通し）</div>
+        <div style="font-size:13px;line-height:1.8">${escapeHtml(ai.forecast.comment || '')}</div>
+        ${(ai.forecast.focusKeywords || []).length ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:var(--text-sub)">重点キーワード:</span>${ai.forecast.focusKeywords.map(w => `<span style="font-size:12px;background:rgba(46,143,240,0.1);color:var(--accent);padding:3px 10px;border-radius:999px;font-weight:600">${escapeHtml(w)}</span>`).join('')}</div>` : ''}
+        ${(ai.forecast.priorityActions || []).length ? `<ul style="font-size:12.5px;color:var(--text-sub);line-height:1.9;padding-left:18px;margin:8px 0 0">${ai.forecast.priorityActions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>` : ''}
+      </div>` : ''}
+
       ${missChips ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:var(--text-sub)">未対応:</span>${missChips}</div>` : ''}
       <div style="margin-top:12px;text-align:right"><button class="btn btn-outline btn-sm" onclick="selectLocation(${idx})">この店舗の詳細ページを開く →</button></div>`;
   } catch (e) {
