@@ -904,6 +904,7 @@ body {
             <div class="page-sub"><span id="storeCount">0</span>件</div>
           </div>
           <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="seedDemoStore(this)" title="営業デモ用のサンプル店舗を作成します"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M2 3h20v14H2z"/><path d="M8 21h8M12 17v4"/></svg>デモ店舗</button>
             <button class="btn btn-outline btn-sm" onclick="showArchivedStores()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8"/><path d="M10 12h4"/></svg>アーカイブ一覧</button>
             <button class="btn btn-primary btn-sm" onclick="showStoreAdd()">＋ 店舗追加</button>
           </div>
@@ -8269,6 +8270,31 @@ async function deleteStore(storeId) {
 }
 
 // ── アーカイブ一覧（復元・完全削除） ──
+// 営業デモ用のサンプル店舗を作成（既にあれば削除するか確認）
+async function seedDemoStore(btn) {
+  const exists = (window._locations || []).some(l => l.storeId === 'demo-store');
+  if (exists) {
+    if (!confirm('デモ店舗はすでに作成されています。削除しますか？')) return;
+    try {
+      await fetch('/api/admin?action=remove-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      showToast('デモ店舗を削除しました', 'success');
+      await loadLocations();
+      if (typeof showStoreList === 'function') showStoreList();
+    } catch (e) { showToast('削除に失敗: ' + e.message, 'error'); }
+    return;
+  }
+  if (!confirm('営業デモ用のサンプル店舗「さくら美容室 渋谷店」を作成します。\n順位・口コミ・競合・レポートがサンプルデータで表示され、商談でそのまま見せられます。よろしいですか？')) return;
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '作成中…'; }
+  try {
+    const d = await fetch('/api/admin?action=seed-demo', { method: 'POST', headers: { 'Content-Type': 'application/json' } }).then(r => r.json());
+    if (!d.success) throw new Error(d.error || '作成に失敗しました');
+    showToast('デモ店舗を作成しました。サイドバーの店舗切替から選べます', 'success');
+    await loadLocations();
+    if (typeof showStoreList === 'function') showStoreList();
+  } catch (e) { showToast('作成に失敗: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.innerHTML = bh; }
+}
+
 async function showArchivedStores() {
   const modal = document.getElementById('clientIssueModal');
   const body = document.getElementById('clientIssueBody');

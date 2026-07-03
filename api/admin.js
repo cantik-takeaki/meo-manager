@@ -618,6 +618,84 @@ export default async function handler(req, res) {
     return res.json(summary);
   }
 
+  // ── 営業デモ用のサンプル店舗を作成/削除（実データと同じKVに入れるので全機能がそのまま動く） ──
+  if (action === 'seed-demo' && req.method === 'POST') {
+    const DID = 'demo-store';
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    const prevYm = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+    const dstr = (daysAgo) => new Date(now - daysAgo * 86400000).toISOString().slice(0, 10);
+    // 手動店舗として登録（サイドバー・店舗管理に出る）
+    const stores = await kvGet('admin_stores') || [];
+    if (!stores.some(s => s.storeId === DID)) {
+      stores.push({ storeId: DID, storeName: '【デモ】さくら美容室 渋谷店', clientEmail: '', password: 'demo1234', createdAt: now.toISOString(), active: true, isDemo: true });
+      await kvSet('admin_stores', stores);
+    }
+    // 企業ナレッジ
+    await kvSet(`knowledge_${DID}`, {
+      storeName: '【デモ】さくら美容室 渋谷店', category: '美容室', postalCode: '150-0002',
+      address: '東京都渋谷区渋谷2-1-1', phone: '03-1234-5678', businessDays: '火〜日', closedDays: '毎週月曜',
+      businessHours: '10:00〜20:00', parking: '近隣コインパーキング利用', nearbyLandmarks: 'JR渋谷駅 東口から徒歩5分',
+      description: '渋谷駅徒歩5分の隠れ家サロン。縮毛矯正とヘアカラーが得意で、丁寧なカウンセリングが好評です。',
+      strengths: '経験10年以上のスタイリストが在籍。髪質改善・縮毛矯正が得意。個室でゆったり施術。',
+      expertise: '毛髪診断士在籍・縮毛矯正の症例2000件以上', services: 'カット/カラー/縮毛矯正/トリートメント/ヘッドスパ',
+      serviceArea: '渋谷区・目黒区・世田谷区', targetCustomer: '20〜40代の働く女性',
+      keywords: ['渋谷 美容室', '渋谷 縮毛矯正', '渋谷 髪質改善'], updatedAt: now.toISOString(), isDemo: true,
+    });
+    // 対策キーワード（順位履歴つき・優先度・エリア）
+    await kvSet(`rankings_${DID}`, {
+      keywords: ['渋谷 美容室', '渋谷 縮毛矯正', '渋谷 髪質改善', '渋谷 ヘッドスパ', '渋谷 カラー 上手い'],
+      meta: {
+        '渋谷 美容室': { area: '渋谷区', category: '今すぐ客', priority: 'A', enabled: true },
+        '渋谷 縮毛矯正': { area: '渋谷区', category: '悩み・目的', priority: 'A', enabled: true },
+        '渋谷 髪質改善': { area: '渋谷区', category: '悩み・目的', priority: 'B', enabled: true },
+        '渋谷 ヘッドスパ': { area: '渋谷区', category: '差別化', priority: 'B', enabled: true },
+        '渋谷 カラー 上手い': { area: '渋谷区', category: '差別化', priority: 'C', enabled: true },
+      },
+      history: [
+        { date: dstr(28), rankings: [8, 12, 15, 6, 20], recordedAt: now.toISOString() },
+        { date: dstr(21), rankings: [6, 10, 14, 5, 18], recordedAt: now.toISOString() },
+        { date: dstr(14), rankings: [5, 9, 12, 4, 16], recordedAt: now.toISOString() },
+        { date: dstr(7), rankings: [4, 7, 11, 4, 15], recordedAt: now.toISOString() },
+        { date: dstr(1), rankings: [3, 6, 10, 3, 14], recordedAt: now.toISOString() },
+      ],
+    });
+    // 競合＋競合順位の記録
+    const compA = 'demo-cmp-a', compB = 'demo-cmp-b';
+    await kvSet(`competitors_${DID}`, [
+      { id: compA, name: 'BEAUTY SALON Lumiere', placeId: '', area: '渋谷区', compare: true, memo: '駅近・価格帯やや高め', addedAt: now.toISOString() },
+      { id: compB, name: 'hair studio Neo 渋谷', placeId: '', area: '渋谷区', compare: true, memo: 'カラー訴求が強い', addedAt: now.toISOString() },
+    ]);
+    await kvSet(`comp_history_${DID}`, [
+      { date: dstr(14), keyword: '渋谷 美容室', self: 5, comps: [{ id: compA, rank: 2 }, { id: compB, rank: 7 }] },
+      { date: dstr(7), keyword: '渋谷 美容室', self: 4, comps: [{ id: compA, rank: 2 }, { id: compB, rank: 6 }] },
+      { date: dstr(1), keyword: '渋谷 美容室', self: 3, comps: [{ id: compA, rank: 3 }, { id: compB, rank: 8 }] },
+      { date: dstr(1), keyword: '渋谷 縮毛矯正', self: 6, comps: [{ id: compA, rank: 4 }, { id: compB, rank: null }] },
+    ]);
+    // KPI（当月＋前月）
+    await kvSet(`kpi_${DID}_${ym}`, { scan: 46, rate: 0, survey: 31, ai: 18, click: 27, line: 9, lowfb: 2, rateSum: 142, rateCount: 31 });
+    await kvSet(`kpi_${DID}_${prevYm}`, { scan: 38, rate: 0, survey: 24, ai: 12, click: 19, line: 6, lowfb: 3, rateSum: 106, rateCount: 24 });
+    // 口コミ統計（レポート・クライアント配布用）
+    await kvSet(`review_stats_${DID}`, { averageRating: 4.6, totalCount: 128, unrepliedCount: 3, distribution: { 1: 3, 2: 5, 3: 12, 4: 38, 5: 70 }, updatedAt: now.toISOString() });
+    // survey（担当者コメント・アンケート設定の既定）
+    await kvSet(`survey_${DID}`, { reportComment: '今月は「渋谷 美容室」でTOP3を達成しました。縮毛矯正のキーワードも上昇傾向です。来月は口コミ返信の徹底で評価維持を狙います。', isDemo: true });
+    // クライアント配布用アカウント
+    await kvSet(`client_${DID}`, { storeId: DID, storeName: '【デモ】さくら美容室 渋谷店', password: 'demo1234', active: true, createdAt: now.toISOString(), isDemo: true });
+    return res.json({ success: true, storeId: DID });
+  }
+  if (action === 'remove-demo' && req.method === 'POST') {
+    const DID = 'demo-store';
+    const now = new Date();
+    const ym = now.toISOString().slice(0, 7);
+    const prevYm = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+    const stores = (await kvGet('admin_stores') || []).filter(s => s.storeId !== DID);
+    await kvSet('admin_stores', stores);
+    for (const k of [`knowledge_${DID}`, `rankings_${DID}`, `competitors_${DID}`, `comp_history_${DID}`, `review_stats_${DID}`, `survey_${DID}`, `client_${DID}`, `kpi_${DID}_${ym}`, `kpi_${DID}_${prevYm}`]) {
+      await kvDel(k);
+    }
+    return res.json({ success: true });
+  }
+
   // ── クライアント用レポートのPW発行（GBP管理店にも発行できる・監査#4） ──
   if (req.method === 'POST' && action === 'client-issue') {
     const { storeId, storeName, regenerate } = req.body || {};
