@@ -425,11 +425,21 @@ export default async function handler(req, res) {
     return res.json({ month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
   }
 
-  // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)
+  // GET /api/admin?action=comp-history&storeId=xxx — 競合順位の自動記録履歴（fetch-rankが同時記録したもの）
+  if (req.method === 'GET' && action === 'comp-history') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const history = await kvGet(`comp_history_${storeId}`) || [];
+    const competitors = await kvGet(`competitors_${storeId}`) || [];
+    return res.json({ history, competitors });
+  }
+
+  // GET /api/admin?action=fetch-rank&keyword=新宿 カフェ&location=Shinjuku,Tokyo,Japan&store=店舗名(部分一致)&storeId=xxx
+  // storeIdを渡すと、同じSERP結果から登録済み競合店舗の順位も同時記録する（追加APIリクエストなし＝SerpApi枠を消費しない）
   if (req.method === 'GET' && action === 'fetch-rank') {
     const SERPAPI_KEY = process.env.SERPAPI_KEY;
     if (!SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
-    const { keyword, location, store } = req.query;
+    const { keyword, location, store, storeId } = req.query;
     if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
     // 月間上限ガード（既定=無料枠100・環境変数で変更可）。上限到達で自動停止し課金枠突入を防ぐ。
     const ym = new Date().toISOString().slice(0, 7);
@@ -465,9 +475,41 @@ export default async function handler(req, res) {
         position: item.position || (i + 1),
         title: item.title, rating: item.rating || null, reviews: item.reviews || null,
       }));
+
+      // ── 競合順位の同時記録（同じSERP結果を使うだけ＝SerpApi枠を消費しない） ──
+      let comps = null;
+      if (storeId) {
+        try {
+          const registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
+          if (registered.length) {
+            comps = registered.map(c => {
+              let cRank = null, cMatched = null;
+              const cnPlace = String(c.placeId || '').trim();
+              const cn = norm(c.name);
+              list.forEach((item, i) => {
+                if (cRank) return;
+                if (cnPlace && item.place_id && item.place_id === cnPlace) { cRank = item.position || (i + 1); cMatched = item.title; return; }
+                const t = norm(item.title);
+                if (cn && t && (t.includes(cn) || cn.includes(t))) { cRank = item.position || (i + 1); cMatched = item.title; }
+              });
+              return { id: c.id, name: c.name, rank: cRank, matched: cMatched };
+            });
+            // 履歴へ保存（同日・同KWは上書き。最大800件で古い順に間引き）
+            const histKey = `comp_history_${storeId}`;
+            const hist = await kvGet(histKey) || [];
+            const date = new Date().toISOString().slice(0, 10);
+            const entry = { date, keyword, self: rank, comps: comps.map(c => ({ id: c.id, rank: c.rank })) };
+            const dup = hist.findIndex(h => h.date === date && h.keyword === keyword);
+            if (dup >= 0) hist[dup] = entry; else hist.push(entry);
+            while (hist.length > 800) hist.shift();
+            await kvSet(histKey, hist);
+          }
+        } catch (e) { /* 競合記録の失敗で本体の順位取得を落とさない */ }
+      }
+
       return res.json({
         keyword, location: location || null, rank, matched,
-        found: rank !== null, top, checkedAt: new Date().toISOString(),
+        found: rank !== null, top, comps, checkedAt: new Date().toISOString(),
       });
     } catch (e) {
       return res.status(500).json({ error: e.message });

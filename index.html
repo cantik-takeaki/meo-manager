@@ -1416,7 +1416,7 @@ body {
         </div>
         <div class="card" style="border-color:rgba(46,143,240,0.25);background:rgba(46,143,240,0.04)">
           <div style="font-weight:700;font-size:13px;margin-bottom:4px">競合店舗の自動順位取得について</div>
-          <p style="font-size:12px;color:var(--text-sub);line-height:1.7">Google Place ID を設定すると、順位取得時に競合店舗の順位も同時に自動記録されます（対応後）。手入力の比較にも使えます。</p>
+          <p style="font-size:12px;color:var(--text-sub);line-height:1.7">競合を登録すると、「AIで順位取得」や競合分析の実行時に、<b>同じ検索結果から競合店舗の順位も同時に自動記録</b>されます。追加のAPIリクエストは発生しません（月間の取得枠も消費しません）。Google Place ID を設定すると照合の精度が上がります。</p>
         </div>
         <!-- 追加/編集フォーム -->
         <div id="competitorForm" class="card" style="display:none">
@@ -1437,6 +1437,17 @@ body {
           </div>
         </div>
         <div class="card"><div id="competitorList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div></div>
+
+        <!-- 競合順位の推移（fetch-rankが同時記録した履歴） -->
+        <div class="card" id="compHistoryCard">
+          <div class="card-header">
+            <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><path d="M6 15l4-5 4 3 5-7"/></svg>競合順位の推移（自動記録）</div>
+            <button class="btn btn-outline btn-sm" onclick="renderCompHistory()">更新</button>
+          </div>
+          <div id="compHistKwChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+          <div id="compHistChart"></div>
+          <div id="compHistTable" style="margin-top:14px"></div>
+        </div>
       </div>
 
       <!-- ▼▼ 店舗レポートビュー（店舗分析ボタンから） ▼▼ -->
@@ -4202,7 +4213,7 @@ async function aiFetchRanks(ev) {
       const m = D.meta[en.k] || {};
       const loc = m.area ? (pref ? `${m.area},${pref},Japan` : `${m.area},Japan`) : '';
       try {
-        const r = await fetch(`/api/admin?action=fetch-rank&keyword=${encodeURIComponent(en.k)}&store=${encodeURIComponent(store)}&location=${encodeURIComponent(loc)}`).then(x => x.json());
+        const r = await fetch(`/api/admin?action=fetch-rank&keyword=${encodeURIComponent(en.k)}&store=${encodeURIComponent(store)}&location=${encodeURIComponent(loc)}&storeId=${encodeURIComponent(currentLocationId)}`).then(x => x.json());
         if (r.error) { fail++; if (!firstErr) firstErr = r.error; if (r.overLimit) break; continue; }
         await fetch(`/api/admin?action=rank-input&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storeId: currentLocationId, keyword: en.k, date: today, rank: r.rank }) });
         ok++;
@@ -4765,7 +4776,7 @@ async function runCompetitorAnalysis() {
   const box = document.getElementById('compResult');
   box.innerHTML = '<div class="loading"><div class="spinner"></div>競合を分析中…</div>';
   try {
-    const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '' });
+    const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '', storeId: currentLocationId || '' });
     if (loc) p.set('location', loc);
     const d = await fetch('/api/admin?' + p.toString()).then(r => r.json());
     if (d.error) { box.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
@@ -6430,6 +6441,7 @@ async function showStoreCompetitors(idx) {
   document.getElementById('compStoreName').textContent = loc.title || '';
   document.getElementById('competitorForm').style.display = 'none';
   renderCompetitorList();
+  renderCompHistory();
 }
 function openCompetitorForm(c) {
   const f = document.getElementById('competitorForm');
@@ -6491,6 +6503,82 @@ async function deleteCompetitor(id) {
     showToast('削除しました', 'success');
     renderCompetitorList();
   } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+// ─── 競合順位の推移（fetch-rankが同時記録した履歴の表示） ───
+const COMP_COLORS = ['#e05555', '#8b5cf6', '#0ea5a0', '#d97706', '#db2777'];
+async function renderCompHistory(selKw) {
+  const chips = document.getElementById('compHistKwChips');
+  const chart = document.getElementById('compHistChart');
+  const table = document.getElementById('compHistTable');
+  if (!chips || !currentLocationId) return;
+  try {
+    const d = await fetch(`/api/admin?action=comp-history&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const hist = d.history || [];
+    const comps = (d.competitors || []).filter(c => c.compare !== false);
+    window._compHist = { hist, comps };
+    if (!hist.length) {
+      chips.innerHTML = '';
+      chart.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">まだ記録がありません。競合を登録した状態で対策キーワードの「AIで順位取得」を実行すると、自店と同時に競合の順位も記録されます。</p>';
+      table.innerHTML = '';
+      return;
+    }
+    // KWチップ（新しい記録があるKW順）
+    const kws = [...new Set(hist.slice().reverse().map(h => h.keyword))];
+    const kw = selKw && kws.includes(selKw) ? selKw : kws[0];
+    chips.innerHTML = kws.map(k => `<button class="pop-tab ${k === kw ? 'pop-tab-on' : ''}" style="flex:none;padding:6px 14px;border:1px solid var(--border);border-radius:999px" onclick="renderCompHistory(${JSON.stringify(k).replace(/"/g, '&quot;')})">${escapeHtml(k)}</button>`).join('');
+    // 対象KWの時系列（日付昇順）
+    const rows = hist.filter(h => h.keyword === kw).sort((a, b) => a.date < b.date ? -1 : 1);
+    const series = [{ label: '自店', color: 'var(--accent)', pts: rows.map(r => r.self) }];
+    comps.forEach((c, i) => series.push({ label: c.name, color: COMP_COLORS[i % COMP_COLORS.length], pts: rows.map(r => { const e = (r.comps || []).find(x => x.id === c.id); return e ? e.rank : null; }) }));
+    chart.innerHTML = _compHistSvg(rows.map(r => r.date), series);
+    // 最新比較テーブル（KW×自店/競合の最新順位）
+    const latestByKw = {};
+    hist.forEach(h => { if (!latestByKw[h.keyword] || latestByKw[h.keyword].date <= h.date) latestByKw[h.keyword] = h; });
+    const fmt = r => (Number.isFinite(r) && r >= 1) ? `${r}位` : '圏外';
+    const cls = (self, comp) => { if (!Number.isFinite(self)) return 'color:var(--text-sub)'; if (!Number.isFinite(comp) || self < comp) return 'color:var(--green);font-weight:700'; if (self > comp) return 'color:var(--red)'; return ''; };
+    table.innerHTML = `<div style="overflow-x:auto"><table class="summary-table" style="min-width:520px">
+      <thead><tr><th style="text-align:left;padding-left:14px">キーワード</th><th>自店</th>${comps.map(c => `<th>${escapeHtml(c.name)}</th>`).join('')}<th>記録日</th></tr></thead>
+      <tbody>${Object.values(latestByKw).map(h => {
+        const self = h.self;
+        return `<tr><td style="text-align:left;padding-left:14px;font-weight:600">${escapeHtml(h.keyword)}</td>
+          <td style="font-weight:700;color:${Number.isFinite(self) && self <= 3 ? 'var(--green)' : Number.isFinite(self) && self <= 10 ? 'var(--gold)' : 'var(--text-sub)'}">${fmt(self)}</td>
+          ${comps.map(c => { const e = (h.comps || []).find(x => x.id === c.id); const r = e ? e.rank : null; return `<td style="${cls(self, r)}">${fmt(r)}</td>`; }).join('')}
+          <td style="font-size:12px;color:var(--text-sub)">${h.date}</td></tr>`;
+      }).join('')}</tbody></table></div>
+      <p style="font-size:11px;color:var(--text-sub);margin-top:8px">緑=自店が勝っているキーワード／赤=負けているキーワード。負けているキーワードを翌月の重点対策に。</p>`;
+  } catch (e) {
+    chart.innerHTML = `<p style="font-size:12px;color:var(--red)">取得に失敗しました: ${escapeHtml(e.message)}</p>`;
+  }
+}
+// 折れ線SVG（Y軸=順位・下が悪い。null=圏外は21位相当の破線位置に×印）
+function _compHistSvg(dates, series) {
+  const W = 640, H = 220, PL = 34, PR = 120, PT = 12, PB = 26;
+  const n = dates.length;
+  if (!n) return '';
+  const maxR = 20;
+  const x = i => n === 1 ? (PL + (W - PL - PR) / 2) : PL + (W - PL - PR) * i / (n - 1);
+  const y = r => PT + (H - PT - PB) * (Math.min(Number.isFinite(r) ? r : maxR + 1, maxR + 1) - 1) / maxR;
+  let g = '';
+  [1, 5, 10, 15, 20].forEach(r => { g += `<line x1="${PL}" y1="${y(r)}" x2="${W - PR}" y2="${y(r)}" stroke="var(--border)" stroke-width="1"/><text x="${PL - 6}" y="${y(r) + 4}" text-anchor="end" font-size="10" fill="var(--text-sub)">${r}</text>`; });
+  series.forEach(s => {
+    let path = '', prev = false;
+    s.pts.forEach((r, i) => {
+      if (Number.isFinite(r) && r >= 1) { path += `${prev ? 'L' : 'M'}${x(i).toFixed(1)},${y(r).toFixed(1)} `; prev = true; }
+      else prev = false;
+    });
+    if (path) g += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    s.pts.forEach((r, i) => {
+      if (Number.isFinite(r) && r >= 1) g += `<circle cx="${x(i).toFixed(1)}" cy="${y(r).toFixed(1)}" r="3.2" fill="${s.color}"/>`;
+      else g += `<text x="${x(i).toFixed(1)}" y="${y(null).toFixed(1)}" text-anchor="middle" font-size="10" fill="${s.color}" opacity="0.6">×</text>`;
+    });
+  });
+  // X軸ラベル（最大6個に間引き）
+  const step = Math.max(1, Math.ceil(n / 6));
+  dates.forEach((dt, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--text-sub)">${dt.slice(5)}</text>`; });
+  // 凡例（右側）
+  series.forEach((s, i) => { const ly = PT + 8 + i * 18; g += `<line x1="${W - PR + 10}" y1="${ly}" x2="${W - PR + 28}" y2="${ly}" stroke="${s.color}" stroke-width="2.5"/><text x="${W - PR + 33}" y="${ly + 4}" font-size="11" fill="var(--text)">${escapeHtml(String(s.label).slice(0, 12))}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
 }
 
 // ─── 店舗レポート（店舗分析ボタン） ───
