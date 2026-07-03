@@ -618,6 +618,37 @@ ${knowledge.targetCustomer ? `- ターゲット: ${knowledge.targetCustomer}` : 
 - 架空のキャンペーンやサービスを提案しない`;
   }
 
+  // 月次レポートのAI総評（総評／良かった点／改善ポイント／来月の施策提案・構造化JSON）
+  if (type === 'monthly_report') {
+    const c = req.body.report || {};
+    const rv = c.reviewStats || {};
+    const reviewLine = rv.totalCount != null
+      ? `累計${rv.totalCount || 0}件・平均★${rv.averageRating || 0}・未返信${rv.unrepliedCount || 0}件`
+      : '未取得';
+    const rankLine = (c.rankings && c.rankings.length)
+      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '圏外'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前月比${r.diff > 0 ? '+' + r.diff : r.diff}）` : ''}`).join('、')
+      : '未計測';
+    const insLine = c.insights
+      ? `表示${c.insights.impressions || 0}・電話${c.insights.calls || 0}・ルート検索${c.insights.directionRequests || 0}・サイト訪問${c.insights.websiteClicks || 0}`
+      : '未取得';
+    prompt = `あなたはMEO（Googleマップ集客）の専門コンサルタントです。以下の${c.month || '今月'}の店舗データをもとに、クライアントへ提出する月次レポートの文章をJSONで出力してください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || '不明'}
+【対象年月】${c.month || '不明'}
+【口コミ】${reviewLine}
+【キーワード順位（前月比つき）】${rankLine}
+【GBPインサイト】${insLine}
+【口コミ獲得KPI】QRスキャン${c.kpi?.scan || 0}・アンケート${c.kpi?.survey || 0}・Google誘導${c.kpi?.click || 0}
+
+【出力ルール】
+- 以下のJSONのみを出力（説明・前置き・コードフェンスなし）
+{"summary":"その月の総評を3〜4文。順位・口コミの動きと最大の成果/課題","good":["先月より改善した点・維持できた強みを2〜4個"],"improve":["改善が必要な点・対策すべきキーワードを2〜4個"],"nextActions":["来月に実施すべき優先アクションを3〜5個（具体的に）"]}
+- データに基づく事実のみ。数値を捏造しない。効果・集客数を断定しない（「〜が期待できます」程度）
+- クライアント向けの丁寧で前向きな文体。専門用語は噛み砕く
+- 架空のキャンペーンやサービスを作らない`;
+  }
+
   // 媒体登録状況・AIO/LLMO/GEOの「やることリスト」助言（現状をふまえて次の一手を提示）
   if (type === 'advice') {
     const topic = req.body.topic;
@@ -1049,8 +1080,8 @@ ${topText || 'データなし'}
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: type === 'keyword_ideas' ? 1800 : type === 'weekly_tasks' ? 1100 : 500,
-        temperature: type === 'keyword_ideas' ? 0.55 : type === 'weekly_tasks' ? 0.5 : 0.85,
+        max_tokens: type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500,
+        temperature: type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : 0.85,
         top_p: 0.9,
       }),
     });

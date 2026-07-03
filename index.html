@@ -1505,6 +1505,13 @@ body {
             <span id="repMeta" style="font-size:12px;color:var(--text-muted)"></span>
           </div>
         </div>
+        <div class="card" style="border-color:rgba(46,143,240,0.3)">
+          <div class="card-header">
+            <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>AI月次分析</div>
+            <button class="btn btn-primary btn-sm" onclick="generateMonthlyAi(this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで生成</button>
+          </div>
+          <div id="repAiBody"><p style="font-size:12px;color:var(--text-sub)">「AIで生成」を押すと、この月の総評・良かった点・改善ポイント・来月の施策提案をAIがまとめます（PDFにも出力されます）。</p></div>
+        </div>
         <div class="card">
           <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(16,185,129,0.12);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></span>今月の口コミ獲得サマリー</div></div>
           <div class="kpi-agg-grid"><div class="kpi-agg-cell"><div class="k-l">QRスキャン数</div><div class="k-v" id="repScan">0</div></div>
@@ -6963,19 +6970,24 @@ async function showStoreReport(idx) {
   document.getElementById('repMonth').value = new Date().toISOString().slice(0, 7);
   // 保存済み担当者コメント
   try { const s = await fetch(`/api/admin?action=survey&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); document.getElementById('repComment').value = s.reportComment || ''; } catch (e) {}
+  // 前回のAI分析をリセット
+  window._reportAi = null;
+  const aiBody = document.getElementById('repAiBody');
+  if (aiBody) aiBody.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">「AIで生成」を押すと、この月の総評・良かった点・改善ポイント・来月の施策提案をAIがまとめます（PDFにも出力されます）。</p>';
   loadStoreReport();
 }
 async function loadStoreReport() {
   const sid = encodeURIComponent(currentLocationId);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   try {
-    const [kpi, rvData, rk, comp] = await Promise.all([
+    const [kpi, rvData, rk, comp, ins] = await Promise.all([
       fetch(`/api/admin?action=kpi&storeId=${sid}`).then(r => r.json()).catch(() => ({})),
       (currentLocation?.name ? fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({})),
       fetch(`/api/admin?action=rankings&storeId=${sid}`).then(r => r.json()).catch(() => ({ keywords: [], history: [] })),
       fetch(`/api/admin?action=competitors&storeId=${sid}`).then(r => r.json()).catch(() => ({ competitors: [] })),
+      (currentLocation?.name ? fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({})),
     ]);
-    window._report = { kpi, rv: rvData, rk, comp };
+    window._report = { kpi, rv: rvData, rk, comp, insights: (ins && !ins.error && !ins.pending) ? ins.summary : null };
     const c = kpi.current || {};
     set('repScan', (c.scan || 0) + '回'); set('repSurvey', (c.survey || 0) + '件'); set('repAi', (c.ai || 0) + '回');
     set('repClick', (c.click || 0) + '回'); set('repLine', (c.line || 0) + '回');
@@ -7014,6 +7026,50 @@ async function saveReportComment() {
     showToast('担当者コメントを保存しました', 'success');
   } catch (e) { showToast('保存に失敗しました', 'error'); }
 }
+
+// 月次レポートのAI総評を生成（総評／良かった点／改善ポイント／来月の施策提案）
+async function generateMonthlyAi(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const r = window._report || {};
+  const box = document.getElementById('repAiBody');
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">AIが分析しています…（10秒ほどかかります）</div>';
+  // キーワードの前月比を組み立て
+  const rk = r.rk || {};
+  const hist = rk.history || [];
+  const last = hist[hist.length - 1]?.rankings || [];
+  const prev = hist[hist.length - 2]?.rankings || [];
+  const rankings = (rk.keywords || []).filter(Boolean).map((kw, i) => {
+    const cur = parseInt(last[i], 10), pv = parseInt(prev[i], 10);
+    return { keyword: kw, rank: Number.isFinite(cur) ? cur : null, diff: (Number.isFinite(cur) && Number.isFinite(pv)) ? pv - cur : null };
+  });
+  const st = r.rv?.stats || {};
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId: currentLocationId, type: 'monthly_report',
+        report: {
+          month: document.getElementById('repMonth')?.value || '',
+          reviewStats: { totalCount: r.rv?.totalReviewCount ?? st.totalCount, averageRating: r.rv?.averageRating || st.averageRating, unrepliedCount: st.unrepliedCount },
+          rankings, insights: r.insights || null, kpi: r.kpi?.current || {},
+        },
+      }),
+    }).then(x => x.json());
+    let ai = null;
+    try { const t = d.content || ''; const s = t.indexOf('{'), e = t.lastIndexOf('}'); if (s !== -1 && e !== -1) ai = JSON.parse(t.slice(s, e + 1)); } catch (e) {}
+    if (!ai) { box.innerHTML = '<p style="font-size:12px;color:var(--red)">生成に失敗しました。もう一度お試しください。</p>'; if (btn) { btn.disabled = false; btn.innerHTML = bh; } return; }
+    window._reportAi = ai;
+    const listSec = (title, items, color) => (items && items.length) ? `<div style="margin-top:10px"><div style="font-size:12.5px;font-weight:700;color:${color};margin-bottom:4px">${title}</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.9">${items.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul></div>` : '';
+    box.innerHTML = `
+      <div style="font-size:13px;line-height:1.9">${escapeHtml(ai.summary || '')}</div>
+      ${listSec('良かった点', ai.good, 'var(--accent-2)')}
+      ${listSec('改善ポイント', ai.improve, 'var(--gold)')}
+      ${listSec('来月の施策提案', ai.nextActions, 'var(--accent)')}`;
+    showToast('AI月次分析を生成しました', 'success');
+  } catch (e) { box.innerHTML = `<p style="font-size:12px;color:var(--red)">生成に失敗しました: ${escapeHtml(e.message)}</p>`; }
+  if (btn) { btn.disabled = false; btn.innerHTML = bh; }
+}
 // 店舗レポートを印刷用に開く（ブラウザの「PDFに保存」でPDF化）
 function printStoreReport() {
   const r = window._report || {};
@@ -7025,7 +7081,10 @@ function printStoreReport() {
   const store = currentLocation?.title || '当店';
   const month = document.getElementById('repMonth')?.value || '';
   const comment = document.getElementById('repComment')?.value || '';
+  const ai = window._reportAi || null;
+  const ins = r.insights || null;
   const esc = (s) => String(s == null ? '' : s).replace(/</g, '&lt;');
+  const liList = (items) => (items && items.length) ? '<ul style="margin:4px 0 0;padding-left:20px">' + items.map(x => `<li>${esc(x)}</li>`).join('') + '</ul>' : '';
   const kwRows = kws.map((k, i) => `<tr><td>${esc(k)}</td><td style="text-align:center">${Number.isFinite(parseInt(last[i],10)) ? last[i] + '位' : '圏外'}</td></tr>`).join('') || '<tr><td colspan="2" style="color:#888">キーワード未登録</td></tr>';
   const compRows = comps.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.area)}</td><td>${c.compare === false ? '対象外' : '比較対象'}</td></tr>`).join('') || '<tr><td colspan="3" style="color:#888">競合未登録</td></tr>';
   const w = window.open('', '_blank', 'width=800,height=1000');
@@ -7045,6 +7104,10 @@ function printStoreReport() {
   </style></head><body>
   <div class="bar"><button onclick="window.print()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>印刷 / PDFに保存</button></div>
   <h1>店舗レポート</h1><div class="sub">${esc(store)}${currentLocation?.company ? ' / ' + esc(currentLocation.company) : ''}　対象年月: ${esc(month)}</div>
+  ${ai ? `<h2>AI月次総評</h2><div class="note">${esc(ai.summary || '')}</div>
+  ${ai.good && ai.good.length ? `<h2>良かった点</h2>${liList(ai.good)}` : ''}
+  ${ai.improve && ai.improve.length ? `<h2>改善ポイント</h2>${liList(ai.improve)}` : ''}
+  ${ai.nextActions && ai.nextActions.length ? `<h2>来月の施策提案</h2>${liList(ai.nextActions)}` : ''}` : ''}
   <h2>今月の口コミ獲得サマリー</h2>
   <div class="grid">
     <div class="cell"><div class="l">QRスキャン数</div><div class="v">${kpi.scan || 0}</div></div>
@@ -7060,6 +7123,13 @@ function printStoreReport() {
     <div class="cell"><div class="l">平均評価</div><div class="v">${(r.rv?.averageRating || st.averageRating) ? '★' + (Math.round((r.rv?.averageRating || st.averageRating)*10)/10) : '—'}</div></div>
     <div class="cell"><div class="l">未返信(最新50)</div><div class="v">${st.unrepliedCount ?? '—'}</div></div>
   </div>
+  ${ins ? `<h2>GBPインサイト</h2>
+  <div class="grid">
+    <div class="cell"><div class="l">表示回数（合計）</div><div class="v">${(ins.impressions || 0).toLocaleString()}</div></div>
+    <div class="cell"><div class="l">電話タップ</div><div class="v">${(ins.calls || 0).toLocaleString()}</div></div>
+    <div class="cell"><div class="l">ルート検索</div><div class="v">${(ins.directionRequests || 0).toLocaleString()}</div></div>
+    <div class="cell"><div class="l">サイト訪問</div><div class="v">${(ins.websiteClicks || 0).toLocaleString()}</div></div>
+  </div>` : ''}
   <h2>キーワード別 順位</h2>
   <table><thead><tr><th>キーワード</th><th style="text-align:center;width:120px">今回順位</th></tr></thead><tbody>${kwRows}</tbody></table>
   <h2>競合比較</h2>
