@@ -4303,13 +4303,13 @@ function _popNl2br(s) { return _popEsc(s).replace(/\n/g, '<br>'); }
 function _popStarsRow(L) {
   const sz = L(6.4);
   const star = `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="#fbbc04" style="margin:0 ${L(0.5)}"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
-  return `<div style="display:flex;justify-content:center;align-items:center;margin-bottom:${L(3)}">${star.repeat(5)}</div>`;
+  return `<div style="display:flex;justify-content:center;align-items:center;margin-bottom:${L(2.5)}">${star.repeat(5)}</div>`;
 }
 // Googleブランドバッジ（公式4色G）
 function _popGoogleBadge(L, F, fs) {
   const g = L(5.4);
   const G = `<svg viewBox="0 0 24 24" width="${g}" height="${g}" style="flex-shrink:0"><path fill="#4285F4" d="M23 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.16c-.27 1.4-1.07 2.59-2.28 3.39v2.82h3.68C21.7 18.98 23 15.92 23 12.27z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.68-2.82c-1.02.69-2.33 1.1-4.25 1.1-3.27 0-6.04-2.21-7.03-5.18H1.16v2.91C3.13 21.03 7.24 24 12 24z"/><path fill="#FBBC05" d="M4.97 14.19c-.25-.75-.4-1.55-.4-2.37s.14-1.62.4-2.37V6.54H1.16C.42 8.09 0 9.99 0 11.82s.42 3.73 1.16 5.28l3.81-2.91z"/><path fill="#EA4335" d="M12 4.75c1.84 0 3.5.63 4.8 1.87l3.6-3.6C18.2 1 15.49 0 12 0 7.24 0 3.13 2.97 1.16 6.54l3.81 2.91C5.96 6.96 8.73 4.75 12 4.75z"/></svg>`;
-  return `<div style="display:inline-flex;align-self:center;align-items:center;gap:${L(2)};background:#fff;border:1px solid #dadce0;border-radius:999px;padding:${L(1.4)} ${L(4)};margin-bottom:${L(3)};box-shadow:0 ${L(0.4)} ${L(1.6)} rgba(0,0,0,.08)">${G}<span style="font-size:${F(fs)};font-weight:700;color:#3c4043;letter-spacing:.02em">Googleクチコミ</span></div>`;
+  return `<div style="display:inline-flex;align-self:center;align-items:center;gap:${L(2)};background:#fff;border:1px solid #dadce0;border-radius:999px;padding:${L(1.4)} ${L(4)};margin-bottom:${L(2.5)};box-shadow:0 ${L(0.4)} ${L(1.6)} rgba(0,0,0,.08)">${G}<span style="font-size:${F(fs)};font-weight:700;color:#3c4043;letter-spacing:.02em">Googleクチコミ</span></div>`;
 }
 // L=長さ関数（プレビュー:px / 印刷:mm）, F=フォント関数（プレビュー:px / 印刷:pt）
 function popInnerHtml(L, F) {
@@ -4342,12 +4342,12 @@ function popInnerHtml(L, F) {
   const msg = st.message ? `<div style="font-size:${F(st.fs.message)};color:${c.text};opacity:.72;margin-top:${L(3)};line-height:1.5">${_popNl2br(st.message)}</div>` : '';
   const qrW = paper.w * st.qr.size / 100;
   return `
-   <div style="background:${bg};color:${c.text};width:100%;height:100%;padding:${L(9)} ${L(7)};text-align:center;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
-     <div style="display:inline-block;align-self:center;background:${c.accent};color:#fff;font-size:${F(st.fs.catch)};font-weight:700;padding:${L(1.4)} ${L(5)};border-radius:999px;margin-bottom:${L(4)}">${_popEsc(st.catch)}</div>
+   <div style="background:${bg};color:${c.text};width:100%;height:100%;padding:${L(7.5)} ${L(6.5)};text-align:center;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;font-family:'Hiragino Sans','Noto Sans JP',sans-serif">
+     <div style="display:inline-block;align-self:center;background:${c.accent};color:#fff;font-size:${F(st.fs.catch)};font-weight:700;padding:${L(1.4)} ${L(5)};border-radius:999px;margin-bottom:${L(3.2)}">${_popEsc(st.catch)}</div>
      ${logo}
      ${stars}
      <div style="font-size:${F(st.fs.title)};font-weight:800;line-height:1.35;margin-bottom:${L(2)}">${_popNl2br(st.title)}</div>
-     <div style="font-size:${F(st.fs.store)};color:${c.text};opacity:.6;margin-bottom:${L(5)}">${_popEsc(st.store)}</div>
+     <div style="font-size:${F(st.fs.store)};color:${c.text};opacity:.6;margin-bottom:${L(3.6)}">${_popEsc(st.store)}</div>
      ${gbadge}
      <div style="background:${c.card};border-radius:${L(4)};padding:${L(6)} ${L(4)};margin:0 auto;width:100%;box-sizing:border-box">
        <div style="height:${L(0.8)};width:${L(14)};background:${c.accent};border-radius:99px;margin:0 auto ${L(3)}"></div>
@@ -4355,7 +4355,7 @@ function popInnerHtml(L, F) {
        <div style="font-size:${F(st.fs.qr)};color:${c.text};opacity:.72;margin-top:${L(2.5)};line-height:1.5">${_popNl2br(st.qr.text)}</div>
        <div style="height:${L(0.8)};width:${L(14)};background:${c.accent};border-radius:99px;margin:${L(3)} auto 0"></div>
      </div>
-     <div style="font-size:${F(st.fs.desc)};color:${c.text};opacity:.72;margin-top:${L(4)};line-height:1.5">${_popNl2br(st.desc)}</div>
+     <div style="font-size:${F(st.fs.desc)};color:${c.text};opacity:.72;margin-top:${L(3.4)};line-height:1.5">${_popNl2br(st.desc)}</div>
      ${msg}
    </div>`;
 }
