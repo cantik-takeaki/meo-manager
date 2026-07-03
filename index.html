@@ -6364,17 +6364,17 @@ async function generateIgCaption() {
 
 // ── ハッシュタグ（Instagram用・最大5個） ──
 const HASHTAG_MAX = 5; // Instagramは2025年12月以降ハッシュタグ最大5個
-// AI出力/入力を「#タグ」だけの1行に正規化（重複除去・最大5個）
+// AI出力/入力を「#タグ」だけの1行に正規化（全角＃も対応・重複除去・最大5個）
 function _cleanHashtags(s, max = HASHTAG_MAX) {
   const seen = new Set(); const out = [];
-  (String(s || '').match(/#[^\s#　、,]+/g) || []).forEach(t => { const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } });
+  (String(s || '').replace(/＃/g, '#').match(/#[^\s#　、,]+/g) || []).forEach(t => { const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } });
   return out.slice(0, max).join(' ');
 }
 // 適正数の表示（3〜5個が目安・最大5個）
 function updateHashCount(inputId, countId) {
   const el = document.getElementById(inputId), out = document.getElementById(countId);
   if (!el || !out) return;
-  const n = (el.value.match(/#[^\s#　、,]+/g) || []).length;
+  const n = (el.value.replace(/＃/g, '#').match(/#[^\s#　、,]+/g) || []).length;
   let color = 'var(--text-sub)', msg;
   if (n === 0) msg = '適正数の目安：3〜5個（Instagramは最大5個）';
   else if (n <= HASHTAG_MAX) { color = '#1b9d55'; msg = `${n}個・適正（3〜5個が目安）`; }
