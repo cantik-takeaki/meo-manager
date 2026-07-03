@@ -466,6 +466,19 @@ body {
 @media (max-width:1023px) { .gen-2col { grid-template-columns:1fr; } }
 /* 投稿画像作成ページ表示中は他の子を常時抑止（非同期のインサイト表示等が後から割り込むのも防ぐ） */
 #panel-instagram.gen-open > :not(#igGenView) { display:none !important; }
+/* 設定ページのトグルスイッチ */
+.tgl { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+.tgl input { opacity:0; width:0; height:0; }
+.tgl .tgl-track { position:absolute; inset:0; background:var(--border); border-radius:999px; transition:background .18s; cursor:pointer; }
+.tgl .tgl-track::before { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .18s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.tgl input:checked + .tgl-track { background:var(--accent); }
+.tgl input:checked + .tgl-track::before { transform:translateX(20px); }
+.tgl input:disabled + .tgl-track { opacity:.45; cursor:not-allowed; }
+.set-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 0; border-bottom:1px solid var(--border); }
+.set-row:last-child { border-bottom:none; }
+.set-row-main { min-width:0; }
+.set-row-title { font-size:13.5px; font-weight:600; color:var(--text); }
+.set-row-sub { font-size:12px; color:var(--text-sub); margin-top:2px; line-height:1.6; }
 </style>
 </head>
 <body>
@@ -561,6 +574,12 @@ body {
       <button class="nav-item" onclick="showPanel('rankreport', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
         順位レポート
+      </button>
+
+      <div class="sidebar-section">アカウント</div>
+      <button class="nav-item" onclick="showPanel('settings', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h.01a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        設定
       </button>
 
       <div class="sidebar-section">店舗切替</div>
@@ -2497,6 +2516,104 @@ body {
         </div>
       </div>
     </div>
+
+    <!-- Settings -->
+    <div class="panel" id="panel-settings">
+      <div class="page-header">
+        <div class="page-title">設定</div>
+        <div class="page-sub">アカウント・セキュリティ・契約/利用状況の管理</div>
+      </div>
+
+      <!-- アカウント -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0114 0v1"/></svg>アカウント</div></div>
+        <div class="set-row">
+          <div class="set-row-main" style="flex:1">
+            <div class="set-row-title">表示名</div>
+            <div class="set-row-sub">サイドバーやメールに表示される名前です。</div>
+            <div style="display:flex;gap:8px;margin-top:8px;max-width:380px">
+              <input id="setName" type="text" maxlength="30" placeholder="例：株式会社cantik" style="flex:1;min-width:0;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              <button class="btn btn-primary btn-sm" id="setNameSave" onclick="saveProfileName()">保存</button>
+            </div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">ログイン方法</div>
+            <div class="set-row-sub" id="setLoginInfo">—</div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">パスワード</div>
+            <div class="set-row-sub" id="setPwHint">—</div>
+          </div>
+          <button class="btn btn-outline btn-sm" id="setPwBtn" onclick="openChangePw()" style="display:none;flex-shrink:0">パスワードを変更</button>
+        </div>
+      </div>
+
+      <!-- セキュリティ -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>セキュリティ</div></div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">2段階認証（メールで6桁コード）</div>
+            <div class="set-row-sub" id="setTwofaHint">ログイン時、登録メールに届く6桁の認証コードの入力を求めます。</div>
+          </div>
+          <label class="tgl"><input type="checkbox" id="setTwofa" onchange="toggleTwofa(this)"><span class="tgl-track"></span></label>
+        </div>
+      </div>
+
+      <!-- 店舗 -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9v11a1 1 0 001 1h16a1 1 0 001-1V9"/><path d="M3 9h18"/><path d="M9 21v-7h6v7"/></svg>店舗</div>
+          <button class="btn btn-outline btn-sm" onclick="showPanel('stores')">店舗管理を開く</button>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">管理中の店舗</div>
+            <div class="set-row-sub" id="setStoreInfo">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 契約・利用状況 -->
+      <div class="card" style="max-width:720px">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>契約・利用状況</div></div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">プラン</div>
+            <div class="set-row-sub">現在は全機能を無料でご利用いただけます。</div>
+          </div>
+          <span style="font-size:12px;font-weight:700;color:var(--accent);background:rgba(46,143,240,.1);padding:4px 12px;border-radius:999px;flex-shrink:0">無料プラン</span>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main" style="flex:1">
+            <div class="set-row-title">AI順位取得（今月）</div>
+            <div class="set-row-sub" id="setSerpText">—</div>
+            <div style="height:6px;background:var(--bg-3);border-radius:99px;margin-top:8px;overflow:hidden;max-width:380px"><div id="setSerpBar" style="height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .3s"></div></div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">Googleビジネスプロフィール連携</div>
+            <div class="set-row-sub" id="setGbpInfo">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ログアウト -->
+      <div class="card" style="max-width:720px">
+        <div class="set-row" style="padding:2px 0">
+          <div class="set-row-main">
+            <div class="set-row-title">ログアウト</div>
+            <div class="set-row-sub">このアカウントからログアウトします。</div>
+          </div>
+          <a class="btn btn-outline btn-sm" href="/api/auth/logout" style="flex-shrink:0;text-decoration:none"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>ログアウト</a>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -2729,6 +2846,102 @@ async function submitChangePw(e) {
   return false;
 }
 
+// ─── 設定ページ ───
+async function loadSettings() {
+  let me = {};
+  try { me = await fetch('/api/me').then(r => r.json()); } catch (e) {}
+  // 表示名
+  const nameIn = document.getElementById('setName');
+  if (nameIn) nameIn.value = me.name || '';
+  const nameSave = document.getElementById('setNameSave');
+  const isPw = me.method === 'password';
+  if (nameIn) nameIn.disabled = !isPw;
+  if (nameSave) nameSave.style.display = isPw ? '' : 'none';
+  // ログイン方法
+  const info = document.getElementById('setLoginInfo');
+  if (info) info.textContent = me.method === 'google'
+    ? `Googleアカウント（${me.email || ''}）でログイン中`
+    : `メール＋パスワード（${me.email || ''}）でログイン中${me.envManaged ? '・管理者アカウント' : ''}`;
+  // パスワード
+  const pwHint = document.getElementById('setPwHint');
+  const pwBtn = document.getElementById('setPwBtn');
+  if (me.method !== 'password') {
+    if (pwHint) pwHint.textContent = 'Googleログインのため、パスワードはGoogleアカウント側で管理されています。';
+    if (pwBtn) pwBtn.style.display = 'none';
+  } else if (me.envManaged) {
+    if (pwHint) pwHint.textContent = 'パスワードは環境変数（ADMIN_PASS）で管理されています。変更はVercelの環境変数を更新してください。';
+    if (pwBtn) pwBtn.style.display = 'none';
+  } else {
+    if (pwHint) pwHint.textContent = 'ログインパスワードを変更できます。';
+    if (pwBtn) pwBtn.style.display = '';
+  }
+  // 2段階認証
+  const tw = document.getElementById('setTwofa');
+  const twHint = document.getElementById('setTwofaHint');
+  if (tw) {
+    tw.checked = !!me.twofaEnabled;
+    tw.disabled = !isPw || !me.twofaAvailable;
+  }
+  if (twHint) {
+    if (!isPw) twHint.textContent = 'Googleログインでは2段階認証はGoogleアカウント側の設定が適用されます。';
+    else if (!me.twofaAvailable) twHint.textContent = 'メール送信（RESEND_API_KEY）が未設定のため現在は利用できません。設定すると有効化できます。';
+    else twHint.textContent = 'ログイン時、登録メールに届く6桁の認証コードの入力を求めます。';
+  }
+  // 店舗数
+  const stInfo = document.getElementById('setStoreInfo');
+  if (stInfo) {
+    const n = (window._locations || []).length;
+    stInfo.textContent = n ? `${n}店舗を管理中です。店舗の追加・選抜は店舗管理から行えます。` : '店舗管理から管理する店舗を選択してください。';
+  }
+  // GBP連携
+  const gbpInfo = document.getElementById('setGbpInfo');
+  if (gbpInfo) gbpInfo.textContent = me.gbpConnected
+    ? `連携済み（${me.gbpEmail || 'Google'}）。口コミ・インサイト・投稿が利用できます。`
+    : '未連携です。ダッシュボードの「Googleと連携」から接続できます。';
+  // AI順位取得の利用状況
+  try {
+    const u = await fetch('/api/admin?action=serpapi-usage').then(r => r.json());
+    const t = document.getElementById('setSerpText');
+    const bar = document.getElementById('setSerpBar');
+    if (t && u && u.limit) {
+      t.textContent = `${u.month}: ${u.used} / ${u.limit} 回（残り ${u.remaining} 回・毎月リセット）`;
+      const pct = Math.min(100, Math.round((u.used / u.limit) * 100));
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--gold)' : 'var(--accent)'; }
+    } else if (t) t.textContent = '利用状況を取得できませんでした';
+  } catch (e) { const t = document.getElementById('setSerpText'); if (t) t.textContent = '利用状況を取得できませんでした'; }
+}
+
+async function saveProfileName() {
+  const nameIn = document.getElementById('setName');
+  const nm = (nameIn?.value || '').trim();
+  if (!nm) return showToast('表示名を入力してください', 'error');
+  try {
+    const r = await fetch('/api/me', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'profile', name: nm }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) {
+      showToast('表示名を変更しました', 'success');
+      const un = document.getElementById('userName'); if (un) un.textContent = d.name;
+      const ini = document.getElementById('userInitial'); if (ini) ini.textContent = (d.name.trim()[0] || 'C').toUpperCase();
+    } else showToast(d.error || '変更できませんでした', 'error');
+  } catch (e) { showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+async function toggleTwofa(el) {
+  const enabled = el.checked;
+  try {
+    const r = await fetch('/api/me', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'twofa', enabled }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) showToast(enabled ? '2段階認証を有効にしました' : '2段階認証を無効にしました', 'success');
+    else { el.checked = !enabled; showToast(d.error || '変更できませんでした', 'error'); }
+  } catch (e) { el.checked = !enabled; showToast('通信エラー: ' + e.message, 'error'); }
+}
+
 // ─── Init ───
 async function init() {
   try {
@@ -2773,7 +2986,7 @@ async function init() {
     // リロード時は直前のページを復元（ログイン直後はdashboardに設定済み）。ダッシュボードは初期表示のまま。
     try {
       const saved = sessionStorage.getItem('rakuraku_panel');
-      const valid = ['dashboard', 'clients', 'stores', 'reviews', 'posts', 'instagram', 'citation', 'aio', 'protection', 'knowledge', 'rankmgr', 'rankreport'];
+      const valid = ['dashboard', 'clients', 'stores', 'reviews', 'posts', 'instagram', 'citation', 'aio', 'protection', 'knowledge', 'rankmgr', 'rankreport', 'settings'];
       if (saved && saved !== 'dashboard' && valid.includes(saved)) switchPanel(saved);
     } catch (e) {}
   } catch {
@@ -7305,7 +7518,7 @@ function switchPanel(name, triggerEl) {
     dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
     posts: '投稿管理', instagram: 'Instagram投稿', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
-    rankmgr: '順位管理', rankreport: '順位レポート',
+    rankmgr: '順位管理', rankreport: '順位レポート', settings: '設定',
   };
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
@@ -7318,6 +7531,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'rankmgr') loadRankMgr();
   if (name === 'rankreport') loadRankReport();
   if (name === 'knowledge') loadNotionStatus();
+  if (name === 'settings') loadSettings();
 }
 
 function showPanel(name, el) {

@@ -7,6 +7,8 @@ import { kvGet, kvSet } from './_kv.js';
 import crypto from 'crypto';
 
 const ADMIN_KEY = 'admin_credential'; // { user(email), salt, hash, name, createdAt }
+const NAME_KEY = 'admin_display_name'; // 表示名の上書き（env管理でも表示名だけは変えられる）
+const TWOFA_KEY = 'twofa_enabled'; // 2段階認証の設定（false=無効。未設定=有効＝従来挙動）
 
 function parseCookies(req) {
   const c = {};
@@ -46,12 +48,18 @@ async function sendMail(to, subject, html) {
   } catch (e) { return false; }
 }
 
-function setSession(res, cred) {
+function setSession(res, cred, dispName) {
   const MAXAGE = 60 * 60 * 24 * 30;
   res.setHeader('Set-Cookie', [
     `pw_session=${sessionToken(cred)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
-    `user_name=${encodeURIComponent(cred.name || '管理者')}; Path=/; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
+    `user_name=${encodeURIComponent(dispName || cred.name || '管理者')}; Path=/; Secure; SameSite=Lax; Max-Age=${MAXAGE}`,
   ]);
+}
+
+// 表示名（KVの上書きがあれば優先。env管理アカウントでも表示名だけは設定ページから変更できる）
+async function getDisplayName(cred) {
+  try { const nm = await kvGet(NAME_KEY); if (nm) return nm; } catch (e) {}
+  return (cred && cred.name) || '管理者';
 }
 
 export default async function handler(req, res) {
@@ -94,6 +102,30 @@ export default async function handler(req, res) {
       return res.json({ success: true });
     }
 
+    // ── プロフィール（表示名）変更（ログイン中のみ）──
+    if (action === 'profile') {
+      if (!cred) return res.status(400).json({ error: '未登録です' });
+      if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
+      const nm = String(name || '').trim();
+      if (!nm) return res.status(400).json({ error: '表示名を入力してください' });
+      if (nm.length > 30) return res.status(400).json({ error: '表示名は30文字以内にしてください' });
+      await kvSet(NAME_KEY, nm);
+      res.setHeader('Set-Cookie', `user_name=${encodeURIComponent(nm)}; Path=/; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
+      return res.json({ success: true, name: nm });
+    }
+
+    // ── 2段階認証のON/OFF（ログイン中のみ）──
+    if (action === 'twofa') {
+      if (!cred) return res.status(400).json({ error: '未登録です' });
+      if (!(c.pw_session && c.pw_session === sessionToken(cred))) return res.status(401).json({ error: 'ログインが必要です' });
+      const enabled = !!(req.body || {}).enabled;
+      if (enabled && !process.env.RESEND_API_KEY) {
+        return res.status(400).json({ error: 'メール送信（RESEND_API_KEY）が未設定のため2段階認証を有効にできません' });
+      }
+      await kvSet(TWOFA_KEY, enabled);
+      return res.json({ success: true, enabled });
+    }
+
     // ── コード検証（2段階認証の2手目）──
     if (action === 'verify') {
       if (!cred) return res.status(400).json({ error: '未登録です' });
@@ -106,14 +138,22 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: '認証コードが違います' });
       }
       await kvSet(codeKey(cred.user), null); // 使い切り
-      setSession(res, cred);
-      return res.json({ success: true, name: cred.name || '管理者' });
+      const dn = await getDisplayName(cred);
+      setSession(res, cred, dn);
+      return res.json({ success: true, name: dn });
     }
 
     // ── ログイン（1手目: メール＋パスワード）──
     if (!cred) return res.status(400).json({ error: 'まだ登録されていません。先に登録してください。' });
     if (String(user).toLowerCase() !== cred.user || hashPw(String(pass), cred.salt) !== cred.hash) {
       return res.status(401).json({ error: 'メールアドレスまたはパスワードが違います' });
+    }
+    // 設定で2段階認証がOFFなら、コードを送らずそのままログイン
+    const twofaPref = await kvGet(TWOFA_KEY);
+    if (twofaPref === false) {
+      const dn = await getDisplayName(cred);
+      setSession(res, cred, dn);
+      return res.json({ success: true, name: dn, twofaSkipped: true });
     }
     // 6桁コードを生成→メール送信。送れたら2段階へ、送れなければ(未設定)そのままログイン。
     const digits = (crypto.randomBytes(4).readUInt32BE(0) % 1000000).toString().padStart(6, '0');
@@ -124,8 +164,9 @@ export default async function handler(req, res) {
       return res.json({ step: 'code', email: cred.user });
     }
     // メール未設定 → 2段階スキップ（パスワードのみでログイン）
-    setSession(res, cred);
-    return res.json({ success: true, name: cred.name || '管理者', twofaSkipped: true });
+    const dn = await getDisplayName(cred);
+    setSession(res, cred, dn);
+    return res.json({ success: true, name: dn, twofaSkipped: true });
   }
 
   // ── GET: ログイン状態 ──
@@ -136,7 +177,14 @@ export default async function handler(req, res) {
   const cred = await getCred();
   if (cred && c.pw_session && c.pw_session === sessionToken(cred)) {
     const gbp = await getMasterInfo();
-    return res.json({ loggedIn: true, method: 'password', name: cred.name || c.user_name || '管理者', envManaged: !!cred._env, gbpConnected: gbp.connected, gbpEmail: gbp.email });
+    const dn = await getDisplayName(cred);
+    const twofaPref = await kvGet(TWOFA_KEY);
+    const twofaAvailable = !!process.env.RESEND_API_KEY;
+    return res.json({
+      loggedIn: true, method: 'password', name: dn, email: cred.user, envManaged: !!cred._env,
+      gbpConnected: gbp.connected, gbpEmail: gbp.email,
+      twofaAvailable, twofaEnabled: twofaAvailable && twofaPref !== false,
+    });
   }
   return res.status(401).json({ loggedIn: false, needsSetup: !cred });
 }
