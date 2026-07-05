@@ -79,17 +79,69 @@ export default async function handler(req, res) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY未設定' });
 
+  // ── 生成オプション（UIの詳細設定から）──
+  const _tone = String(req.body.tone || '').trim();       // '' | 'friendly' | 'pro'
+  const _length = String(req.body.length || '').trim();   // '' | 'short' | 'long'
+  const _kwFocus = String(req.body.kwFocus || 'all').trim(); // 'all' | 'A' | 'top'
+
   // ── 対策キーワード（rankings_ の meta）を各生成に自然に織り込むための共通ブロック ──
   // MEOはGBPに「キーワード欄」が無いため、選んだ語を説明文/サービス/投稿/Q&A/HP等へ自然に盛り込む。
+  // Googleローカル検索の3要素（関連性・近接性・視認性/実在感）に効く形で、検索意図（A今すぐ客/B悩み/C差別化）
+  // ごとに置き場所を指示し、地域名を前方に明示して"順位に効く"織り込みを狙う。
   const _rankData = await kvGet(`rankings_${locationId}`) || {};
   const _rankMeta = _rankData.meta || {};
   const _prOrder = { A: 0, B: 1, C: 2 };
-  const seoKws = (_rankData.keywords || [])
+  let seoKws = (_rankData.keywords || [])
     .filter(k => k && (_rankMeta[k]?.enabled !== false))
     .sort((a, b) => (_prOrder[_rankMeta[a]?.priority] ?? 3) - (_prOrder[_rankMeta[b]?.priority] ?? 3));
-  const seoWeave = seoKws.length
-    ? `\n\n【MEO対策キーワード（Googleに専門性を伝えるため文章に自然に織り込む語・優先度順）】\n${seoKws.slice(0, 12).map(k => `・${k}${_rankMeta[k]?.category ? `（${_rankMeta[k].category}）` : ''}`).join('\n')}\n→ 上位の2〜4語を、意味が通る範囲で自然に本文へ織り込む。羅列・詰め込み・不自然な繰り返しは禁止。日本語の読みやすさを最優先し、対策語が"結果的に含まれている"状態を目指す。地域名は文脈に合う形で1回程度添える。実在しないサービスや誇大表現は作らない。`
-    : '';
+  // フォーカス指定: A(今すぐ客)を優先 / 主力上位のみ
+  if (_kwFocus === 'A') { const aOnly = seoKws.filter(k => (_rankMeta[k]?.priority || 'A') === 'A'); if (aOnly.length) seoKws = aOnly; }
+  else if (_kwFocus === 'top') seoKws = seoKws.slice(0, 5);
+
+  let seoWeave = '';
+  let _targetedKws = [];
+  if (seoKws.length) {
+    _targetedKws = seoKws.slice(0, 10);
+    // 店舗の地域（市区町村・最寄り）をナレッジから拾い、近接性シグナルとして前方に置かせる
+    const _kn = await kvGet(`knowledge_${locationId}`) || {};
+    const _cities = (String(_kn.address || '').match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]+?[市区町村]/g) || []).slice(0, 2);
+    const _lm = String(_kn.nearbyLandmarks || '').split(/[\s、,・]+/).filter(Boolean).slice(0, 2);
+    const _geoHint = [...new Set([..._cities, ..._lm])].filter(Boolean).join('・');
+    // 検索意図（優先度）ごとにグルーピング
+    const _grp = { A: [], B: [], C: [] };
+    _targetedKws.forEach(k => { const p = _rankMeta[k]?.priority; (_grp[p] || _grp.A).push(k); });
+    const _catLabel = { A: '今すぐ客（地域×業種の主力）', B: '悩み・目的', C: '差別化・こだわり' };
+    const _grpLines = ['A', 'B', 'C'].filter(p => _grp[p].length)
+      .map(p => `・[${_catLabel[p]}] ${_grp[p].join(' / ')}`).join('\n');
+    const _primary = _targetedKws[0] || '';
+    seoWeave = `\n\n【MEO対策キーワード（Googleに専門性を伝えるため文章に自然に織り込む語）】
+${_grpLines}
+${_geoHint ? `【この店の地域】${_geoHint}\n` : ''}→ 織り込みの狙いはGoogleローカル検索での上位表示。次を守る:
+・主力語「${_primary}」の要素（地域名・業種）は、冒頭の1〜2文（または見出し・タイトル）に自然に置く=最も順位に効く。
+・[今すぐ客A]の語＝地域名＋業種を優先的に。[悩み・目的B]の語＝その悩みに答える文脈で。[差別化C]の語＝選ばれる理由・強みの部分で使う。
+・地域名（市区町村・最寄り駅）は文中に1〜2回、不自然にならない範囲で具体的に出す（近接性シグナル）。
+・対策語そのものだけでなく、関連語・共起語（例：業種の一般名、用途、対象者）も自然に混ぜて話題の網を広げる。
+・全体で対策語は2〜4語ぶんが"結果的に含まれている"状態を目標。羅列・詰め込み・不自然な繰り返し・キーワードの丸暗記的反復は禁止。読みやすさを最優先。
+・実在しないサービス・地名・実績や誇大表現は作らない。`;
+  }
+
+  // MEO実効を高める共通ディレクティブ（公開コンテンツ系typeに付与）
+  const _meoBoost = `\n\n【MEOで順位を上げるための書き方（重要）】
+・関連性: 検索する人の意図に“直接”答える具体的な情報を書く（何を・誰に・どんな時に）。抽象的な美辞麗句や当たり障りのない一般論は避ける。
+・実在感/E-E-A-T: 実際に営業している店だと伝わる具体描写（提供内容・こだわり・対象者・利用シーン）を入れる。経験に基づく手触りのある表現にする。
+・近接性: 地域名（市区町村）・最寄り駅・対応エリアを、文脈に合う形で具体的に示す。`;
+
+  // 文体・長さの微調整（UI詳細設定）
+  const _toneLine = _tone === 'friendly'
+    ? '\n\n【文体】やわらかく親しみやすいトーンで（堅すぎない・話しかけるような自然さ。ただし敬体は保つ）。'
+    : _tone === 'pro'
+      ? '\n\n【文体】丁寧で専門性・信頼感が伝わる落ち着いたトーンで。'
+      : '';
+  const _lengthLine = _length === 'short'
+    ? '\n\n【長さ】指定の文字数より簡潔・短めに。要点を絞る。'
+    : _length === 'long'
+      ? '\n\n【長さ】指定範囲の上限側で、具体例やシーンを1つ加えて内容に厚みを持たせる（ただし誇張・水増しはしない）。'
+      : '';
 
   // ── URLから店舗情報を自動抽出（HP/ぐるなび等のWebページ） ──
   if (type === 'autofill') {
@@ -626,7 +678,9 @@ ${knowledge.targetCustomer ? `- ターゲット: ${knowledge.targetCustomer}` : 
 
 【ルール】
 - 全体で400〜700文字（GBPの上限750文字以内を厳守）
-- 冒頭の1文で「どこで・何を提供する店か」が伝わるようにする（地域名＋業種を自然に含める）
+- 冒頭の1文で「どこで・何を提供する店か」が伝わるようにする（地域名＋業種を自然に含める。ここが検索の関連性・近接性に最も効く）
+- 続く段落で、提供サービスの具体・強み・こだわり・対象者や利用シーンを織り込み、実在する店だと伝わる手触りを出す（E-E-A-T）
+- 対応エリア（近隣の市区町村・最寄り駅）に自然に触れ、守備範囲を示す
 - 実在の情報のみ使う。架空のメニュー・実績・受賞歴を作らない。誇大表現・効果の断定・「No.1」「日本一」等は使わない
 - URL・電話番号・記号の羅列・絵文字は入れない（GBPガイドライン）
 - 2〜3段落で読みやすく。です・ます調
@@ -1042,7 +1096,8 @@ ${topText || 'データなし'}
 
 【ルール】
 - 1つの商品・サービスにつき、名称＋60〜120字の説明文。魅力と特徴が具体的に伝わるように。
-- 検索されやすい語（地域名・業種・用途）を自然に含める。誇大表現・効果断定・架空実績はしない。
+- 検索されやすい語（地域名・業種・用途・対象者）を自然に含める。誰の・どんな時のニーズに応えるかを1つ具体的に示す。
+- 誇大表現・効果断定・架空実績はしない。実際に提供している内容の範囲で書く。
 - ${name ? 'この商品・サービス1件について書く。' : '代表的な商品・サービスを3件、それぞれ「■名称」の見出しで書く。'}
 - 前置き・説明・コードフェンスは書かず、本文のみ。`;
   }
@@ -1063,8 +1118,9 @@ ${topText || 'データなし'}
 
 【ルール】
 - 質問と回答のペアを${n}個。回答は事実ベース（不明な項目は一般的で無難な範囲にとどめ、架空の断定はしない）。
-- 予約・支払い・アクセス・所要時間・初めての利用・こだわり など、来店前の不安を解消する実用的な内容。
-- 検索されやすい語（地域名・業種・サービス名）を質問文に自然に含める。
+- 予約・支払い・アクセス・所要時間・初めての利用・こだわり など、来店前の不安を解消する実用的な内容。実際に検索される疑問文の形にする。
+- 検索されやすい語（地域名・業種・サービス名）を質問文に自然に含める（Q&AはGoogleに拾われやすくMEOに効く）。
+- 少なくとも1問はアクセス・エリア（地域名・最寄り駅）に触れる内容にする（近接性シグナル）。
 - 出力形式は各ペアを「Q. 〜」「A. 〜」の2行、ペア間は1行空ける。前置き不要。`;
   }
 
@@ -1081,8 +1137,10 @@ ${topText || 'データなし'}
 【ターゲット】${knowledge.targetCustomer || ''}
 
 【ルール】
-- 見出し（20字前後）＋本文（250〜400字）。読み手の来店・問い合わせにつながる自然な紹介。
+- 見出し（20字前後・地域名か業種を自然に含むと理想）＋本文（250〜400字）。読み手の来店・問い合わせにつながる自然な紹介。
+- 冒頭の1文で「どこの・何の店か（地域＋業種）」が分かるようにする（検索での関連性・近接性に効く）。
 - 地域名・業種・サービス名を検索を意識して自然に含める（SEO/MEOに効くが、詰め込みは禁止）。
+- 読み手（ターゲット）が抱く不安や目的に具体的に触れ、この店ならどう応えるかを1つ書く（実在感・E-E-A-T）。
 - 誇大表現・効果断定・架空実績は書かない。実際のスタッフが書いたような等身大の文章。
 - 前置き・説明は書かず、見出しと本文のみ。`;
   }
@@ -1105,7 +1163,22 @@ ${topText || 'データなし'}
 
   // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
   const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
-  if (seoWeave && _seoTypes.includes(type)) prompt += seoWeave;
+  const _isSeoType = _seoTypes.includes(type);
+  // 十分な長さの本文系＝地域名・E-E-A-Tまで織り込む / 短文系（キャッチ・写真説明・テーマ列挙）＝軽い織り込みのみ
+  const _proseTypes = ['gbp_description', 'hp_content', 'product_desc', 'qa_generate', 'post', 'instagram', 'instagram_post'];
+  const _isProse = _proseTypes.includes(type);
+  if (_isSeoType) {
+    if (_isProse) {
+      if (seoWeave) prompt += seoWeave;
+      prompt += _meoBoost;
+      if (_toneLine) prompt += _toneLine;
+      if (_lengthLine) prompt += _lengthLine;
+    } else if (_targetedKws.length) {
+      // 短文系: 詰め込むと不自然になるため、主力語の要素を「入れられれば入れる」程度に
+      prompt += `\n\n【対策キーワード（可能な範囲で自然に）】主力語: ${_targetedKws.slice(0, 3).join(' / ')}\n→ 無理に全部入れない。文の自然さを最優先し、地域名や業種など要素の一部が自然に入ればよい。羅列・詰め込みは禁止。`;
+      if (_toneLine) prompt += _toneLine;
+    }
+  }
 
   // 運用者が設定ページで登録した「AIへの追加指示」（typeごと・KV）。文体調整・禁止事項の追加に使う
   try {
@@ -1148,7 +1221,16 @@ ${topText || 'データなし'}
         .replace(/\n{2,}/g, '\n')     // 余分な空行をまとめる
         .trim();
     }
-    res.json({ content });
+    // 対策キーワードの織り込み達成度を返す（UIで可視化・再生成の判断材料に）
+    // キーワードを空白で分割し、全トークンが本文に含まれれば「織り込み済み」と判定（語順・助詞の差を許容）
+    let kw;
+    if (_isProse && _targetedKws.length) {
+      const _norm = String(content).replace(/[\s　]+/g, '');
+      const _hit = k => { const toks = String(k).split(/[\s　]+/).filter(Boolean); return toks.length > 0 && toks.every(t => _norm.includes(t)); };
+      const used = _targetedKws.filter(_hit);
+      kw = { targeted: _targetedKws, used, missing: _targetedKws.filter(k => !used.includes(k)) };
+    }
+    res.json({ content, kw });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

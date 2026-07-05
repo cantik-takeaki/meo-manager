@@ -2542,6 +2542,32 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <input id="scInput" type="text" placeholder="（任意）商品名・写真の内容・HPのセクション名 など" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           <button class="btn btn-primary btn-sm" id="scGenBtn" onclick="scGenerate(event)">生成</button>
         </div>
+        <details style="margin-top:10px">
+          <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>詳細設定（トーン・長さ・キーワード）</summary>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">トーン
+              <select id="scTone" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                <option value="">おまかせ</option>
+                <option value="friendly">親しみやすい</option>
+                <option value="pro">丁寧・専門的</option>
+              </select>
+            </label>
+            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">長さ
+              <select id="scLength" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                <option value="">標準</option>
+                <option value="short">短め</option>
+                <option value="long">長め・厚め</option>
+              </select>
+            </label>
+            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">対策キーワード
+              <select id="scKwFocus" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                <option value="all">すべて反映</option>
+                <option value="A">今すぐ客(A)を優先</option>
+                <option value="top">主力上位のみ</option>
+              </select>
+            </label>
+          </div>
+        </details>
         <div id="scResult" style="margin-top:12px"></div>
       </div>
 
@@ -5068,14 +5094,38 @@ function scOnType() {
   const ph = { product_desc: '（任意）商品・サービス名', qa_generate: '（Q&Aは店舗情報から自動生成）', hp_content: '（任意）HPのセクション名（例：トップの紹介文）', photo_caption: '写真の内容・伝えたいこと', post: '（任意）投稿のテーマ・伝えたいこと', catchcopy: '（任意）切り口の指定', gbp_description: '（GBPの説明文は店舗情報から自動生成されます）' };
   if (inp) inp.placeholder = ph[t] || '';
 }
-async function scGenerate(ev) {
+function scGenerate(ev) { return scRun(ev?.currentTarget || document.getElementById('scGenBtn')); }
+// 対策キーワードの織り込み達成度バッジ（○n/m ＋ 織り込めた語=緑チップ / 未織り込み=グレー）
+function scKwBadge(kw) {
+  if (!kw || !Array.isArray(kw.targeted) || !kw.targeted.length) {
+    return (window._kwData?.keywords || []).filter(k => k && window._kwData.meta?.[k]?.enabled !== false).length
+      ? '<div style="font-size:11px;color:var(--accent-2);margin-bottom:6px">✓ この店舗の対策キーワードを反映しました</div>'
+      : '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">※対策キーワード未登録のため一般的な内容で生成しました。<b>店舗管理→対策キーワード</b>で登録すると順位に効く文章になります。</div>';
+  }
+  const used = kw.used || [], miss = kw.missing || [], n = used.length, m = kw.targeted.length;
+  const ratio = n / m;
+  const col = ratio >= 0.75 ? 'var(--accent-2)' : ratio >= 0.4 ? '#d97706' : '#ef4444';
+  const chip = (k, on) => `<span style="display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:999px;margin:2px 3px 0 0;${on ? 'background:rgba(16,185,129,.12);color:var(--accent-2);border:1px solid rgba(16,185,129,.3)' : 'background:var(--bg-3);color:var(--text-muted);border:1px solid var(--border)'}">${on ? '✓ ' : ''}${escapeHtml(k)}</span>`;
+  const missHint = miss.length ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:5px">未織り込み: ${miss.map(k => chip(k, false)).join('')}<br><span style="opacity:.85">→ 「再生成」または詳細設定で「主力上位のみ」に絞ると入りやすくなります。</span></div>` : '<div style="font-size:10.5px;color:var(--accent-2);margin-top:5px">対策キーワードをすべて自然に織り込めました。</div>';
+  return `<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:${col}">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>対策キーワード ${n}/${m} 織り込み
+    </div>
+    <div style="margin-top:5px">${used.map(k => chip(k, true)).join('')}</div>
+    ${missHint}
+  </div>`;
+}
+async function scRun(btn) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
   const type = document.getElementById('scType').value;
   const input = document.getElementById('scInput').value.trim();
   const res = document.getElementById('scResult');
-  const btn = ev?.currentTarget; const bh = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
   res.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">AIが生成しています…（対策キーワードを織り込み中）</div>';
-  const body = { locationId: currentLocationId, type };
+  const body = { locationId: currentLocationId, type,
+    tone: document.getElementById('scTone')?.value || '',
+    length: document.getElementById('scLength')?.value || '',
+    kwFocus: document.getElementById('scKwFocus')?.value || 'all' };
   if (type === 'product_desc') body.productName = input;
   else if (type === 'hp_content') body.section = input || 'トップの紹介文';
   else if (type === 'photo_caption') body.photoNote = input;
@@ -5085,13 +5135,14 @@ async function scGenerate(ev) {
   try {
     const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
     const txt = d.content || d.error || '生成できませんでした';
-    const kwNote = (window._kwData?.keywords || []).filter(k => k && window._kwData.meta?.[k]?.enabled !== false).length
-      ? '<div style="font-size:11px;color:var(--accent-2);margin-bottom:6px">✓ この店舗の対策キーワードを反映しました</div>' : '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">※対策キーワード未登録のため一般的な内容で生成しました</div>';
-    res.innerHTML = kwNote + `<textarea readonly style="width:100%;min-height:150px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;line-height:1.8;resize:vertical">${escapeHtml(txt)}</textarea>
-      <div style="text-align:right;margin-top:6px"><button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.value);showToast('コピーしました','success')">コピー</button></div>`
+    res.innerHTML = scKwBadge(d.kw) + `<textarea readonly style="width:100%;min-height:150px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;line-height:1.8;resize:vertical">${escapeHtml(txt)}</textarea>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
+        <button class="btn btn-outline btn-sm" onclick="scRun(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>再生成</button>
+        <button class="btn btn-outline btn-sm" onclick="var ta=document.querySelector('#scResult textarea');navigator.clipboard.writeText(ta.value);showToast('コピーしました','success')">コピー</button>
+      </div>`
       + (d.content ? kbFindingsHtml(kbCheckText(txt)) : '');
   } catch (e) { res.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">生成に失敗しました: ${escapeHtml(e.message)}</div>`; }
-  if (btn) { btn.disabled = false; btn.textContent = bh; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; else btn.textContent = '生成'; }
 }
 
 // ── アンケート編集 ──
