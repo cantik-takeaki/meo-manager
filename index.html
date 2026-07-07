@@ -5604,7 +5604,8 @@ async function loadPhotoFreshness() {
   box.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">写真の鮮度を確認中…</span>';
   try {
     const nm = currentLocation.name || '';
-    const d = await fetch(`/api/posts?action=gbp-photo&storeId=${encodeURIComponent(currentLocationId)}&locationName=${encodeURIComponent(nm)}`).then(r => r.json());
+    // locationNameのみ（storeId未指定）でcookieトークン経路を使う＝インサイト/口コミと同じ動く経路
+    const d = await fetch(`/api/posts?action=gbp-photo&locationName=${encodeURIComponent(nm)}`).then(r => r.json());
     if (d.error) { box.innerHTML = ''; return; } // 権限待ち等は静かに隠す
     const count = d.count || 0;
     const days = d.latest ? Math.floor((Date.now() - new Date(d.latest).getTime()) / 86400000) : null;
