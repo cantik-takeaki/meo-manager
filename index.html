@@ -8441,21 +8441,23 @@ let _reviewGoal = 0;
 async function renderReviewPace() {
   const box = document.getElementById('reviewPaceWrap'); if (!box) return;
   const reviews = (allReviews || []).filter(r => r.createTime && !/^demo\//.test(r.name || ''));
-  // JST基準の当月・前月
-  const now = new Date(Date.now() + 9 * 3600 * 1000);
-  const ym = now.toISOString().slice(0, 7);
-  const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+  // JST基準の当月・前月（すべてUTCメソッドで統一＝ブラウザのタイムゾーンに依存しない）
+  const jst = new Date(Date.now() + 9 * 3600 * 1000);
+  const ym = jst.toISOString().slice(0, 7);
+  // 前月キーは ym から純粋な文字列演算で作る（setMonthの月末日オーバーフローを避ける）
+  const _y = +ym.slice(0, 4), _m = +ym.slice(5, 7);
+  const pm = `${_m === 1 ? _y - 1 : _y}-${String(_m === 1 ? 12 : _m - 1).padStart(2, '0')}`;
   const ymOf = t => new Date(new Date(t).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 7);
   const thisMonth = reviews.filter(r => ymOf(r.createTime) === ym).length;
   const lastMonth = reviews.filter(r => ymOf(r.createTime) === pm).length;
   // 目標をKVから取得（未取得時のみ）
   try { const g = await fetch(`/api/admin?action=review-goal&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); _reviewGoal = g.goal || 0; } catch (e) { _reviewGoal = 0; }
-  const day = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const day = jst.getUTCDate();
+  const daysInMonth = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + 1, 0)).getUTCDate();
   const projected = day > 0 ? Math.round(thisMonth / day * daysInMonth) : thisMonth;
-  const weeksLeft = Math.max(0.15, (daysInMonth - day) / 7);
+  const daysLeft = Math.max(0, daysInMonth - day);
   const remain = Math.max(0, _reviewGoal - thisMonth);
-  const perWeek = _reviewGoal > 0 ? Math.ceil(remain / weeksLeft) : 0;
+  const perWeek = (_reviewGoal > 0 && daysLeft >= 3) ? Math.ceil(remain / (daysLeft / 7)) : 0;
   const onTrack = _reviewGoal === 0 ? null : projected >= _reviewGoal;
   const isDemo = reviews.length === 0 && (allReviews || []).length > 0;
 
@@ -8466,9 +8468,11 @@ async function renderReviewPace() {
   let goalArea;
   if (_reviewGoal > 0) {
     const col = onTrack ? 'var(--accent-2)' : '#d97706';
+    const needVal = remain <= 0 ? '達成' : daysLeft < 3 ? `あと${remain}件` : `週${perWeek}件`;
+    const needSub = remain <= 0 ? '🎉' : daysLeft < 3 ? `今月ラスト${daysLeft}日` : `あと${remain}件`;
     goalArea = `${cell('今月の目標', _reviewGoal + '件')}
       ${cell('着地予測', projected + '件', `<span style="color:${col}">${onTrack ? 'ペース到達見込み' : 'ペース不足'}</span>`)}
-      ${cell('必要ペース', remain > 0 ? `週${perWeek}件` : '達成', remain > 0 ? `あと${remain}件` : '🎉')}`;
+      ${cell('必要ペース', needVal, needSub)}`;
   } else {
     goalArea = `<div style="align-self:center"><button class="btn btn-outline btn-sm" onclick="editReviewGoal()">月間目標を設定</button></div>`;
   }
@@ -8539,9 +8543,13 @@ async function genJsonLd() {
     if (addr.postalCode || kn.postalCode) address.postalCode = addr.postalCode || kn.postalCode;
     if (Object.keys(address).length > 2) biz.address = address;
     const spec = _jsonldHours(loc.regularHours); if (spec.length) biz.openingHoursSpecification = spec;
-    const rsTotal = parseInt((document.getElementById('rsTotal') || {}).textContent, 10);
-    const rsAvg = parseFloat((document.getElementById('rsAvg') || {}).textContent);
-    if (rsTotal > 0 && rsAvg > 0) biz.aggregateRating = { '@type': 'AggregateRating', ratingValue: rsAvg, reviewCount: rsTotal };
+    // 評価は実データのみ（デモ口コミの数値を構造化データに混入させない）
+    const realRevs = (allReviews || []).filter(r => !/^demo\//.test(r.name || ''));
+    if (realRevs.length) {
+      let s = 0, n = 0;
+      realRevs.forEach(r => { const v = starRatingToNum(r.starRating); if (v >= 1 && v <= 5) { s += v; n++; } });
+      if (n > 0) biz.aggregateRating = { '@type': 'AggregateRating', ratingValue: Math.round(s / n * 10) / 10, reviewCount: n };
+    }
     // FAQ（Groqで生成・無料。失敗してもLocalBusinessは出す）
     let faqJson = null;
     try {

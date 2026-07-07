@@ -69,14 +69,17 @@ async function fetchLocalResults(keyword, { location, ll } = {}) {
       const list = items.filter(x => x.type === 'maps_search').map((x, i) => ({
         title: x.title, position: x.rank_absolute || (i + 1), rating: x.rating?.value || null, reviews: x.rating?.votes_count || null, place_id: x.place_id || '',
       }));
-      if (!list.length && d?.tasks?.[0]?.status_message && d.tasks[0].status_code >= 40000) return { error: d.tasks[0].status_message };
-      return { list };
-    } catch (e) { return { error: e.message }; }
+      if (!list.length && d?.tasks?.[0]?.status_message && d.tasks[0].status_code >= 40000) return { error: d.tasks[0].status_message, calls: 1 };
+      return { list, calls: 1 };
+    } catch (e) { return { error: e.message, calls: 1 }; }
   }
   // 既定: SerpApi（無料枠）。google_localは location 文字列で計測。
+  // calls = 実際に投げたSerpApiリクエスト数（再試行で2回になり得る）。呼び出し側はこの数で枠を加算し過少計上を防ぐ。
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
-  if (!SERPAPI_KEY) return { error: 'SERPAPI_KEY未設定' };
+  if (!SERPAPI_KEY) return { error: 'SERPAPI_KEY未設定', calls: 0 };
+  let calls = 0;
   const call = async (loc) => {
+    calls++;
     const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
     if (loc) params.set('location', loc);
     const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
@@ -84,11 +87,11 @@ async function fetchLocalResults(keyword, { location, ll } = {}) {
   };
   let data = await call(location);
   if (data.error && /location/i.test(data.error) && location) data = await call(''); // 不正地点はKWの地域語頼みで再試行
-  if (data.error) return { error: data.error };
+  if (data.error) return { error: data.error, calls };
   const list = (data.local_results || []).map((item, i) => ({
     position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null, place_id: item.place_id || '',
   }));
-  return { list };
+  return { list, calls };
 }
 
 // SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
@@ -658,8 +661,8 @@ export default async function handler(req, res) {
     for (const job of jobs) {
       if (ok + fail >= MAX_CALLS) break;
       try {
-        const { list, error } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
-        if (_cronUseSerp) { used++; await kvSet(usedKey, used); }
+        const { list, error, calls } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
+        if (_cronUseSerp && calls) { used += calls; await kvSet(usedKey, used); } // 実リクエスト数で加算（再試行含む）
         if (error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error }); continue; }
         const target = _normName(job.st.name);
         let rank = null;
@@ -941,9 +944,9 @@ export default async function handler(req, res) {
     const used = await kvGet(usedKey) || 0;
     if (useSerp && used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
     try {
-      const { list, error } = await fetchLocalResults(keyword, { location, ll });
+      const { list, error, calls } = await fetchLocalResults(keyword, { location, ll });
+      if (useSerp && calls) await kvSet(usedKey, used + calls); // 使用回数を記録（実リクエスト数＝再試行含む）
       if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
-      if (useSerp) await kvSet(usedKey, used + 1); // 使用回数を記録（SerpApiのみ）
       const target = _normName(store);
       let rank = null, matched = null;
       list.forEach((item, i) => {
@@ -990,10 +993,12 @@ export default async function handler(req, res) {
     const target = _normName(store);
     const results = [];
     for (const area of areas) {
+      // 途中でも上限に達したら停止（再試行で1件2回呼ぶ場合があるため事前チェックだけに頼らない＝枠突入を防ぐ）
+      if (useSerp && used >= SERPAPI_LIMIT) { results.push({ area, rank: null, error: '取得枠に達したため中断' }); continue; }
       try {
-        const { list, error } = await fetchLocalResults(keyword, { location: area });
+        const { list, error, calls } = await fetchLocalResults(keyword, { location: area });
+        if (useSerp && calls) { used += calls; await kvSet(usedKey, used); } // 実リクエスト数で加算（エラー時も消費済み）
         if (error) { results.push({ area, rank: null, error }); continue; }
-        if (useSerp) { used += 1; await kvSet(usedKey, used); }
         let rank = null;
         (list || []).forEach((item, i) => {
           if (rank) return;
