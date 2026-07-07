@@ -7834,11 +7834,41 @@ async function renderCompHistory(selKw) {
           ${comps.map(c => { const e = (h.comps || []).find(x => x.id === c.id); const r = e ? e.rank : null; return `<td style="${cls(self, r)}">${fmt(r)}</td>`; }).join('')}
           <td style="font-size:12px;color:var(--text-sub)">${h.date}</td></tr>`;
       }).join('')}</tbody></table></div>
-      <p style="font-size:11px;color:var(--text-sub);margin-top:8px">緑=自店が勝っているキーワード／赤=負けているキーワード。負けているキーワードを翌月の重点対策に。</p>`;
+      <p style="font-size:11px;color:var(--text-sub);margin-top:8px">緑=自店が勝っているキーワード／赤=負けているキーワード。負けているキーワードを翌月の重点対策に。</p>
+      ${_compReviewsBlock(hist, comps)}`;
   } catch (e) {
     chart.innerHTML = `<p style="font-size:12px;color:var(--red)">取得に失敗しました: ${escapeHtml(e.message)}</p>`;
   }
 }
+// 競合の口コミ数・評価の推移（同じSERP記録から。最新値＋初回記録からの伸び）
+function _compReviewsBlock(hist, comps) {
+  if (!comps.length) return '';
+  // 各競合の (date, reviews, rating) を時系列で集める（reviewsが数値のものだけ）
+  const rows = comps.map(c => {
+    const pts = [];
+    hist.forEach(h => { const e = (h.comps || []).find(x => x.id === c.id); if (e && Number.isFinite(e.reviews)) pts.push({ date: h.date, reviews: e.reviews, rating: e.rating }); });
+    pts.sort((a, b) => a.date < b.date ? -1 : 1);
+    if (!pts.length) return { name: c.name, none: true };
+    const last = pts[pts.length - 1], first = pts[0];
+    const delta = last.date !== first.date ? last.reviews - first.reviews : null;
+    return { name: c.name, reviews: last.reviews, rating: last.rating, delta, since: first.date };
+  });
+  if (rows.every(r => r.none)) return '<p style="font-size:11px;color:var(--text-muted);margin-top:10px">競合の口コミ数は、順位取得を数回続けると推移が表示されます（同じデータから記録されます・追加コストなし）。</p>';
+  const dtxt = d => d == null ? '<span style="color:var(--text-muted)">—</span>' : d > 0 ? `<span style="color:var(--accent-2);font-weight:700">+${d}</span>` : d < 0 ? `<span style="color:var(--red)">${d}</span>` : '<span style="color:var(--text-sub)">±0</span>';
+  return `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>競合の口コミ数・評価（最新）</div>
+    <div style="overflow-x:auto"><table class="summary-table" style="min-width:420px">
+      <thead><tr><th style="text-align:left;padding-left:14px">競合</th><th>口コミ数</th><th>評価</th><th>記録開始からの伸び</th></tr></thead>
+      <tbody>${rows.map(r => r.none
+        ? `<tr><td style="text-align:left;padding-left:14px;font-weight:600">${escapeHtml(r.name)}</td><td colspan="3" style="color:var(--text-muted);font-size:12px">未記録（順位取得で自動記録）</td></tr>`
+        : `<tr><td style="text-align:left;padding-left:14px;font-weight:600">${escapeHtml(r.name)}</td>
+            <td style="font-weight:700">${r.reviews}件</td>
+            <td>${r.rating != null ? '★' + r.rating : '—'}</td>
+            <td>${dtxt(r.delta)}<span style="font-size:10px;color:var(--text-muted);margin-left:4px">${r.delta != null ? 'since ' + r.since.slice(5) : ''}</span></td></tr>`).join('')}</tbody></table></div>
+    <p style="font-size:11px;color:var(--text-sub);margin-top:8px">口コミ数の<b>伸び</b>が競合の勢いです。自店の獲得ペースは「口コミ管理」で確認できます。差が開くキーワードはPOP・QRで口コミ依頼を強化しましょう。</p>
+  </div>`;
+}
+
 // 折れ線SVG（Y軸=順位・下が悪い。null=圏外は21位相当の破線位置に×印）
 function _compHistSvg(dates, series) {
   const W = 640, H = 220, PL = 34, PR = 120, PT = 12, PB = 26;

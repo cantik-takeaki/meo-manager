@@ -100,21 +100,22 @@ async function recordCompRanks(storeId, keyword, selfRank, list) {
     const registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
     if (!registered.length) return null;
     const comps = registered.map(c => {
-      let cRank = null, cMatched = null;
+      let cRank = null, cMatched = null, cRating = null, cReviews = null;
       const cnPlace = String(c.placeId || '').trim();
       const cn = _normName(c.name);
       list.forEach((item, i) => {
         if (cRank) return;
-        if (cnPlace && item.place_id && item.place_id === cnPlace) { cRank = item.position || (i + 1); cMatched = item.title; return; }
+        if (cnPlace && item.place_id && item.place_id === cnPlace) { cRank = item.position || (i + 1); cMatched = item.title; cRating = item.rating; cReviews = item.reviews; return; }
         const t = _normName(item.title);
-        if (cn && t && (t.includes(cn) || cn.includes(t))) { cRank = item.position || (i + 1); cMatched = item.title; }
+        if (cn && t && (t.includes(cn) || cn.includes(t))) { cRank = item.position || (i + 1); cMatched = item.title; cRating = item.rating; cReviews = item.reviews; }
       });
-      return { id: c.id, name: c.name, rank: cRank, matched: cMatched };
+      return { id: c.id, name: c.name, rank: cRank, matched: cMatched, rating: cRating, reviews: cReviews };
     });
     const histKey = `comp_history_${storeId}`;
     const hist = await kvGet(histKey) || [];
     const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
-    const entry = { date, keyword, self: selfRank, comps: comps.map(c => ({ id: c.id, rank: c.rank })) };
+    // 順位に加え、同じSERPから取れる評価・口コミ数も記録（追加APIコストなし）
+    const entry = { date, keyword, self: selfRank, comps: comps.map(c => ({ id: c.id, rank: c.rank, rating: c.rating, reviews: c.reviews })) };
     const dup = hist.findIndex(h => h.date === date && h.keyword === keyword);
     if (dup >= 0) hist[dup] = entry; else hist.push(entry);
     while (hist.length > 800) hist.shift();
