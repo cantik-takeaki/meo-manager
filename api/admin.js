@@ -960,6 +960,52 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 口コミ獲得の月間目標（店舗ごと）。ペース表示用の目標値のみ保持 ──
+  if (action === 'review-goal') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `review_goal_${storeId}`;
+    if (req.method === 'GET') return res.json({ goal: (await kvGet(key)) || 0 });
+    if (req.method === 'POST') {
+      const g = Math.max(0, Math.min(999, parseInt((req.body || {}).goal, 10) || 0));
+      await kvSet(key, g);
+      return res.json({ success: true, goal: g });
+    }
+  }
+
+  // ── 簡易ジオグリッド：近隣エリア文字列ごとに順位を計測（自店の"場所による見え方"）──
+  // 各エリア＝SerpApi 1回。枠ガード必須（上限到達で停止）。自動では回さない（フロントの手動実行のみ）。
+  if (req.method === 'GET' && action === 'geo-rank') {
+    const { keyword, store, storeId } = req.query;
+    const areas = String(req.query.areas || '').split('|').map(s => s.trim()).filter(Boolean).slice(0, 9);
+    if (!keyword || !store || !areas.length) return res.status(400).json({ error: 'keyword・store・areas必須' });
+    const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
+    const useSerp = !(provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    const ym = new Date().toISOString().slice(0, 7);
+    const usedKey = `serpapi_usage_${ym}`;
+    let used = await kvGet(usedKey) || 0;
+    if (useSerp && (SERPAPI_LIMIT - used) < areas.length) {
+      return res.status(429).json({ error: `残り枠が不足しています（残り${Math.max(0, SERPAPI_LIMIT - used)}回／必要${areas.length}回）。来月リセットされます`, overLimit: true, remaining: Math.max(0, SERPAPI_LIMIT - used), need: areas.length });
+    }
+    const target = _normName(store);
+    const results = [];
+    for (const area of areas) {
+      try {
+        const { list, error } = await fetchLocalResults(keyword, { location: area });
+        if (error) { results.push({ area, rank: null, error }); continue; }
+        if (useSerp) { used += 1; await kvSet(usedKey, used); }
+        let rank = null;
+        (list || []).forEach((item, i) => {
+          if (rank) return;
+          const t = _normName(item.title);
+          if (t && (t.includes(target) || target.includes(t))) rank = item.position || (i + 1);
+        });
+        results.push({ area, rank });
+      } catch (e) { results.push({ area, rank: null, error: e.message }); }
+    }
+    return res.json({ keyword, results, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
+  }
+
   // ── ダッシュボード全社集計（順位ロールアップ＋口コミ獲得KPI合計＋店舗別サマリー） ──
   // 競合ぐるっとMEOのダッシュボード相当。managed_locations＋手動store を横断集計。既存データのみ使用。
   if (req.method === 'GET' && action === 'dashboard') {

@@ -814,6 +814,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <div class="kpi-agg-cell" style="flex:1"><div class="k-l"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>未返信</div><div class="k-v" style="color:var(--gold)" id="rsUnreplied">—</div></div>
           </div>
         </div>
+        <!-- 口コミ獲得ペース＋目標（獲得スピードはGoogleが見る活性シグナル） -->
+        <div id="reviewPaceWrap" style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px"></div>
       </div>
 
       <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -1310,6 +1312,25 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div id="rankingInputFields"></div>
         <button class="btn btn-primary" style="margin-top:12px" onclick="saveRankings()">順位を保存</button>
         <p style="font-size:11px;color:var(--text-muted);margin-top:10px">※自動取得はSerpApi経由。地点は「市区,都道府県,Japan」形式（英語）が確実です。</p>
+      </div>
+
+      <!-- エリア別順位（簡易ジオグリッド）: 検索する場所による見え方を可視化。各エリア=取得1回分の枠 -->
+      <div class="card" id="geoRankCard" style="display:none;border-color:rgba(79,125,243,0.3)">
+        <div class="card-header" style="flex-wrap:wrap;gap:6px">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>エリア別順位（場所による見え方）</div>
+          <span id="geoUsage" style="font-size:11px;color:var(--text-sub)"></span>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">検索する<b>場所</b>で順位は変わります。近隣エリアごとに自店の順位を測り「どこで強い／弱い」を可視化します。<b>各エリア＝取得1回分の枠</b>を使います（自動では回りません）。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <input id="geoKeyword" type="text" placeholder="キーワード（例：相模原市 ホームページ制作）" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
+        </div>
+        <label style="font-size:11px;color:var(--text-sub);display:block;margin-bottom:4px">計測するエリア（1行に1つ・「市区,都道府県,Japan」の英語表記が確実）</label>
+        <textarea id="geoAreas" rows="4" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:ui-monospace,monospace;resize:vertical" placeholder="Sagamihara,Kanagawa,Japan&#10;Zama,Kanagawa,Japan&#10;Machida,Tokyo,Japan"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="fillGeoAreas()">近隣エリアを自動入力</button>
+          <button class="btn btn-primary btn-sm" id="geoRunBtn" onclick="runGeoRank()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>エリア別に順位を取得</button>
+        </div>
+        <div id="geoResult" style="margin-top:12px"></div>
       </div>
       </div><!-- /storeAddView -->
 
@@ -2482,6 +2503,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
         </div>
         <div id="aioAnalyzeStatus" style="font-size:12px;color:var(--text-sub);margin-bottom:6px"></div>
         <div id="aioAnalyzeResult"></div>
+      </div>
+
+      <div class="card" style="border-color:rgba(79,125,243,0.3)">
+        <div class="card-header" style="flex-wrap:wrap;gap:6px">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>構造化データ（JSON-LD）を生成</div>
+          <button class="btn btn-primary btn-sm" id="jsonldBtn" onclick="genJsonLd()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>コードを生成</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--text-sub);margin:-2px 0 0">企業ナレッジとGoogle情報から、公式サイトに貼れる <b>LocalBusiness＋FAQ</b> のコードを作ります。Google・AI検索が店の情報を正確に理解し、リッチ表示や引用に繋がります。<code>&lt;head&gt;</code> 内に貼ってください。</p>
+        <div id="jsonldResult" style="margin-top:10px"></div>
       </div>
 
       <div class="card">
@@ -8406,6 +8436,132 @@ async function loadReviews() {
   }
 }
 
+// ── 口コミ獲得ペース＋目標：獲得スピードはGoogleが見る活性シグナル。allReviewsのcreateTimeから算出 ──
+let _reviewGoal = 0;
+async function renderReviewPace() {
+  const box = document.getElementById('reviewPaceWrap'); if (!box) return;
+  const reviews = (allReviews || []).filter(r => r.createTime && !/^demo\//.test(r.name || ''));
+  // JST基準の当月・前月
+  const now = new Date(Date.now() + 9 * 3600 * 1000);
+  const ym = now.toISOString().slice(0, 7);
+  const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+  const ymOf = t => new Date(new Date(t).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+  const thisMonth = reviews.filter(r => ymOf(r.createTime) === ym).length;
+  const lastMonth = reviews.filter(r => ymOf(r.createTime) === pm).length;
+  // 目標をKVから取得（未取得時のみ）
+  try { const g = await fetch(`/api/admin?action=review-goal&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); _reviewGoal = g.goal || 0; } catch (e) { _reviewGoal = 0; }
+  const day = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const projected = day > 0 ? Math.round(thisMonth / day * daysInMonth) : thisMonth;
+  const weeksLeft = Math.max(0.15, (daysInMonth - day) / 7);
+  const remain = Math.max(0, _reviewGoal - thisMonth);
+  const perWeek = _reviewGoal > 0 ? Math.ceil(remain / weeksLeft) : 0;
+  const onTrack = _reviewGoal === 0 ? null : projected >= _reviewGoal;
+  const isDemo = reviews.length === 0 && (allReviews || []).length > 0;
+
+  const diff = lastMonth != null ? thisMonth - lastMonth : null;
+  const dtxt = diff == null ? '' : diff > 0 ? `<span style="color:var(--accent-2)">▲${diff}</span>` : diff < 0 ? `<span style="color:var(--red)">▼${-diff}</span>` : '<span style="color:var(--text-sub)">±0</span>';
+  const cell = (label, val, sub) => `<div style="text-align:center;min-width:92px"><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${val}</div><div style="font-size:11px;color:var(--text-sub)">${label}</div>${sub ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:1px">${sub}</div>` : ''}</div>`;
+
+  let goalArea;
+  if (_reviewGoal > 0) {
+    const col = onTrack ? 'var(--accent-2)' : '#d97706';
+    goalArea = `${cell('今月の目標', _reviewGoal + '件')}
+      ${cell('着地予測', projected + '件', `<span style="color:${col}">${onTrack ? 'ペース到達見込み' : 'ペース不足'}</span>`)}
+      ${cell('必要ペース', remain > 0 ? `週${perWeek}件` : '達成', remain > 0 ? `あと${remain}件` : '🎉')}`;
+  } else {
+    goalArea = `<div style="align-self:center"><button class="btn btn-outline btn-sm" onclick="editReviewGoal()">月間目標を設定</button></div>`;
+  }
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>口コミ獲得ペース</div>
+      ${_reviewGoal > 0 ? `<button class="btn btn-outline btn-sm" style="padding:3px 10px" onclick="editReviewGoal()">目標を変更</button>` : ''}
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+      ${cell('今月の新規', thisMonth + '件', `前月 ${lastMonth}件 ${dtxt}`)}
+      ${goalArea}
+    </div>
+    ${isDemo ? '<p style="font-size:11px;color:var(--text-muted);margin-top:8px">※ 日付つきの口コミが取得できるとペースが表示されます（現在はサンプル表示）。</p>'
+      : '<p style="font-size:11px;color:var(--text-sub);margin-top:8px">口コミの<b>増加スピード</b>はGoogleが見る活性シグナルです。QR・POP・アンケートで継続的に依頼しましょう。</p>'}`;
+}
+async function editReviewGoal() {
+  const cur = _reviewGoal || '';
+  const v = prompt('口コミの月間獲得目標（件数）を入力してください', cur);
+  if (v === null) return;
+  const g = Math.max(0, Math.min(999, parseInt(v, 10) || 0));
+  try {
+    await fetch(`/api/admin?action=review-goal&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: g }) });
+    _reviewGoal = g; renderReviewPace();
+    showToast('目標を設定しました', 'success');
+  } catch (e) { showToast('目標の保存に失敗しました', 'error'); }
+}
+
+// ── 構造化データ（JSON-LD）生成：企業ナレッジ＋Google情報から貼れるコードを作る（純クライアント・無料）──
+function _jsonldHours(regularHours) {
+  const dayMap = { MONDAY: 'Monday', TUESDAY: 'Tuesday', WEDNESDAY: 'Wednesday', THURSDAY: 'Thursday', FRIDAY: 'Friday', SATURDAY: 'Saturday', SUNDAY: 'Sunday' };
+  const periods = (regularHours && regularHours.periods) || [];
+  const fmt = t => typeof t === 'string' ? (t.length === 4 ? t.slice(0, 2) + ':' + t.slice(2) : t) : (t && t.hours != null ? String(t.hours).padStart(2, '0') + ':' + String(t.minutes || 0).padStart(2, '0') : null);
+  const out = [];
+  periods.forEach(p => {
+    const day = dayMap[p.openDay]; if (!day) return;
+    const o = fmt(p.openTime), c = fmt(p.closeTime);
+    if (o && c) out.push({ '@type': 'OpeningHoursSpecification', dayOfWeek: day, opens: o, closes: c });
+  });
+  return out;
+}
+function _parseQaPairs(text) {
+  const lines = String(text).split('\n'); const pairs = []; let q = null;
+  lines.forEach(l => {
+    const qm = l.match(/^\s*Q[.:：]\s*(.+)/i), am = l.match(/^\s*A[.:：]\s*(.+)/i);
+    if (qm) q = qm[1].trim();
+    else if (am && q) { pairs.push({ q, a: am[1].trim() }); q = null; }
+  });
+  return pairs.slice(0, 6);
+}
+async function genJsonLd() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('jsonldResult');
+  const btn = document.getElementById('jsonldBtn'); const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">構造化データを生成中…（FAQもAIで作成）</div>';
+  try {
+    const kn = await fetch(`/api/admin?action=knowledge&locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()).catch(() => ({}));
+    const loc = currentLocation || {}; const addr = loc.storefrontAddress || {};
+    const biz = { '@context': 'https://schema.org', '@type': 'LocalBusiness', name: kn.storeName || loc.title || '当店' };
+    if (kn.description) biz.description = kn.description;
+    const tel = (loc.phoneNumbers && loc.phoneNumbers.primaryPhone) || kn.phone; if (tel) biz.telephone = tel;
+    const url = loc.websiteUri || kn.url; if (url) biz.url = url;
+    const address = { '@type': 'PostalAddress', addressCountry: 'JP' };
+    const line = (addr.addressLines || []).join(' ') || kn.address || '';
+    if (line) address.streetAddress = line;
+    if (addr.locality) address.addressLocality = addr.locality;
+    if (addr.administrativeArea) address.addressRegion = addr.administrativeArea;
+    if (addr.postalCode || kn.postalCode) address.postalCode = addr.postalCode || kn.postalCode;
+    if (Object.keys(address).length > 2) biz.address = address;
+    const spec = _jsonldHours(loc.regularHours); if (spec.length) biz.openingHoursSpecification = spec;
+    const rsTotal = parseInt((document.getElementById('rsTotal') || {}).textContent, 10);
+    const rsAvg = parseFloat((document.getElementById('rsAvg') || {}).textContent);
+    if (rsTotal > 0 && rsAvg > 0) biz.aggregateRating = { '@type': 'AggregateRating', ratingValue: rsAvg, reviewCount: rsTotal };
+    // FAQ（Groqで生成・無料。失敗してもLocalBusinessは出す）
+    let faqJson = null;
+    try {
+      const q = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'qa_generate', count: 4 }) }).then(r => r.json());
+      const faqs = _parseQaPairs(q.content || '');
+      if (faqs.length) faqJson = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faqs.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+    } catch (e) {}
+    const S = '<' + 'script type="application/ld+json">', E = '</' + 'script>';
+    const blocks = [`${S}\n${JSON.stringify(biz, null, 2)}\n${E}`];
+    if (faqJson) blocks.push(`${S}\n${JSON.stringify(faqJson, null, 2)}\n${E}`);
+    const code = blocks.join('\n\n');
+    box.innerHTML = `<textarea readonly id="jsonldCode" style="width:100%;min-height:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:12px;font-family:ui-monospace,monospace;line-height:1.55;resize:vertical">${escapeHtml(code)}</textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text-sub)">LocalBusiness${faqJson ? '＋FAQPage' : ''}${biz.aggregateRating ? '＋評価' : ''} を生成。公式サイトの &lt;head&gt; に貼ってください。</span>
+        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('jsonldCode').value);showToast('コピーしました','success')">コードをコピー</button>
+      </div>`;
+  } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">生成に失敗しました: ${escapeHtml(e.message)}</div>`; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+
 // 口コミサマリー（総数・平均・★分布・返信状況）を描画。allReviewsからクライアント側で集計（実データ/デモ共通）
 function renderReviewStats() {
   const card = document.getElementById('reviewStatsCard');
@@ -8427,6 +8583,7 @@ function renderReviewStats() {
   document.getElementById('rsTotal').textContent = count;
   document.getElementById('rsReplied').textContent = replied;
   document.getElementById('rsUnreplied').textContent = reviews.length - replied;
+  renderReviewPace();
   // ★分布 横バー（5→1）
   const max = Math.max(1, ...Object.values(dist));
   document.getElementById('rsDist').innerHTML = [5, 4, 3, 2, 1].map(s => {
@@ -9322,6 +9479,8 @@ async function openRankingInput(storeId, storeName) {
   document.getElementById('rankingInputCard').style.display = 'block';
   document.getElementById('rankingInputCard').scrollIntoView({ behavior: 'smooth' });
   loadSerpUsage();
+  const geoCard = document.getElementById('geoRankCard');
+  if (geoCard) { geoCard.style.display = 'block'; document.getElementById('geoResult').innerHTML = ''; loadGeoUsage(); }
 
   // キーワード取得：①過去の順位データ → ②企業ナレッジのキーワード → ③プレースホルダ
   const res = await fetch(`/api/admin?action=rankings&storeId=${storeId}`);
@@ -9346,6 +9505,64 @@ async function openRankingInput(storeId, storeName) {
     </div>`).join('');
 
   window._rankingKeywords = keywords;
+  // エリア別順位のキーワードを主力語でプリフィル
+  const gk = document.getElementById('geoKeyword');
+  if (gk && !gk.value) { const real = keywords.find(k => k && !/^キーワード/.test(k)); if (real) gk.value = real; }
+}
+
+// ── 簡易ジオグリッド（エリア別順位）：場所による見え方を可視化。各エリア=取得1回分の枠 ──
+async function loadGeoUsage() {
+  try { const d = await fetch('/api/admin?action=serpapi-usage').then(r => r.json()); const el = document.getElementById('geoUsage'); if (el) el.textContent = `今月の残り取得枠 ${d.remaining}/${d.limit}`; } catch (e) {}
+}
+function fillGeoAreas() {
+  const sid = (selectedClientStore || {}).storeId || currentLocationId;
+  fetch(`/api/admin?action=knowledge&locationId=${encodeURIComponent(sid)}`).then(r => r.json()).then(k => {
+    const raw = [k.address, k.serviceArea, k.nearbyLandmarks].filter(Boolean).join('、');
+    const areas = (raw.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]+?[市区町村]/g) || []).filter((v, i, a) => a.indexOf(v) === i).slice(0, 6);
+    const ta = document.getElementById('geoAreas');
+    if (areas.length) { ta.value = areas.map(a => a + ',Japan').join('\n'); showToast('近隣エリアを入力しました。英語表記が確実です（必要に応じて修正してください）', 'success'); }
+    else showToast('企業ナレッジに地域情報が少ないため、手動でエリアを入力してください', 'error');
+  }).catch(() => showToast('エリアの自動入力に失敗しました', 'error'));
+}
+async function runGeoRank() {
+  const store = (selectedClientStore || {}).storeName || currentLocation?.title;
+  const storeId = (selectedClientStore || {}).storeId || currentLocationId;
+  if (!store) return showToast('店舗を選択してください', 'error');
+  const keyword = document.getElementById('geoKeyword').value.trim();
+  const areas = document.getElementById('geoAreas').value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 9);
+  if (!keyword) return showToast('キーワードを入力してください', 'error');
+  if (!areas.length) return showToast('計測するエリアを入力してください', 'error');
+  if (!confirm(`${areas.length}件のエリアで順位を取得します。\n取得枠を${areas.length}回分使用します。実行しますか？`)) return;
+  const box = document.getElementById('geoResult');
+  const btn = document.getElementById('geoRunBtn'); const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '取得中…'; }
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">エリア別に順位を取得中…（数十秒かかることがあります）</div>';
+  try {
+    const q = `keyword=${encodeURIComponent(keyword)}&store=${encodeURIComponent(store)}&storeId=${encodeURIComponent(storeId)}&areas=${encodeURIComponent(areas.join('|'))}`;
+    const d = await fetch(`/api/admin?action=geo-rank&${q}`).then(r => r.json());
+    if (d.error) box.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px">${escapeHtml(d.error)}</div>`;
+    else { box.innerHTML = renderGeoResults(d.results || []); loadGeoUsage(); }
+  } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">取得に失敗しました: ${escapeHtml(e.message)}</div>`; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+function renderGeoResults(results) {
+  if (!results.length) return '<div style="font-size:12px;color:var(--text-sub)">結果がありません</div>';
+  const cell = r => {
+    const rk = r.rank;
+    const col = rk == null ? 'var(--text-muted)' : rk <= 3 ? 'var(--accent-2)' : rk <= 10 ? '#d97706' : 'var(--red)';
+    const bg = rk == null ? 'var(--bg-3)' : rk <= 3 ? 'rgba(16,185,129,.12)' : rk <= 10 ? 'rgba(217,119,6,.12)' : 'rgba(239,68,68,.10)';
+    const label = rk == null ? '圏外' : rk + '位';
+    return `<div style="background:${bg};border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:${col};font-variant-numeric:tabular-nums">${label}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:3px;word-break:break-all">${escapeHtml((r.area || '').replace(/,\s*Japan$/i, ''))}</div>
+    </div>`;
+  };
+  const ranked = results.filter(r => r.rank != null).map(r => r.rank);
+  const best = ranked.length ? Math.min(...ranked) : null, worst = ranked.length ? Math.max(...ranked) : null;
+  const note = ranked.length
+    ? `最高${best}位${worst !== best ? `・最低${worst}位` : ''}。近いエリアで上位・離れると下がるのが自然です。上位を広げたいエリアは、その地域名を対策キーワードや投稿に入れて関連性を高めましょう。`
+    : 'どのエリアでも圏外でした。まずGBPの基本最適化と口コミ獲得を進めましょう。';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px">${results.map(cell).join('')}</div>
+    <p style="font-size:11.5px;color:var(--text-sub);margin-top:10px;line-height:1.6">${note}</p>`;
 }
 
 // 1キーワードの順位をSerpApiで自動取得
@@ -9410,6 +9627,7 @@ async function saveRankings() {
   });
   showToast('順位を保存しました！', 'success');
   document.getElementById('rankingInputCard').style.display = 'none';
+  const _gc = document.getElementById('geoRankCard'); if (_gc) _gc.style.display = 'none';
 }
 
 // ─── Citation ───
