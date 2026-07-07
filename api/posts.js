@@ -615,6 +615,23 @@ export default async function handler(req, res) {
     } catch (e) { /* 補完失敗時はそのまま */ }
   }
 
+  // GBP写真の鮮度チェック（最終追加日・枚数）— 読み取りのみ。写真の新しさはGBP活性シグナル。
+  if (action === 'gbp-photo' && req.method === 'GET') {
+    try {
+      const r = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/media`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const data = await r.json();
+      if (data.error) return res.status(r.status).json({ error: data.error.message, pending: true });
+      const items = data.mediaItems || [];
+      let latest = null;
+      for (const m of items) { const t = m.createTime; if (t && (!latest || t > latest)) latest = t; }
+      return res.json({ count: data.totalMediaItemCount ?? items.length, latest });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // GBPに写真を追加（ライブラリの公開URLをGoogleビジネスプロフィールのメディアに登録）
   // ※社外書き込み。フロントで承認ダイアログを通してから呼ぶ設計。
   if (action === 'gbp-photo' && req.method === 'POST') {

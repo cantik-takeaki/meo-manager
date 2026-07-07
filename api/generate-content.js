@@ -1161,6 +1161,34 @@ ${topText || 'データなし'}
 - 前置き不要、説明文のみ。`;
   }
 
+  // GBPカテゴリの最適化提案（対策KW×業種から主/副カテゴリ候補）。カテゴリは関連性の最重要レバー。
+  if (type === 'category_suggest') {
+    const curPrimary = String(req.body.currentPrimary || knowledge.category || '未設定');
+    const curAdd = Array.isArray(req.body.currentAdditional)
+      ? req.body.currentAdditional.filter(Boolean).join('、')
+      : String(req.body.currentAdditional || '');
+    const kwLine = _targetedKws.length ? _targetedKws.join('、') : (seoKws.join('、') || '（未登録）');
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。Googleビジネスプロフィール（GBP）の「カテゴリ」を最適化するための提案をしてください。
+GBPのカテゴリはGoogleが用意した固定リストから選びます。実在するGBPカテゴリ名だけを使い、存在しないカテゴリを創作しないでください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【現在のメインカテゴリ】${curPrimary}
+【現在のサブカテゴリ】${curAdd || 'なし'}
+【対策キーワード】${kwLine}
+【提供サービス】${services || '未設定'}
+【強み】${strengths || '未設定'}
+
+【出力】次の見出しで簡潔に。各項目は日本語のGBP実在カテゴリ名で。
+■推奨メインカテゴリ
+- 1つだけ。店の中心事業と対策キーワードに最も合うカテゴリ。現在ので適切ならその旨を書く。（理由を一言）
+■追加すべきサブカテゴリ（2〜3個）
+- ・カテゴリ名 … なぜ有効か（対策KW・提供サービスとの関連を一言）。既に設定済みのものは挙げない。
+■ヒント
+- 無関係なカテゴリの入れすぎは逆効果である旨を1行。
+※実在するGBPカテゴリ名のみ。効果の断定はしない。前置き・コードフェンスは書かず本文のみ。`;
+  }
+
   // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
   const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
   const _isSeoType = _seoTypes.includes(type);
@@ -1199,7 +1227,7 @@ ${topText || 'データなし'}
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500,
-        temperature: type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : 0.85,
+        temperature: type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85,
         top_p: 0.9,
       }),
     });

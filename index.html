@@ -1078,6 +1078,17 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <div class="card" id="gbpCheckCard" style="display:none">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
         <div id="gbpCheckList"></div>
+        <!-- 写真の鮮度（GBP活性シグナル） -->
+        <div id="gbpPhotoFresh" style="margin-top:12px"></div>
+        <!-- カテゴリ最適化（AI提案） -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M3 7h18M3 12h18M3 17h18"/></svg>カテゴリ最適化（AI提案）</div>
+            <button class="btn btn-outline btn-sm" id="gbpCatBtn" onclick="suggestGbpCategories(event)">AIでカテゴリを提案</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:4px">カテゴリは関連性の最重要レバー。対策キーワードと業種から主・副カテゴリの候補を提案します。</div>
+          <div id="gbpCatResult" style="margin-top:8px"></div>
+        </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
           <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
           <div style="margin-top:4px;line-height:1.9"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>写真（外観/内観/メニューを月数枚）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>商品・サービス登録（価格つき）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Q&Aの自作／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><path d="M7 7h.01"/></svg>属性（バリアフリー等）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>説明文／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9h4"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>投稿（週1）</div>
@@ -5582,6 +5593,58 @@ function gbpCheck() {
         ${missing.map(i => `<div style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:4px"><b style="color:var(--text)">${i.label}:</b> ${i.hint}</div>`).join('')}
         <div style="font-size:11px;color:var(--text-sub);margin-top:6px">反映まで数分かかることがあります。反映後、この画面を開き直すとチェックが更新されます。</div>
       </div>` : '');
+  // 写真の鮮度を非同期で読み込む（カテゴリ提案はボタン起動）
+  loadPhotoFreshness();
+  const cr = document.getElementById('gbpCatResult'); if (cr) cr.innerHTML = '';
+}
+
+// ── 写真の鮮度（GBP活性シグナル）：最終追加日と枚数を表示し、古ければ催促 ──
+async function loadPhotoFreshness() {
+  const box = document.getElementById('gbpPhotoFresh'); if (!box || !currentLocation) return;
+  box.innerHTML = '<span style="font-size:12px;color:var(--text-sub)">写真の鮮度を確認中…</span>';
+  try {
+    const nm = currentLocation.name || '';
+    const d = await fetch(`/api/posts?action=gbp-photo&storeId=${encodeURIComponent(currentLocationId)}&locationName=${encodeURIComponent(nm)}`).then(r => r.json());
+    if (d.error) { box.innerHTML = ''; return; } // 権限待ち等は静かに隠す
+    const count = d.count || 0;
+    const days = d.latest ? Math.floor((Date.now() - new Date(d.latest).getTime()) / 86400000) : null;
+    box.innerHTML = photoFreshHtml(days, count);
+  } catch (e) { box.innerHTML = ''; }
+}
+function photoFreshHtml(days, count) {
+  const stale = (days == null) || days >= 30;
+  const label = days == null ? '写真がまだ登録されていません'
+    : days === 0 ? '今日 最終追加'
+    : days < 30 ? `${days}日前に最終追加`
+    : days < 90 ? `約${Math.round(days / 30)}ヶ月前に最終追加（更新が止まり気味）`
+    : `約${Math.round(days / 30)}ヶ月 更新が止まっています`;
+  const col = days == null ? 'var(--red)' : days < 30 ? 'var(--accent-2)' : days < 90 ? '#d97706' : 'var(--red)';
+  const nudge = stale ? `<div style="font-size:11.5px;color:var(--text-sub);margin-top:6px;line-height:1.6">Googleは<b>写真の新しさ</b>を活性シグナルとして評価します。月2〜3枚の追加が目安です。
+      <button class="btn btn-outline btn-sm" style="margin-left:4px;padding:3px 10px" onclick="showPanel('instagram')">写真を追加する</button></div>` : '';
+  return `<div style="padding:11px 13px;background:var(--bg-3);border-radius:8px;border:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:${col}">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      GBP写真 ${count}枚 ・ ${label}
+    </div>${nudge}</div>`;
+}
+
+// ── GBPカテゴリのAI提案（対策KW×業種から主/副カテゴリ候補）──
+async function suggestGbpCategories(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('gbpCatResult');
+  const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '提案中…'; }
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">AIがカテゴリを提案中…</div>';
+  const cats = currentLocation?.categories || {};
+  const curPrimary = (cats.primaryCategory && (cats.primaryCategory.displayName || cats.primaryCategory)) || '';
+  const curAdd = (cats.additionalCategories || []).map(c => c.displayName || c).filter(Boolean);
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'category_suggest', currentPrimary: curPrimary, currentAdditional: curAdd }) }).then(r => r.json());
+    const txt = d.content || d.error || '提案できませんでした';
+    box.innerHTML = `<div style="white-space:pre-wrap;font-size:13px;line-height:1.75;background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:12px">${escapeHtml(txt)}</div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:6px">※ カテゴリは Googleビジネスプロフィール →「カテゴリ」で設定します。提案は候補です（実在するカテゴリ名かGBP側でご確認ください）。</div>`;
+  } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">提案の取得に失敗しました</div>`; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
 }
 
 // 競合分析のキーワード候補をAIで提示（まず登録済み対策KW→無ければAI生成）。チップで入力欄に反映。
