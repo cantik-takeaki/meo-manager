@@ -7232,6 +7232,14 @@ async function loadInsightsPage(opts) {
     return;
   }
   if (sub) sub.textContent = currentLocation.title || '';
+  // 日付ピッカー：上限=今日、未入力なら直近30日を既定に
+  const _today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const _fromEl = document.getElementById('insFrom'), _toEl = document.getElementById('insTo');
+  if (_fromEl && _toEl) {
+    _fromEl.max = _today; _toEl.max = _today;
+    if (!_toEl.value) _toEl.value = _today;
+    if (!_fromEl.value) { const dd = new Date(Date.now() + 9 * 3600 * 1000); dd.setDate(dd.getDate() - 30); _fromEl.value = dd.toISOString().slice(0, 10); }
+  }
   const months = [3, 6, 12].includes(opts.months) ? opts.months : (window._insPageMonths || 3);
   const custom = !!(opts.start && opts.end);
   if (!custom) window._insPageMonths = months;
@@ -7256,6 +7264,9 @@ function loadInsightsPageCustom() {
   const f = document.getElementById('insFrom').value, t = document.getElementById('insTo').value;
   if (!f || !t) return showToast('開始日と終了日を選んでください', 'error');
   if (f > t) return showToast('開始日は終了日より前にしてください', 'error');
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST今日
+  if (t > today) return showToast('終了日は今日以前の日付にしてください', 'error');
+  if ((new Date(t) - new Date(f)) / 86400000 > 550) return showToast('期間は約18ヶ月以内で指定してください（Googleインサイトの取得上限）', 'error');
   loadInsightsPage({ start: f, end: t });
 }
 // 選択メトリクスに応じて日別データを合成（series を日付ごとに足す）
