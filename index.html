@@ -2855,10 +2855,13 @@ body.role-viewer [data-edit-action] { display:none !important; }
       </div>
       <div class="card">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-          <div id="insPresetTabs" style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px">
-            <button class="pop-tab pop-tab-on" data-ip="3" onclick="loadInsightsPage({months:3})" style="flex:none;padding:5px 14px;font-size:12px">3ヶ月</button>
-            <button class="pop-tab" data-ip="6" onclick="loadInsightsPage({months:6})" style="flex:none;padding:5px 14px;font-size:12px">6ヶ月</button>
-            <button class="pop-tab" data-ip="12" onclick="loadInsightsPage({months:12})" style="flex:none;padding:5px 14px;font-size:12px">12ヶ月</button>
+          <div id="insPresetTabs" style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;flex-wrap:wrap">
+            <button class="pop-tab" data-ip="d1" onclick="loadInsightsPreset('d1')" style="flex:none;padding:5px 12px;font-size:12px">1日</button>
+            <button class="pop-tab" data-ip="d7" onclick="loadInsightsPreset('d7')" style="flex:none;padding:5px 12px;font-size:12px">1週間</button>
+            <button class="pop-tab pop-tab-on" data-ip="d30" onclick="loadInsightsPreset('d30')" style="flex:none;padding:5px 12px;font-size:12px">1ヶ月</button>
+            <button class="pop-tab" data-ip="3" onclick="loadInsightsPreset('3')" style="flex:none;padding:5px 12px;font-size:12px">3ヶ月</button>
+            <button class="pop-tab" data-ip="6" onclick="loadInsightsPreset('6')" style="flex:none;padding:5px 12px;font-size:12px">6ヶ月</button>
+            <button class="pop-tab" data-ip="12" onclick="loadInsightsPreset('12')" style="flex:none;padding:5px 12px;font-size:12px">12ヶ月</button>
           </div>
           <span style="color:var(--border-active)">|</span>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -7222,6 +7225,19 @@ async function loadInsights(months) {
 
 // ── インサイト専用ページ（日別チャート＋期間指定・順位セクションのナビ）──
 let _insPageData = null;
+// プリセット: d1=1日 / d7=1週間 / d30=1ヶ月 / 3・6・12=Nヶ月
+function loadInsightsPreset(key) {
+  window._insLastPreset = key;
+  if (/^d\d+$/.test(key)) {
+    const days = parseInt(key.slice(1), 10);
+    const end = new Date(Date.now() + 9 * 3600 * 1000);
+    const start = new Date(end.getTime()); start.setDate(end.getDate() - (days - 1));
+    const iso = d => d.toISOString().slice(0, 10);
+    loadInsightsPage({ start: iso(start), end: iso(end), preset: key });
+  } else {
+    loadInsightsPage({ months: parseInt(key, 10), preset: key });
+  }
+}
 async function loadInsightsPage(opts) {
   opts = opts || {};
   const sub = document.getElementById('insPageStore'), grid = document.getElementById('insPageGrid'), chart = document.getElementById('insChart');
@@ -7231,6 +7247,8 @@ async function loadInsightsPage(opts) {
     if (chart) chart.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">店舗を選択するとインサイトが表示されます。</p>';
     return;
   }
+  // 期間指定なしの呼び出し（ページ表示・店舗切替）は前回のプリセットを再適用（既定=1ヶ月）
+  if (!opts.preset && !opts.start && !opts.months) return loadInsightsPreset(window._insLastPreset || 'd30');
   if (sub) sub.textContent = currentLocation.title || '';
   // 日付ピッカー：上限=今日、未入力なら直近30日を既定に
   const _today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -7240,10 +7258,10 @@ async function loadInsightsPage(opts) {
     if (!_toEl.value) _toEl.value = _today;
     if (!_fromEl.value) { const dd = new Date(Date.now() + 9 * 3600 * 1000); dd.setDate(dd.getDate() - 30); _fromEl.value = dd.toISOString().slice(0, 10); }
   }
-  const months = [3, 6, 12].includes(opts.months) ? opts.months : (window._insPageMonths || 3);
   const custom = !!(opts.start && opts.end);
-  if (!custom) window._insPageMonths = months;
-  document.querySelectorAll('#insPresetTabs .pop-tab').forEach(b => b.classList.toggle('pop-tab-on', !custom && parseInt(b.dataset.ip, 10) === months));
+  const months = [3, 6, 12].includes(opts.months) ? opts.months : 3;
+  // プリセットのハイライト（data-ip一致。日付ピッカーからのカスタムはpreset無し＝全オフ）
+  document.querySelectorAll('#insPresetTabs .pop-tab').forEach(b => b.classList.toggle('pop-tab-on', b.dataset.ip === (opts.preset || '')));
   if (grid) grid.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--text-sub);padding:10px">読み込み中…</div>';
   if (chart) chart.innerHTML = '';
   const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
@@ -7287,10 +7305,10 @@ function renderInsChart() {
   const box = document.getElementById('insChart'); if (!box) return;
   const metric = document.getElementById('insMetric')?.value || 'impressions';
   const data = _insDaily(metric);
-  if (!data.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">日別データがありません。</p>'; return; }
+  if (!data.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">この期間の日別データがありません。<br>※Googleのインサイトは反映に2〜3日かかるため、直近の日付（今日・昨日など）は空になることがあります。少し前の日付や広めの期間でお試しください。</p>'; return; }
   box.innerHTML = _insChartSvg(data);
   const total = data.reduce((s, p) => s + p.value, 0);
-  const note = document.getElementById('insDailyNote'); if (note) note.textContent = `${data.length}日分・合計 ${total.toLocaleString()}（棒1本＝1日／棒にカーソルで日付と数値）`;
+  const note = document.getElementById('insDailyNote'); if (note) note.innerHTML = `${data.length}日分・合計 <b>${total.toLocaleString()}</b>（棒1本＝1日／棒にカーソルで日付と数値）　<span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`;
 }
 function _insChartSvg(data) {
   const n = data.length;
