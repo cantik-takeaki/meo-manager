@@ -210,6 +210,30 @@ body {
 .panel { display: none; padding: 28px; }
 .panel.active { display: block; }
 
+/* ─── ハンバーガー & モバイルドロワー（SP対応） ─── */
+.nav-hamburger { display: none; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: 2px; border: 1px solid var(--border); background: var(--bg-3); border-radius: 9px; color: var(--text); cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+.nav-scrim { display: none; }
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 56px 1fr; }
+  .topbar { grid-column: 1; grid-row: 1; padding: 0 12px; gap: 8px; }
+  .main { grid-column: 1; grid-row: 2; overflow-x: hidden; }
+  .nav-hamburger { display: inline-flex; }
+  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 268px; max-width: 82vw; z-index: 300; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 2px 0 26px rgba(0,0,0,.4); }
+  .app.nav-open .sidebar { transform: translateX(0); }
+  .app.nav-open .nav-scrim { display: block; position: fixed; inset: 0; background: rgba(10,18,32,.5); z-index: 250; }
+  .panel { padding: 16px 13px; }
+  #topbarTitle { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #topbarUpdated { display: none; }
+  .topbar .btn-sm { padding: 7px 9px; }
+  .page-header { flex-wrap: wrap; }
+}
+@media (max-width: 520px) {
+  .panel { padding: 12px 10px; }
+  .card { padding: 14px 13px; }
+  #topbarHelpBtn span, #topbarHelpBtn { font-size: 0; }
+  #topbarHelpBtn svg { margin-right: 0 !important; }
+}
+
 /* ─── Page Header ─── */
 .page-header { margin-bottom: 24px; }
 .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
@@ -645,6 +669,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
 
   <!-- Topbar（メイン列の上） -->
   <header class="topbar">
+    <button class="nav-hamburger" id="navHamburger" onclick="toggleNav()" aria-label="メニューを開閉"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <div id="topbarTitle" style="font-weight:700;font-size:16px;color:var(--text)">ダッシュボード</div>
     <div class="topbar-user" style="display:flex;align-items:center;gap:10px">
       <span id="topbarUpdated" style="font-size:12px;color:var(--text-sub);white-space:nowrap"></span>
@@ -653,6 +678,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <span id="gbpConnectState"></span>
     </div>
   </header>
+  <div class="nav-scrim" id="navScrim" onclick="closeNav()"></div>
 
   <!-- Main -->
   <main class="main">
@@ -3974,6 +4000,7 @@ function populateStoreSelect() {
 function selectLocation(idx, keepPanel) {
   const loc = window._locations?.[idx];
   if (!loc) return;
+  closeNav(); // モバイル: 店舗選択でドロワーを閉じる
   currentLocation = loc;
   // IDは storeId（手動）または GBP name をスラッシュ除去して使う
   currentLocationId = loc.storeId || loc.name.replace(/\//g, '_');
@@ -9602,7 +9629,11 @@ function openPanelHelp() {
 
 function showPanel(name, el) {
   switchPanel(name, el || event?.currentTarget);
+  closeNav(); // モバイル: パネル選択でドロワーを閉じる
 }
+// ─── モバイルのサイドバー開閉（ドロワー） ───
+function toggleNav() { document.getElementById('app')?.classList.toggle('nav-open'); }
+function closeNav() { document.getElementById('app')?.classList.remove('nav-open'); }
 
 // ─── Toast ───
 function showToast(msg, type = 'success') {
