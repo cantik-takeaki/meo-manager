@@ -2857,7 +2857,11 @@ body.role-viewer [data-edit-action] { display:none !important; }
       #panel-insights .ins-date{position:relative;display:inline-flex;align-items:center}
       #panel-insights .ins-date .ed-in{max-width:160px;margin:0;cursor:pointer}
       #panel-insights #insPageGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-      #panel-insights #insReadout{font-size:13px;color:var(--text);background:var(--bg-3);border-radius:8px;padding:9px 13px;margin-bottom:10px}
+      #panel-insights #insReadout{font-size:13px;color:var(--text);background:var(--bg-3);border-radius:8px;padding:9px 13px;margin-bottom:10px;line-height:1.9}
+      #panel-insights .ins-metrics{display:flex;flex-wrap:wrap;gap:8px 16px;margin:2px 0 12px}
+      #panel-insights .ins-metrics label{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;user-select:none}
+      #panel-insights .ins-metrics label i{width:12px;height:12px;border-radius:3px;flex:none}
+      #panel-insights .ins-metrics input{width:16px;height:16px;cursor:pointer}
       #panel-insights #insChart{overflow-x:auto;-webkit-overflow-scrolling:touch}
       @media(max-width:640px){
         #panel-insights .ins-controls{flex-direction:column;align-items:stretch}
@@ -2900,17 +2904,17 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <div id="insPageGrid" style="margin-bottom:16px"></div>
       <div class="card">
         <div class="card-header" style="flex-wrap:wrap;gap:8px">
-          <div class="card-title" style="font-size:13px">日別の推移</div>
-          <select id="insMetric" class="ed-in" style="max-width:200px;margin:0" onchange="renderInsChart()">
-            <option value="impressions">表示回数（合計）</option>
-            <option value="maps">Maps表示</option>
-            <option value="search">検索表示</option>
-            <option value="calls">電話</option>
-            <option value="directions">ルート案内</option>
-            <option value="web">ウェブクリック</option>
-          </select>
+          <div class="card-title" style="font-size:13px">日別の推移（指標を選んで比較）</div>
         </div>
-        <div id="insReadout">グラフの棒をタップ／カーソルを合わせると、その日の日付と数値が出ます。</div>
+        <div id="insMetricChecks" class="ins-metrics">
+          <label><input type="checkbox" value="impressions" checked onchange="renderInsChart()"><i style="background:#2e8ff0"></i>表示回数(合計)</label>
+          <label><input type="checkbox" value="maps" onchange="renderInsChart()"><i style="background:#10b981"></i>Maps表示</label>
+          <label><input type="checkbox" value="search" onchange="renderInsChart()"><i style="background:#8b5cf6"></i>検索表示</label>
+          <label><input type="checkbox" value="calls" onchange="renderInsChart()"><i style="background:#f59e0b"></i>電話</label>
+          <label><input type="checkbox" value="directions" onchange="renderInsChart()"><i style="background:#ec4899"></i>ルート案内</label>
+          <label><input type="checkbox" value="web" onchange="renderInsChart()"><i style="background:#0ea5e9"></i>ウェブクリック</label>
+        </div>
+        <div id="insReadout">グラフの線／点をタップ・カーソルを合わせると、その日の日付とチェック中の各指標の数値が出ます。</div>
         <div id="insChart"></div>
         <div id="insDailyNote" style="font-size:11px;color:var(--text-sub);margin-top:8px"></div>
       </div>
@@ -7325,55 +7329,74 @@ function _insDaily(metric) {
   keys.forEach(k => (ser[k] || []).forEach(p => { byDate[p.date] = (byDate[p.date] || 0) + (p.value || 0); }));
   return Object.keys(byDate).sort().map(date => ({ date, value: byDate[date] }));
 }
+const INS_METRICS = [
+  { key: 'impressions', label: '表示回数(合計)', color: '#2e8ff0' },
+  { key: 'maps', label: 'Maps表示', color: '#10b981' },
+  { key: 'search', label: '検索表示', color: '#8b5cf6' },
+  { key: 'calls', label: '電話', color: '#f59e0b' },
+  { key: 'directions', label: 'ルート案内', color: '#ec4899' },
+  { key: 'web', label: 'ウェブクリック', color: '#0ea5e9' },
+];
+function _insSelectedMetrics() {
+  const checked = [...document.querySelectorAll('#insMetricChecks input:checked')].map(c => c.value);
+  return INS_METRICS.filter(m => checked.includes(m.key));
+}
 function renderInsChart() {
   const box = document.getElementById('insChart'); if (!box) return;
-  const metric = document.getElementById('insMetric')?.value || 'impressions';
-  const data = _insDaily(metric);
-  if (!data.length) {
+  const note = document.getElementById('insDailyNote'), ro = document.getElementById('insReadout');
+  const metrics = _insSelectedMetrics();
+  if (!metrics.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">上のチェックで指標を1つ以上選んでください。</p>'; if (ro) ro.textContent = '指標を選んでください。'; if (note) note.innerHTML = ''; return; }
+  // 各指標の日別マップ＋日付の和集合
+  const series = metrics.map(m => { const arr = _insDaily(m.key); const map = {}; arr.forEach(p => { map[p.date] = p.value; }); return { ...m, map, total: arr.reduce((a, p) => a + p.value, 0) }; });
+  const dateSet = new Set(); series.forEach(s => Object.keys(s.map).forEach(d => dateSet.add(d)));
+  const dates = [...dateSet].sort();
+  window._insDates = dates; window._insSeries = series;
+  if (!dates.length) {
     box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">この期間の日別データがありません。<br>※Googleのインサイトは反映に2〜3日かかるため、直近の日付（今日・昨日など）は空になることがあります。少し前の日付や広めの期間でお試しください。</p>';
-    const ro = document.getElementById('insReadout'); if (ro) ro.textContent = 'データがありません。';
-    return;
+    if (ro) ro.textContent = 'データがありません。'; if (note) note.innerHTML = ''; return;
   }
-  box.innerHTML = _insChartSvg(data);
+  box.innerHTML = _insChartSvg(dates, series);
   _insEnsureChartHandler();
-  const last = data[data.length - 1]; showInsReadout(last.date, last.value); // 既定=最新日
-  const total = data.reduce((s, p) => s + p.value, 0);
-  const note = document.getElementById('insDailyNote'); if (note) note.innerHTML = `${data.length}日分・合計 <b>${total.toLocaleString()}</b>　<span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`;
+  showInsReadout(dates[dates.length - 1]); // 既定=最新日
+  const legend = series.map(s => `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;white-space:nowrap"><i style="width:10px;height:10px;border-radius:2px;background:${s.color};display:inline-block"></i>${escapeHtml(s.label)} 合計<b>${s.total.toLocaleString()}</b></span>`).join('');
+  if (note) note.innerHTML = `${dates.length}日分　${legend}<br><span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`;
 }
-// 棒（列）をタップ／ホバーで、その日の年月日と数値を上の表示に出す（スマホ対応）
+// 日付列をタップ／ホバーで、その日の年月日とチェック中の全指標の数値を出す（スマホ対応）
 function _insEnsureChartHandler() {
   const c = document.getElementById('insChart'); if (!c || c._insHandler) return;
   c._insHandler = true;
-  const h = e => { const t = (e.target.closest && e.target.closest('[data-d]')); if (t) showInsReadout(t.getAttribute('data-d'), t.getAttribute('data-v')); };
+  const h = e => { const t = (e.target.closest && e.target.closest('[data-d]')); if (t) showInsReadout(t.getAttribute('data-d')); };
   c.addEventListener('pointermove', h);
   c.addEventListener('pointerdown', h);
 }
-function showInsReadout(dateStr, value) {
+function showInsReadout(dateStr) {
   const el = document.getElementById('insReadout'); if (!el) return;
   const [y, m, d] = String(dateStr).split('-').map(Number);
   const wd = ['日', '月', '火', '水', '木', '金', '土'][new Date(y, (m || 1) - 1, d || 1).getDay()];
-  const mlabel = document.getElementById('insMetric')?.selectedOptions?.[0]?.textContent || '';
-  el.innerHTML = `<b style="color:var(--accent)">${y}年${m}月${d}日（${wd}）</b>　${escapeHtml(mlabel)}：<b style="font-variant-numeric:tabular-nums">${Number(value).toLocaleString()}</b>`;
+  const series = window._insSeries || [];
+  const vals = series.map(s => `<span style="white-space:nowrap"><i style="width:9px;height:9px;border-radius:2px;background:${s.color};display:inline-block;vertical-align:-1px;margin-right:3px"></i>${escapeHtml(s.label)}：<b style="font-variant-numeric:tabular-nums">${Number(s.map[dateStr] || 0).toLocaleString()}</b></span>`).join('　');
+  el.innerHTML = `<b style="color:var(--accent)">${y}年${m}月${d}日（${wd}）</b>　${vals}`;
 }
-function _insChartSvg(data) {
-  const n = data.length;
-  const W = Math.max(560, n * 11 + 60), H = 230, PL = 46, PR = 14, PT = 12, PB = 40;
-  const max = Math.max(1, ...data.map(d => d.value));
-  const bw = (W - PL - PR) / n;
-  const y = v => PT + (H - PT - PB) * (1 - v / max);
+// 複数指標の折れ線チャート（指標ごとに色分け）
+function _insChartSvg(dates, series) {
+  const n = dates.length;
+  const W = Math.max(560, n * 11 + 60), H = 250, PL = 46, PR = 14, PT = 12, PB = 40;
+  const max = Math.max(1, ...series.flatMap(s => dates.map(d => s.map[d] || 0)));
+  const X = i => n === 1 ? (PL + (W - PL - PR) / 2) : PL + (W - PL - PR) * i / (n - 1);
+  const Y = v => PT + (H - PT - PB) * (1 - v / max);
   let g = '';
   [0, 0.25, 0.5, 0.75, 1].forEach(f => { const val = Math.round(max * (1 - f)); const yy = PT + (H - PT - PB) * f; g += `<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W - PR}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1"/><text x="${PL - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-sub)">${val.toLocaleString()}</text>`; });
-  data.forEach((d, i) => {
-    const yy = y(d.value), bh = (H - PB) - yy, x = PL + i * bw;
-    const barW = Math.min(bw * 0.7, 46), bx = x + (bw - barW) / 2;
-    g += `<rect x="${bx.toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, barW).toFixed(1)}" height="${Math.max(0, bh).toFixed(1)}" rx="1.5" fill="var(--accent)" pointer-events="none"/>`;
-    // 列全体の透明ヒット領域（タップしやすく）
-    g += `<rect x="${x.toFixed(1)}" y="${PT}" width="${bw.toFixed(1)}" height="${(H - PT - PB).toFixed(1)}" fill="transparent" data-d="${d.date}" data-v="${d.value}" style="cursor:pointer"><title>${d.date}: ${d.value.toLocaleString()}</title></rect>`;
+  series.forEach(s => {
+    let path = '';
+    dates.forEach((d, i) => { const v = s.map[d] || 0; path += (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1) + ' '; });
+    g += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    if (n <= 62) dates.forEach((d, i) => { const v = s.map[d] || 0; g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.4" fill="${s.color}"/>`; });
   });
+  const cw = (W - PL - PR) / Math.max(1, n);
+  dates.forEach((d, i) => { const cx = X(i); g += `<rect x="${(cx - cw / 2).toFixed(1)}" y="${PT}" width="${Math.max(8, cw).toFixed(1)}" height="${(H - PT - PB).toFixed(1)}" fill="transparent" data-d="${d}" style="cursor:pointer"/>`; });
   const step = Math.max(1, Math.ceil(n / (W > 720 ? 14 : 8)));
-  data.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const x = PL + i * bw + bw / 2; const [, mm, dd] = d.date.split('-'); g += `<text x="${x.toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${+mm}/${+dd}</text>`; } });
-  // 年の表示（X軸下・左端に対象年）
-  if (n) { const yrs = [...new Set(data.map(d => d.date.slice(0, 4)))]; g += `<text x="${PL}" y="${H - 6}" font-size="9.5" fill="var(--text-muted)">${yrs.join('〜')}年</text>`; }
+  dates.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const [, mm, dd] = d.split('-'); g += `<text x="${X(i).toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${+mm}/${+dd}</text>`; } });
+  const yrs = [...new Set(dates.map(d => d.slice(0, 4)))]; g += `<text x="${PL}" y="${H - 6}" font-size="9.5" fill="var(--text-muted)">${yrs.join('〜')}年</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;height:${H}px;display:block">${g}</svg>`;
 }
 
