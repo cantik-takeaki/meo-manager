@@ -2848,33 +2848,56 @@ body.role-viewer [data-edit-action] { display:none !important; }
     </div>
 
     <!-- インサイト（GBPパフォーマンス・日別/期間指定） -->
+    <style>
+      #panel-insights .ins-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+      #panel-insights .ins-presets{display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;flex-wrap:wrap}
+      #panel-insights .ins-presets .pop-tab{flex:none;padding:7px 14px;font-size:12.5px}
+      #panel-insights .ins-sep{color:var(--border-active)}
+      #panel-insights .ins-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+      #panel-insights .ins-date{position:relative;display:inline-flex;align-items:center}
+      #panel-insights .ins-date .ed-in{max-width:160px;margin:0;cursor:pointer}
+      #panel-insights #insPageGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+      #panel-insights #insReadout{font-size:13px;color:var(--text);background:var(--bg-3);border-radius:8px;padding:9px 13px;margin-bottom:10px}
+      #panel-insights #insChart{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      @media(max-width:640px){
+        #panel-insights .ins-controls{flex-direction:column;align-items:stretch}
+        #panel-insights .ins-sep{display:none}
+        #panel-insights .ins-presets{width:100%;justify-content:space-between}
+        #panel-insights .ins-presets .pop-tab{flex:1;text-align:center;padding:9px 4px}
+        #panel-insights .ins-range{width:100%}
+        #panel-insights .ins-date{flex:1}
+        #panel-insights .ins-date .ed-in{max-width:none;width:100%}
+        #panel-insights #insMetric{max-width:none !important;width:100%}
+        #panel-insights .card-header{flex-direction:column;align-items:stretch}
+      }
+    </style>
     <div class="panel" id="panel-insights">
       <div class="page-header">
         <div class="page-title">インサイト</div>
         <div class="page-sub" id="insPageStore">左のサイドバーで店舗を選択してください</div>
       </div>
       <div class="card">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-          <div id="insPresetTabs" style="display:flex;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;flex-wrap:wrap">
-            <button class="pop-tab" data-ip="d1" onclick="loadInsightsPreset('d1')" style="flex:none;padding:5px 12px;font-size:12px">1日</button>
-            <button class="pop-tab" data-ip="d7" onclick="loadInsightsPreset('d7')" style="flex:none;padding:5px 12px;font-size:12px">1週間</button>
-            <button class="pop-tab pop-tab-on" data-ip="d30" onclick="loadInsightsPreset('d30')" style="flex:none;padding:5px 12px;font-size:12px">1ヶ月</button>
-            <button class="pop-tab" data-ip="3" onclick="loadInsightsPreset('3')" style="flex:none;padding:5px 12px;font-size:12px">3ヶ月</button>
-            <button class="pop-tab" data-ip="6" onclick="loadInsightsPreset('6')" style="flex:none;padding:5px 12px;font-size:12px">6ヶ月</button>
-            <button class="pop-tab" data-ip="12" onclick="loadInsightsPreset('12')" style="flex:none;padding:5px 12px;font-size:12px">12ヶ月</button>
+        <div class="ins-controls">
+          <div id="insPresetTabs" class="ins-presets">
+            <button class="pop-tab" data-ip="d1" onclick="loadInsightsPreset('d1')">1日</button>
+            <button class="pop-tab" data-ip="d7" onclick="loadInsightsPreset('d7')">1週間</button>
+            <button class="pop-tab pop-tab-on" data-ip="d30" onclick="loadInsightsPreset('d30')">1ヶ月</button>
+            <button class="pop-tab" data-ip="3" onclick="loadInsightsPreset('3')">3ヶ月</button>
+            <button class="pop-tab" data-ip="6" onclick="loadInsightsPreset('6')">6ヶ月</button>
+            <button class="pop-tab" data-ip="12" onclick="loadInsightsPreset('12')">12ヶ月</button>
           </div>
-          <span style="color:var(--border-active)">|</span>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:12px;color:var(--text-sub)">期間指定</span>
-            <input type="date" id="insFrom" class="ed-in" style="max-width:158px;margin:0">
+          <span class="ins-sep">|</span>
+          <div class="ins-range">
+            <span style="font-size:12px;color:var(--text-sub);white-space:nowrap">期間で指定</span>
+            <label class="ins-date"><input type="date" id="insFrom" class="ed-in" onclick="if(this.showPicker)this.showPicker()"></label>
             <span style="color:var(--text-muted)">〜</span>
-            <input type="date" id="insTo" class="ed-in" style="max-width:158px;margin:0">
+            <label class="ins-date"><input type="date" id="insTo" class="ed-in" onclick="if(this.showPicker)this.showPicker()"></label>
             <button class="btn btn-primary btn-sm" onclick="loadInsightsPageCustom()">表示</button>
           </div>
         </div>
         <div id="insPageRange" style="font-size:12px;color:var(--text-sub);margin-top:8px"></div>
       </div>
-      <div class="stats-grid" id="insPageGrid" style="margin-bottom:16px"></div>
+      <div id="insPageGrid" style="margin-bottom:16px"></div>
       <div class="card">
         <div class="card-header" style="flex-wrap:wrap;gap:8px">
           <div class="card-title" style="font-size:13px">日別の推移</div>
@@ -2887,7 +2910,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <option value="web">ウェブクリック</option>
           </select>
         </div>
-        <div id="insChart" style="overflow-x:auto"></div>
+        <div id="insReadout">グラフの棒をタップ／カーソルを合わせると、その日の日付と数値が出ます。</div>
+        <div id="insChart"></div>
         <div id="insDailyNote" style="font-size:11px;color:var(--text-sub);margin-top:8px"></div>
       </div>
     </div>
@@ -7305,23 +7329,52 @@ function renderInsChart() {
   const box = document.getElementById('insChart'); if (!box) return;
   const metric = document.getElementById('insMetric')?.value || 'impressions';
   const data = _insDaily(metric);
-  if (!data.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">この期間の日別データがありません。<br>※Googleのインサイトは反映に2〜3日かかるため、直近の日付（今日・昨日など）は空になることがあります。少し前の日付や広めの期間でお試しください。</p>'; return; }
+  if (!data.length) {
+    box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">この期間の日別データがありません。<br>※Googleのインサイトは反映に2〜3日かかるため、直近の日付（今日・昨日など）は空になることがあります。少し前の日付や広めの期間でお試しください。</p>';
+    const ro = document.getElementById('insReadout'); if (ro) ro.textContent = 'データがありません。';
+    return;
+  }
   box.innerHTML = _insChartSvg(data);
+  _insEnsureChartHandler();
+  const last = data[data.length - 1]; showInsReadout(last.date, last.value); // 既定=最新日
   const total = data.reduce((s, p) => s + p.value, 0);
-  const note = document.getElementById('insDailyNote'); if (note) note.innerHTML = `${data.length}日分・合計 <b>${total.toLocaleString()}</b>（棒1本＝1日／棒にカーソルで日付と数値）　<span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`;
+  const note = document.getElementById('insDailyNote'); if (note) note.innerHTML = `${data.length}日分・合計 <b>${total.toLocaleString()}</b>　<span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`;
+}
+// 棒（列）をタップ／ホバーで、その日の年月日と数値を上の表示に出す（スマホ対応）
+function _insEnsureChartHandler() {
+  const c = document.getElementById('insChart'); if (!c || c._insHandler) return;
+  c._insHandler = true;
+  const h = e => { const t = (e.target.closest && e.target.closest('[data-d]')); if (t) showInsReadout(t.getAttribute('data-d'), t.getAttribute('data-v')); };
+  c.addEventListener('pointermove', h);
+  c.addEventListener('pointerdown', h);
+}
+function showInsReadout(dateStr, value) {
+  const el = document.getElementById('insReadout'); if (!el) return;
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const wd = ['日', '月', '火', '水', '木', '金', '土'][new Date(y, (m || 1) - 1, d || 1).getDay()];
+  const mlabel = document.getElementById('insMetric')?.selectedOptions?.[0]?.textContent || '';
+  el.innerHTML = `<b style="color:var(--accent)">${y}年${m}月${d}日（${wd}）</b>　${escapeHtml(mlabel)}：<b style="font-variant-numeric:tabular-nums">${Number(value).toLocaleString()}</b>`;
 }
 function _insChartSvg(data) {
   const n = data.length;
-  const W = Math.max(640, n * 9 + 60), H = 230, PL = 46, PR = 14, PT = 12, PB = 34;
+  const W = Math.max(560, n * 11 + 60), H = 230, PL = 46, PR = 14, PT = 12, PB = 40;
   const max = Math.max(1, ...data.map(d => d.value));
   const bw = (W - PL - PR) / n;
   const y = v => PT + (H - PT - PB) * (1 - v / max);
   let g = '';
   [0, 0.25, 0.5, 0.75, 1].forEach(f => { const val = Math.round(max * (1 - f)); const yy = PT + (H - PT - PB) * f; g += `<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W - PR}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1"/><text x="${PL - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-sub)">${val.toLocaleString()}</text>`; });
-  data.forEach((d, i) => { const yy = y(d.value); const bh = (H - PB) - yy; const x = PL + i * bw; g += `<rect x="${(x + bw * 0.15).toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, bw * 0.7).toFixed(1)}" height="${Math.max(0, bh).toFixed(1)}" rx="1" fill="var(--accent)"><title>${d.date}: ${d.value.toLocaleString()}</title></rect>`; });
-  const step = Math.max(1, Math.ceil(n / 12));
-  data.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const x = PL + i * bw + bw / 2; g += `<text x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${d.date.slice(5)}</text>`; } });
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;height:${H}px">${g}</svg>`;
+  data.forEach((d, i) => {
+    const yy = y(d.value), bh = (H - PB) - yy, x = PL + i * bw;
+    const barW = Math.min(bw * 0.7, 46), bx = x + (bw - barW) / 2;
+    g += `<rect x="${bx.toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, barW).toFixed(1)}" height="${Math.max(0, bh).toFixed(1)}" rx="1.5" fill="var(--accent)" pointer-events="none"/>`;
+    // 列全体の透明ヒット領域（タップしやすく）
+    g += `<rect x="${x.toFixed(1)}" y="${PT}" width="${bw.toFixed(1)}" height="${(H - PT - PB).toFixed(1)}" fill="transparent" data-d="${d.date}" data-v="${d.value}" style="cursor:pointer"><title>${d.date}: ${d.value.toLocaleString()}</title></rect>`;
+  });
+  const step = Math.max(1, Math.ceil(n / (W > 720 ? 14 : 8)));
+  data.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const x = PL + i * bw + bw / 2; const [, mm, dd] = d.date.split('-'); g += `<text x="${x.toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${+mm}/${+dd}</text>`; } });
+  // 年の表示（X軸下・左端に対象年）
+  if (n) { const yrs = [...new Set(data.map(d => d.date.slice(0, 4)))]; g += `<text x="${PL}" y="${H - 6}" font-size="9.5" fill="var(--text-muted)">${yrs.join('〜')}年</text>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;height:${H}px;display:block">${g}</svg>`;
 }
 
 // AIインサイト異常検知・傾向分析
