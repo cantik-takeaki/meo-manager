@@ -20,12 +20,15 @@ function monthRange(months = 3, offsetMonths = 0) {
   const f = (d) => ({ year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() });
   return { start: f(start), end: f(end) };
 }
+// "YYYY-MM-DD" → {year,month,day}
+function isoToYMD(s) { const [y, m, d] = String(s).split('-').map(Number); return { year: y, month: m, day: d }; }
 
 // ── インサイト（パフォーマンス）取得 ──
-async function fetchInsights(access_token, locationName, months = 3, yoy = false) {
+async function fetchInsights(access_token, locationName, months = 3, yoy = false, startISO = '', endISO = '') {
   const m = String(locationName).match(/locations\/[^/]+/);
   const locPath = m ? m[0] : locationName;
-  const { start, end } = monthRange(months);
+  const custom = startISO && endISO;
+  const { start, end } = custom ? { start: isoToYMD(startISO), end: isoToYMD(endISO) } : monthRange(months);
   const metrics = [
     'BUSINESS_IMPRESSIONS_DESKTOP_MAPS',
     'BUSINESS_IMPRESSIONS_DESKTOP_SEARCH',
@@ -88,8 +91,8 @@ async function fetchInsights(access_token, locationName, months = 3, yoy = false
     series,
   };
 
-  // 前年同期間との比較（GBP Performance APIは過去18ヶ月まで→6ヶ月以内の期間のみ前年比が取れる）
-  if (yoy && months <= 6) {
+  // 前年同期間との比較（GBP Performance APIは過去18ヶ月まで→6ヶ月以内の期間のみ前年比が取れる。カスタム期間は対象外）
+  if (yoy && !custom && months <= 6) {
     try {
       const py = monthRange(months, 12);
       const p2 = new URLSearchParams();
@@ -135,8 +138,11 @@ export default async function handler(req, res) {
   if (action === 'insights') {
     if (!locationName) return res.status(400).json({ error: 'locationName必須' });
     const _mo = [3, 6, 12].includes(parseInt(req.query.months, 10)) ? parseInt(req.query.months, 10) : 3;
+    const _rx = /^\d{4}-\d{2}-\d{2}$/;
+    const _st = _rx.test(req.query.start || '') ? req.query.start : '';
+    const _en = _rx.test(req.query.end || '') ? req.query.end : '';
     try {
-      return res.json(await fetchInsights(access_token, locationName, _mo, req.query.yoy === '1'));
+      return res.json(await fetchInsights(access_token, locationName, _mo, req.query.yoy === '1', _st, _en));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
