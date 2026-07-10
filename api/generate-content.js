@@ -1322,6 +1322,14 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
         .replace(/\n{2,}/g, '\n')     // 余分な空行をまとめる
         .trim();
     }
+    // cantik標準: 本文系は「。」ごとに改行（1文1行）。見出し・段落の空行は保持。
+    const _breakTypes = ['post', 'instagram_post', 'hp_content', 'blog_article', 'gbp_description', 'product_desc'];
+    if (_breakTypes.includes(type)) {
+      content = content
+        .replace(/。[ \t　]*(?=[^\n」』）)】\]])/g, '。\n')  // 。の後で改行（閉じ括弧・既存改行の直前は除く）
+        .replace(/\n{3,}/g, '\n\n')                          // 過剰な空行だけ圧縮（段落間の空行は残す）
+        .trim();
+    }
     // 対策キーワードの織り込み達成度を返す（UIで可視化・再生成の判断材料に）
     // キーワードを空白で分割し、全トークンが本文に含まれれば「織り込み済み」と判定（語順・助詞の差を許容）
     let kw;
