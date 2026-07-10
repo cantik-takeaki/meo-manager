@@ -5544,11 +5544,20 @@ function hpUpdatePreview() {
   const body = document.getElementById('hpBody')?.value || '';
   pv.innerHTML = _articleToHtml(body) || '<span style="color:#999">本文を入力すると、HP掲載イメージ（HTML）が表示されます</span>';
 }
+// 前の店舗の記事下書きが残って別店舗に投稿される事故を防ぐため、記事編集欄を初期化
+let _hpLoadedStore = null;
+function _hpResetArticleEditor() {
+  const box = document.getElementById('hpArticleBox'); if (box) box.style.display = 'none';
+  ['hpTitle', 'hpBody', 'hpTopic'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['hpPreview', 'hpPubResult'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+}
 async function loadHpPost() {
   const hasStore = !!currentLocationId;
   document.getElementById('hpConnCard').style.display = hasStore ? '' : 'none';
   document.getElementById('hpArticleCard').style.display = hasStore ? '' : 'none';
   document.getElementById('hpNoStoreCard').style.display = hasStore ? 'none' : '';
+  // 店舗が切り替わったら記事編集欄をリセット（別店舗への誤投稿を防止）。同一店舗での再表示では編集中の記事を維持
+  if (currentLocationId !== _hpLoadedStore) { _hpResetArticleEditor(); _hpLoadedStore = currentLocationId; }
   const sub = document.getElementById('hpSubtitle');
   if (!hasStore) { if (sub) sub.textContent = '店舗を選択してください'; return; }
   const nm = document.getElementById('currentStoreName')?.textContent || '';

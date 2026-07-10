@@ -1028,7 +1028,8 @@ export default async function handler(req, res) {
       if (!r.ok) return res.json({ ok: false, status: r.status, error: r.status === 401 ? 'ユーザー名またはアプリケーションパスワードが違います' : `接続失敗(${r.status})` });
       let u = {}; try { u = JSON.parse(t); } catch {}
       const caps = u.capabilities || {};
-      return res.json({ ok: true, name: u.name || u.slug || '', canPublish: caps.publish_posts !== false });
+      // WPのcapabilitiesは付与された権限のみ列挙（Contributor等はpublish_posts自体が無い）→ true明示のときだけ公開可
+      return res.json({ ok: true, name: u.name || u.slug || '', canPublish: caps.publish_posts === true });
     } catch (e) {
       return res.json({ ok: false, error: 'サイトに接続できません（URLとREST API有効化をご確認ください）' });
     }
