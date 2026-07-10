@@ -2695,93 +2695,72 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
           <div style="flex:1;min-width:220px;font-size:12px;line-height:1.8;color:var(--text-sub)">
             <b>3つの発信チャネルは連携しています。</b>同じ<b>企業ナレッジ・対策キーワード・学習メモ</b>から生成するので、メッセージが揃います。<br>
-            ・<b>GBP投稿</b>＝下の「AIでMEOコンテンツを作成」→「GBP投稿文」／　・<b>Instagram</b>＝<button class="link-btn" onclick="showPanel('instagram')" style="padding:0;font-size:12px">Instagram投稿</button>　／　・<b>HPのブログ・コラム</b>＝<button class="link-btn" onclick="showPanel('hppost')" style="padding:0;font-size:12px">HP投稿</button>からWordPressへ直接下書き保存
+            ・<b>GBP投稿・Instagram</b>＝下の<b>新規投稿</b>の「AIで文章生成」で作成→投稿先を選んで投稿／　・<b>HPのブログ・コラム</b>＝<button class="link-btn" onclick="showPanel('hppost')" style="padding:0;font-size:12px">HP投稿</button>からWordPressへ直接下書き保存
           </div>
         </div>
-      </div>
-
-      <!-- AIでMEOコンテンツを作成（対策キーワードを自然に織り込む・投稿管理へ移設） -->
-      <div class="card" id="seoContentCard" style="display:none">
-        <div class="card-header" style="flex-wrap:wrap;gap:6px">
-          <div class="card-title" style="display:flex;align-items:center;gap:8px">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>
-            AIでMEOコンテンツを作成
-          </div>
-        </div>
-        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">登録した<b>対策キーワード</b>と<b>企業ナレッジ・独自メモ</b>をすべて読み込み、GBPやHPに載せるMEO評価の高い文章を生成します（羅列でなく読みやすさ優先）。</p>
-        <!-- 独自情報・学習メモ（全生成が毎回読み込む。書き溜めるほど精度UP） -->
-        <details id="scMemoBox" style="margin:0 0 12px;background:rgba(79,125,243,0.05);border:1px solid rgba(79,125,243,0.25);border-radius:10px;padding:10px 12px">
-          <summary style="font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg>
-            独自情報・学習メモ（使うほど精度UP）<span id="scMemoState" style="font-size:11px;font-weight:500;color:var(--text-sub);margin-left:auto"></span>
-          </summary>
-          <p style="font-size:11px;color:var(--text-sub);line-height:1.7;margin:8px 0 6px">この店だけの情報（強み・こだわり・季節ネタ・実績の範囲・避けたい表現やトーンなど）を書き溜めると、<b>GBP説明文・投稿・HP・商品・Q&amp;Aなど主要な生成が毎回これを読み込んで賢くなります</b>。書けば書くほど精度が上がります（最大4000字）。</p>
-          <textarea id="scMemo" rows="5" maxlength="4000" oninput="scMemoState()" placeholder="例：&#10;・地元産の食材にこだわり、朝仕入れのみ提供&#10;・30〜40代の家族連れ・記念日利用が多い&#10;・「日本一」など誇大表現は使わない／落ち着いた丁寧トーン&#10;・相模原市中央区＋座間市・大和市からの来店が中心" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="saveMeoMemo()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>メモを保存</button>
-            <button class="btn btn-outline btn-sm" onclick="suggestMeoMemo(event)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで要点を下書き</button>
-          </div>
-        </details>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="scType" onchange="scOnType()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            <option value="product_desc">商品・サービス説明（GBP商品登録）</option>
-            <option value="qa_generate">よくある質問（Q&amp;A）</option>
-            <option value="hp_content">ホームページのコンテンツ（見出し＋本文）</option>
-            <option value="blog_article">ホームページのブログ・コラム記事（長文）</option>
-            <option value="gbp_description">GBP ビジネスの説明文（750字以内）</option>
-            <option value="photo_caption">写真の説明</option>
-            <option value="post">GBP投稿文</option>
-            <option value="catchcopy">キャッチコピー</option>
-          </select>
-          <input id="scInput" type="text" placeholder="（任意）商品名・写真の内容・HPのセクション名 など" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <button class="btn btn-primary btn-sm" id="scGenBtn" onclick="scGenerate(event)">生成</button>
-        </div>
-        <details style="margin-top:10px">
-          <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>詳細設定（トーン・長さ・キーワード）</summary>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">トーン
-              <select id="scTone" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
-                <option value="">おまかせ</option>
-                <option value="friendly">親しみやすい</option>
-                <option value="pro">丁寧・専門的</option>
-              </select>
-            </label>
-            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">長さ
-              <select id="scLength" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
-                <option value="">標準</option>
-                <option value="short">短め</option>
-                <option value="long">長め・厚め</option>
-              </select>
-            </label>
-            <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">対策キーワード
-              <select id="scKwFocus" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
-                <option value="all">すべて反映</option>
-                <option value="A">今すぐ客(A)を優先</option>
-                <option value="top">主力上位のみ</option>
-              </select>
-            </label>
-          </div>
-        </details>
-        <div id="scResult" style="margin-top:12px"></div>
-      </div>
-
-      <!-- 景表法・薬機法チェッカー（cantik本業知見・機械検出） -->
-      <div class="card">
-        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>景表法・薬機法チェック</div></div>
-        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">投稿文・説明文・チラシ原稿などを貼り付けると、「No.1」「必ず」「完治」等のリスク表現を機械検出し、言い換え例を提示します。AI生成文にも自動で同じチェックがかかります。</p>
-        <textarea id="kbCheckInput" placeholder="チェックしたい文章を貼り付けてください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.7"></textarea>
-        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="kbRunManualCheck()">チェックする</button></div>
-        <div id="kbCheckResult"></div>
       </div>
 
       <div class="card">
         <div class="card-header"><div class="card-title">新規投稿</div></div>
         <div class="post-form">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-            <input id="postGenTopic" type="text" placeholder="投稿テーマ/指示（任意・例：週末ランチの告知）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-            <button class="btn btn-primary btn-sm" onclick="generateNewPost()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで文章生成</button>
+          <!-- AIで文章を作成（旧「AIでMEOコンテンツを作成」を統合。対策KW＋ナレッジ＋学習メモを読み込み、下の投稿欄に反映） -->
+          <div id="postGenArea">
+            <p style="font-size:11px;color:var(--text-sub);margin:0 0 10px"><b>AIで投稿文を作成</b>：登録した<b>対策キーワード</b>と<b>企業ナレッジ・学習メモ</b>をすべて読み込み、MEO評価の高い文章を作って下の投稿欄に反映します。</p>
+            <details id="scMemoBox" style="margin:0 0 12px;background:rgba(79,125,243,0.05);border:1px solid rgba(79,125,243,0.25);border-radius:10px;padding:10px 12px">
+              <summary style="font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg>
+                独自情報・学習メモ（使うほど精度UP）<span id="scMemoState" style="font-size:11px;font-weight:500;color:var(--text-sub);margin-left:auto"></span>
+              </summary>
+              <p style="font-size:11px;color:var(--text-sub);line-height:1.7;margin:8px 0 6px">この店だけの情報（強み・こだわり・季節ネタ・実績の範囲・避けたい表現やトーンなど）を書き溜めると、<b>投稿・GBP説明文・HP・商品・Q&amp;Aなど主要な生成が毎回これを読み込んで賢くなります</b>。書けば書くほど精度が上がります（最大4000字）。</p>
+              <textarea id="scMemo" rows="5" maxlength="4000" oninput="scMemoState()" placeholder="例：&#10;・地元産の食材にこだわり、朝仕入れのみ提供&#10;・30〜40代の家族連れ・記念日利用が多い&#10;・「日本一」など誇大表現は使わない／落ち着いた丁寧トーン&#10;・相模原市中央区＋座間市・大和市からの来店が中心" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="saveMeoMemo()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>メモを保存</button>
+                <button class="btn btn-outline btn-sm" onclick="suggestMeoMemo(event)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで要点を下書き</button>
+              </div>
+            </details>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select id="scType" onchange="scOnType()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+                <option value="post">GBP投稿文</option>
+                <option value="catchcopy">キャッチコピー</option>
+                <option value="product_desc">商品・サービス説明（GBP商品登録）</option>
+                <option value="qa_generate">よくある質問（Q&amp;A）</option>
+                <option value="hp_content">ホームページのコンテンツ（見出し＋本文）</option>
+                <option value="blog_article">ホームページのブログ・コラム記事（長文）</option>
+                <option value="gbp_description">GBP ビジネスの説明文（750字以内）</option>
+                <option value="photo_caption">写真の説明</option>
+              </select>
+              <input id="scInput" type="text" placeholder="（任意）投稿のテーマ・伝えたいこと" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+              <button class="btn btn-primary btn-sm" id="scGenBtn" onclick="postGenerate(this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで文章生成</button>
+            </div>
+            <details style="margin-top:10px">
+              <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>詳細設定（トーン・長さ・キーワード）</summary>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+                <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">トーン
+                  <select id="scTone" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                    <option value="">おまかせ</option>
+                    <option value="friendly">親しみやすい</option>
+                    <option value="pro">丁寧・専門的</option>
+                  </select>
+                </label>
+                <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">長さ
+                  <select id="scLength" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                    <option value="">標準</option>
+                    <option value="short">短め</option>
+                    <option value="long">長め・厚め</option>
+                  </select>
+                </label>
+                <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">対策キーワード
+                  <select id="scKwFocus" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:var(--radius-sm);font-size:12px;font-family:inherit">
+                    <option value="all">すべて反映</option>
+                    <option value="A">今すぐ客(A)を優先</option>
+                    <option value="top">主力上位のみ</option>
+                  </select>
+                </label>
+              </div>
+            </details>
+            <div id="postGenBadge" style="margin-top:10px"></div>
           </div>
-          <textarea id="postText" placeholder="投稿内容を入力（または「AIで文章生成」）" oninput="updatePostCount()"></textarea>
+          <textarea id="postText" placeholder="投稿内容を入力（または上の「AIで文章生成」）" oninput="updatePostCount()"></textarea>
           <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google目安150〜300字／Instagram150〜250字）</div>
 
           <div style="margin:6px 0 2px">
@@ -2856,6 +2835,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <button class="btn btn-primary" onclick="createPost()">今すぐ投稿する</button>
           <p style="font-size:11px;color:var(--text-sub);margin-top:4px">※投稿は社外公開アクションです。内容を確認の上、承認として投稿してください。</p>
         </div>
+      </div>
+
+      <!-- 景表法・薬機法チェッカー（cantik本業知見・機械検出） -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>景表法・薬機法チェック</div></div>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">投稿文・説明文・チラシ原稿などを貼り付けると、「No.1」「必ず」「完治」等のリスク表現を機械検出し、言い換え例を提示します。AI生成文にも自動で同じチェックがかかります。</p>
+        <textarea id="kbCheckInput" placeholder="チェックしたい文章を貼り付けてください" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;line-height:1.7"></textarea>
+        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="kbRunManualCheck()">チェックする</button></div>
+        <div id="kbCheckResult"></div>
       </div>
 
       <!-- 月間投稿プラン -->
@@ -5389,6 +5377,40 @@ function scOnType() {
   if (inp) inp.placeholder = ph[t] || '';
 }
 function scGenerate(ev) { return scRun(ev?.currentTarget || document.getElementById('scGenBtn')); }
+// 新規投稿：種類・トーン・キーワード・学習メモを反映してAI生成し、投稿欄(postText)に直接反映
+async function postGenerate(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const type = document.getElementById('scType').value;
+  const input = document.getElementById('scInput').value.trim();
+  const badge = document.getElementById('postGenBadge');
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  if (badge) badge.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px 0">AIが生成しています…（対策キーワードを織り込み中）</div>';
+  const body = { locationId: currentLocationId, type,
+    tone: document.getElementById('scTone')?.value || '',
+    length: document.getElementById('scLength')?.value || '',
+    kwFocus: document.getElementById('scKwFocus')?.value || 'all' };
+  if (type === 'product_desc') body.productName = input;
+  else if (type === 'hp_content') body.section = input || 'トップの紹介文';
+  else if (type === 'blog_article') body.topic = input;
+  else if (type === 'photo_caption') body.photoNote = input;
+  else if (type === 'qa_generate') body.count = 5;
+  else if (type === 'post') body.customInstruction = input;
+  else if (type === 'catchcopy') body.customInstruction = input;
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+    if (d.error || !d.content) {
+      if (badge) badge.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 0">生成に失敗しました: ${escapeHtml(d.error || '不明なエラー')}</div>`;
+    } else {
+      const pt = document.getElementById('postText');
+      pt.value = d.content;
+      if (typeof updatePostCount === 'function') updatePostCount();
+      if (badge) badge.innerHTML = scKwBadge(d.kw) + kbFindingsHtml(kbCheckText(d.content));
+      pt.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      showToast('文章を作成しました。投稿欄で確認・編集してください', 'success');
+    }
+  } catch (e) { if (badge) badge.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px 0">生成に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; else btn.textContent = 'AIで文章生成'; }
+}
 // ── 独自情報・学習メモ（全コンテンツ生成が毎回読み込む蓄積・使うほど精度UP）──
 function scMemoState(saved) {
   const s = document.getElementById('scMemoState'); if (!s) return;
@@ -9642,9 +9664,9 @@ async function pollAndFinalizeIg(creationId, sid) {
 // 投稿用の画像ライブラリを読み込んで選択UIを表示（複数選択＝カルーセル対応）
 let _postImages = [];
 async function loadPostImages() {
-  // 「AIでMEOコンテンツを作成」カード（投稿管理へ移設）の表示制御
-  const sc = document.getElementById('seoContentCard');
-  if (sc) { if (currentLocationId) { sc.style.display = 'block'; if (typeof scOnType === 'function') scOnType(); if (typeof loadMeoMemo === 'function') loadMeoMemo(); } else { sc.style.display = 'none'; } }
+  // 新規投稿のAI生成エリア（旧「AIでMEOコンテンツを作成」を新規投稿へ統合）の表示制御
+  const sc = document.getElementById('postGenArea');
+  if (sc) { if (currentLocationId) { sc.style.display = ''; if (typeof scOnType === 'function') scOnType(); if (typeof loadMeoMemo === 'function') loadMeoMemo(); } else { sc.style.display = 'none'; } }
   if (currentLocationId && typeof loadDrafts === 'function') loadDrafts(); // 予約投稿の管理も更新
   const box = document.getElementById('postImageList');
   if (!box) return;
