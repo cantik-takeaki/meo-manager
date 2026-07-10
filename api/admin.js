@@ -964,6 +964,19 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 独自情報・学習メモ（店舗ごと）。全コンテンツ生成が毎回読み込む蓄積メモ ──
+  if (action === 'meo-memo') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `meo_memo_${storeId}`;
+    if (req.method === 'GET') return res.json({ memo: (await kvGet(key)) || '' });
+    if (req.method === 'POST') {
+      const memo = String((req.body || {}).memo || '').slice(0, 4000);
+      await kvSet(key, memo);
+      return res.json({ success: true });
+    }
+  }
+
   // ── 口コミ獲得の月間目標（店舗ごと）。ペース表示用の目標値のみ保持 ──
   if (action === 'review-goal') {
     const { storeId } = req.query;

@@ -125,11 +125,14 @@ ${_geoHint ? `【この店の地域】${_geoHint}\n` : ''}→ 織り込みの狙
 ・実在しないサービス・地名・実績や誇大表現は作らない。`;
   }
 
-  // MEO実効を高める共通ディレクティブ（公開コンテンツ系typeに付与）
-  const _meoBoost = `\n\n【MEOで順位を上げるための書き方（重要）】
-・関連性: 検索する人の意図に“直接”答える具体的な情報を書く（何を・誰に・どんな時に）。抽象的な美辞麗句や当たり障りのない一般論は避ける。
-・実在感/E-E-A-T: 実際に営業している店だと伝わる具体描写（提供内容・こだわり・対象者・利用シーン）を入れる。経験に基づく手触りのある表現にする。
-・近接性: 地域名（市区町村）・最寄り駅・対応エリアを、文脈に合う形で具体的に示す。`;
+  // MEOで“評価される文章”にするための評価ルーブリック（公開コンテンツ系typeに付与）
+  const _meoBoost = `\n\n【MEOで評価される文章にするための必須ルール（この基準で自己採点してから出力）】
+1. 検索意図に直答: 読み手が知りたいこと（何を・誰に・どんな時・どこで・いくら位）に具体的に答える。抽象的な美辞麗句・当たり障りのない一般論・「〜な方はぜひ」の連発は禁止。
+2. 地域×業種を前方に: 冒頭1〜2文（または見出し）に「地域名＋業種」を自然に置く。近接性シグナルとして市区町村・最寄り駅・対応エリアを本文に具体的に出す。
+3. 実在感・E-E-A-T: 実際に営業している店だと伝わる“固有の具体”（提供内容・こだわり・対象者・利用シーン・実績の範囲）を最低1つ。固有名詞や具体で手触りを出す（ただし捏造・誇張は厳禁）。
+4. 独自性: 他店にも当てはまる汎用文にしない。この店だけの強み・違いを最低1点は明確に書く。
+5. 自然さと可読性: 対策語は意味が通る形で“結果的に含まれる”状態。羅列・詰め込み・不自然な反復は減点。1文を長くしすぎない。
+6. コンプライアンス: 「No.1」「日本一」「必ず」「完全」等や効果の断定はしない（景表法・Googleガイドライン）。`;
 
   // 文体・長さの微調整（UI詳細設定）
   const _toneLine = _tone === 'friendly'
@@ -1189,6 +1192,32 @@ GBPのカテゴリはGoogleが用意した固定リストから選びます。�
 ※実在するGBPカテゴリ名のみ。効果の断定はしない。前置き・コードフェンスは書かず本文のみ。`;
   }
 
+  // 独自情報・学習メモのAI下書き（ナレッジ＋対策KW＋既存メモから、生成に効く"要点メモ"を蒸留）
+  if (type === 'memo_suggest') {
+    const kn = await kvGet(`knowledge_${locationId}`) || {};
+    const existing = String((await kvGet(`meo_memo_${locationId}`)) || '').trim();
+    prompt = `あなたはMEO（Googleマップ集客）の専門家です。この店舗の「コンテンツ生成用の要点メモ」を作ります。
+これは今後あらゆる文章生成（GBP説明文・投稿・HP・Q&A等）で毎回読み込む"種"になるので、AIが良い文章を書くために役立つ具体情報だけを箇条書きで蒸留してください。
+
+【店舗名】${kn.storeName || storeName}
+【業種】${kn.category || ''}
+【地域/住所】${[kn.address, kn.nearbyLandmarks].filter(Boolean).join(' ')}
+【対応エリア】${kn.serviceArea || ''}
+【強み】${kn.strengths || ''}
+【提供サービス】${kn.services || ''}
+【専門性(E-E-A-T)】${kn.expertise || ''}
+【ターゲット】${kn.targetCustomer || ''}
+【対策キーワード】${(seoKws.length ? seoKws.slice(0, 10) : (kn.keywords ? String(kn.keywords).split(/[、,\s]+/) : [])).join('、') || '未登録'}
+${existing ? `【既存の蓄積メモ（重複させず、補強・整理する）】\n${existing}\n` : ''}
+
+【出力ルール】
+- 「・」始まりの箇条書き8〜14行。1行は短く具体的に。
+- 含めるべき軸: この店だけの強み/違い、対象者と利用シーン、地域と対応エリア、主力サービスの特徴、実績や専門性の範囲(事実のみ)、避けたい表現やトーンの方針。
+- 汎用的で中身のない行（例「丁寧な対応」だけ）は入れない。固有の具体を優先。
+- 架空の実績・数字・受賞は作らない。分からない項目は書かない。
+- 前置き・見出し・コードフェンスは書かず、箇条書きのみ。`;
+  }
+
   // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
   const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
   const _isSeoType = _seoTypes.includes(type);
@@ -1199,6 +1228,11 @@ GBPのカテゴリはGoogleが用意した固定リストから選びます。�
     if (_isProse) {
       if (seoWeave) prompt += seoWeave;
       prompt += _meoBoost;
+      // 蓄積した独自情報・学習メモ（ナレッジ＋キーワードに加え、使うほど賢くなる材料）。必ず反映。
+      try {
+        const _memo = await kvGet(`meo_memo_${locationId}`);
+        if (_memo && String(_memo).trim()) prompt += `\n\n【この店の独自情報・蓄積メモ（事実として必ず踏まえ、内容に反映する）】\n${String(_memo).trim().slice(0, 2500)}`;
+      } catch (e) { /* メモ取得失敗は無視 */ }
       if (_toneLine) prompt += _toneLine;
       if (_lengthLine) prompt += _lengthLine;
     } else if (_targetedKws.length) {

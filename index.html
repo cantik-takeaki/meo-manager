@@ -2600,7 +2600,20 @@ body.role-viewer [data-edit-action] { display:none !important; }
             AIでMEOコンテンツを作成
           </div>
         </div>
-        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">登録した<b>対策キーワード</b>を自然に織り込んで、GBPやHPに載せるコンテンツを生成します（羅列でなく読みやすさ優先）。</p>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">登録した<b>対策キーワード</b>と<b>企業ナレッジ・独自メモ</b>をすべて読み込み、GBPやHPに載せるMEO評価の高い文章を生成します（羅列でなく読みやすさ優先）。</p>
+        <!-- 独自情報・学習メモ（全生成が毎回読み込む。書き溜めるほど精度UP） -->
+        <details id="scMemoBox" style="margin:0 0 12px;background:rgba(79,125,243,0.05);border:1px solid rgba(79,125,243,0.25);border-radius:10px;padding:10px 12px">
+          <summary style="font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg>
+            独自情報・学習メモ（使うほど精度UP）<span id="scMemoState" style="font-size:11px;font-weight:500;color:var(--text-sub);margin-left:auto"></span>
+          </summary>
+          <p style="font-size:11px;color:var(--text-sub);line-height:1.7;margin:8px 0 6px">この店だけの情報（強み・こだわり・季節ネタ・実績の範囲・避けたい表現やトーンなど）を書き溜めると、<b>ここのコンテンツも新規投稿も、すべての生成が毎回これを読み込んで賢くなります</b>。書けば書くほど精度が上がります。</p>
+          <textarea id="scMemo" rows="5" oninput="scMemoState()" placeholder="例：&#10;・地元産の食材にこだわり、朝仕入れのみ提供&#10;・30〜40代の家族連れ・記念日利用が多い&#10;・「日本一」など誇大表現は使わない／落ち着いた丁寧トーン&#10;・相模原市中央区＋座間市・大和市からの来店が中心" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="saveMeoMemo()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>メモを保存</button>
+            <button class="btn btn-outline btn-sm" onclick="suggestMeoMemo(event)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで要点を下書き</button>
+          </div>
+        </details>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <select id="scType" onchange="scOnType()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
             <option value="product_desc">商品・サービス説明（GBP商品登録）</option>
@@ -5266,6 +5279,43 @@ function scOnType() {
   if (inp) inp.placeholder = ph[t] || '';
 }
 function scGenerate(ev) { return scRun(ev?.currentTarget || document.getElementById('scGenBtn')); }
+// ── 独自情報・学習メモ（全コンテンツ生成が毎回読み込む蓄積・使うほど精度UP）──
+function scMemoState(saved) {
+  const s = document.getElementById('scMemoState'); if (!s) return;
+  const len = (document.getElementById('scMemo')?.value || '').length;
+  s.textContent = saved ? '保存しました ✓' : (len ? `${len}文字` : '未入力');
+}
+async function loadMeoMemo() {
+  const ta = document.getElementById('scMemo'); if (!ta || !currentLocationId) return;
+  try { const d = await fetch(`/api/admin?action=meo-memo&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); ta.value = d.memo || ''; } catch (e) { ta.value = ''; }
+  scMemoState();
+}
+async function saveMeoMemo() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const memo = document.getElementById('scMemo').value;
+  try {
+    await fetch(`/api/admin?action=meo-memo&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memo }) });
+    scMemoState(true);
+    showToast('学習メモを保存しました。以後すべての生成（コンテンツ・新規投稿）に反映されます', 'success');
+  } catch (e) { showToast('保存に失敗しました', 'error'); }
+}
+async function suggestMeoMemo(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '作成中…'; }
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'memo_suggest' }) }).then(r => r.json());
+    const txt = (d.content || '').trim();
+    if (!txt) showToast('下書きを作れませんでした（企業ナレッジを充実させると精度が上がります）', 'error');
+    else {
+      const ta = document.getElementById('scMemo');
+      ta.value = ta.value.trim() ? (ta.value.trim() + '\n' + txt) : txt;
+      scMemoState();
+      const box = document.getElementById('scMemoBox'); if (box) box.open = true;
+      showToast('要点を下書きしました。確認・修正して「メモを保存」を押してください', 'success');
+    }
+  } catch (e) { showToast('下書きの取得に失敗しました', 'error'); }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
 // 対策キーワードの織り込み達成度バッジ（○n/m ＋ 織り込めた語=緑チップ / 未織り込み=グレー）
 function scKwBadge(kw) {
   if (!kw || !Array.isArray(kw.targeted) || !kw.targeted.length) {
@@ -9292,7 +9342,7 @@ let _postImages = [];
 async function loadPostImages() {
   // 「AIでMEOコンテンツを作成」カード（投稿管理へ移設）の表示制御
   const sc = document.getElementById('seoContentCard');
-  if (sc) { if (currentLocationId) { sc.style.display = 'block'; if (typeof scOnType === 'function') scOnType(); } else { sc.style.display = 'none'; } }
+  if (sc) { if (currentLocationId) { sc.style.display = 'block'; if (typeof scOnType === 'function') scOnType(); if (typeof loadMeoMemo === 'function') loadMeoMemo(); } else { sc.style.display = 'none'; } }
   if (currentLocationId && typeof loadDrafts === 'function') loadDrafts(); // 予約投稿の管理も更新
   const box = document.getElementById('postImageList');
   if (!box) return;
