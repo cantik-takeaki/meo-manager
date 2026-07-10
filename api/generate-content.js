@@ -852,10 +852,11 @@ ${context}
 ${monthTheme ? `- 今月の方針: ${monthTheme}` : ''}
 
 【ルール】
-- その業種ならではの、検索・来店・予約につながる具体的なテーマにする（一般論や架空のキャンペーンにしない）
-  例）整骨院→「肩こりの原因と自宅でできる予防」「産後骨盤矯正のご案内」、美容室→「梅雨時のうねり対策」「白髪染めの色持ちのコツ」、飲食→「今月の旬の食材を使った一品」「ランチの人気メニュー」
-- 各テーマは15〜35文字程度の短いフレーズ
-- ${count}個を改行区切りで出力。番号・記号・前置きは付けない。テーマのみ`;
+- その業種ならではの、検索・来店・予約につながる具体的なテーマにする（一般論や架空のキャンペーンにしない）。
+- 各行は「テーマ｜切り口」の形式（全角縦棒で区切る）。切り口＝その投稿で書くべき具体（含める要素・読者メリット・シーン）を一言で。これにより後工程で中身の濃い投稿が書ける。
+  例）整骨院→「肩こりの原因と自宅ケア｜デスクワークの人向けに原因3つと1分ストレッチ」／美容室→「梅雨のうねり対策｜髪質別の乾かし方とおすすめメニュー」／飲食→「今月の旬食材の一品｜産地・味の特徴・おすすめの食べ方」
+- テーマは重複させず、季節性・悩み解決・メニュー紹介・お客様の声・豆知識などバリエーションを持たせる。
+- ${count}個を改行区切りで出力。番号・記号（縦棒以外）・前置きは付けない。各行「テーマ｜切り口」のみ`;
   }
 
   // 店舗情報から「狙い目MEOキーワード」をおすすめ順に10個提案
@@ -1148,6 +1149,43 @@ ${topText || 'データなし'}
 - 前置き・説明は書かず、見出しと本文のみ。`;
   }
 
+  // ホームページのブログ・コラム記事（長文・ローカルSEO最適化）
+  if (type === 'blog_article') {
+    const topic = req.body.topic || req.body.section || req.body.customInstruction || '';
+    prompt = `あなたは${storeName}のホームページに載せる「ブログ・コラム記事」を書く、ローカルSEO（MEO）に強いWebライターです。
+検索から新規のお客様が読み、来店・問い合わせにつながる、読み応えのある記事を書いてください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【地域/住所】${[knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ')}
+【対応エリア】${knowledge.serviceArea || ''}
+【強み】${strengths}
+【提供サービス】${services}
+【専門性(E-E-A-T)】${knowledge.expertise || ''}
+【ターゲット】${knowledge.targetCustomer || ''}
+【記事のテーマ】${topic || '（この店の業種で、検索されやすく来店につながるテーマを1つ選ぶ）'}
+
+【構成（この順で出力・記号はそのまま使う）】
+# 記事タイトル（32字以内・検索されやすい語＋読みたくなる具体。地域名か業種を自然に含むと理想）
+（リード文：2〜3文。誰のどんな悩み・目的に応える記事かを明示し、読み進めたくなるように）
+## 見出し1
+本文（このテーマの要点を具体的に。理由・手順・コツ・注意点など読者に役立つ実質のある内容）
+## 見出し2
+本文（別の角度から。ターゲットの利用シーンや、この店ならではの対応・こだわりを具体的に）
+## （必要なら）見出し3
+本文
+## まとめ
+本文（要点の再確認＋自然な来店/問い合わせのひとこと）
+
+【ルール】
+- 全体で900〜1500字程度。中身のある具体を優先し、水増し・繰り返しはしない。
+- 検索意図に直答し、読者が「役に立った」と思う情報を入れる（一般論・当たり障りのない文の羅列は禁止）。
+- 地域名（市区町村・最寄り駅・対応エリア）を自然に、記事全体で2〜3回。冒頭にも業種×地域を出す（近接性）。
+- 実在感・E-E-A-T：この店の実際の強み・こだわり・対象者・実績の範囲を具体で。捏造・誇大・効果断定は禁止（景表法・No.1等も不可）。
+- 見出しにも要点や検索語を自然に。読みやすい段落構成。
+- 前置き・説明・コードフェンスは書かず、記事本文のみ。`;
+  }
+
   // 写真の説明文（GBP写真・SNS用の短いキャプション）
   if (type === 'photo_caption') {
     const note = req.body.photoNote || sourceText || '';
@@ -1220,10 +1258,10 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
   }
 
   // 店舗向けコンテンツ生成では対策キーワードを自然に織り込む（投稿/SNS/キャッチ/HP・商品・Q&A等）
-  const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
+  const _seoTypes = ['post', 'post_themes', 'instagram', 'instagram_post', 'catchcopy', 'hp_content', 'blog_article', 'product_desc', 'qa_generate', 'photo_caption', 'gbp_description'];
   const _isSeoType = _seoTypes.includes(type);
   // 十分な長さの本文系＝地域名・E-E-A-Tまで織り込む / 短文系（キャッチ・写真説明・テーマ列挙）＝軽い織り込みのみ
-  const _proseTypes = ['gbp_description', 'hp_content', 'product_desc', 'qa_generate', 'post', 'instagram', 'instagram_post'];
+  const _proseTypes = ['gbp_description', 'hp_content', 'blog_article', 'product_desc', 'qa_generate', 'post', 'instagram', 'instagram_post'];
   const _isProse = _proseTypes.includes(type);
   if (_isSeoType) {
     if (_isProse) {
@@ -1261,7 +1299,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500,
+        max_tokens: type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500,
         temperature: type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85,
         top_p: 0.9,
       }),

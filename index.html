@@ -2618,7 +2618,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <select id="scType" onchange="scOnType()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
             <option value="product_desc">商品・サービス説明（GBP商品登録）</option>
             <option value="qa_generate">よくある質問（Q&amp;A）</option>
-            <option value="hp_content">ホームページのコンテンツ</option>
+            <option value="hp_content">ホームページのコンテンツ（見出し＋本文）</option>
+            <option value="blog_article">ホームページのブログ・コラム記事（長文）</option>
             <option value="gbp_description">GBP ビジネスの説明文（750字以内）</option>
             <option value="photo_caption">写真の説明</option>
             <option value="post">GBP投稿文</option>
@@ -5275,7 +5276,7 @@ function kbRunManualCheck() {
 // ── AIでMEOコンテンツを作成（対策キーワード反映）──
 function scOnType() {
   const t = document.getElementById('scType').value, inp = document.getElementById('scInput');
-  const ph = { product_desc: '（任意）商品・サービス名', qa_generate: '（Q&Aは店舗情報から自動生成）', hp_content: '（任意）HPのセクション名（例：トップの紹介文）', photo_caption: '写真の内容・伝えたいこと', post: '（任意）投稿のテーマ・伝えたいこと', catchcopy: '（任意）切り口の指定', gbp_description: '（GBPの説明文は店舗情報から自動生成されます）' };
+  const ph = { product_desc: '（任意）商品・サービス名', qa_generate: '（Q&Aは店舗情報から自動生成）', hp_content: '（任意）HPのセクション名（例：トップの紹介文）', blog_article: '記事のテーマ（例：産後の骨盤矯正はいつから？／空欄でAIが選定）', photo_caption: '写真の内容・伝えたいこと', post: '（任意）投稿のテーマ・伝えたいこと', catchcopy: '（任意）切り口の指定', gbp_description: '（GBPの説明文は店舗情報から自動生成されます）' };
   if (inp) inp.placeholder = ph[t] || '';
 }
 function scGenerate(ev) { return scRun(ev?.currentTarget || document.getElementById('scGenBtn')); }
@@ -5352,6 +5353,7 @@ async function scRun(btn) {
     kwFocus: document.getElementById('scKwFocus')?.value || 'all' };
   if (type === 'product_desc') body.productName = input;
   else if (type === 'hp_content') body.section = input || 'トップの紹介文';
+  else if (type === 'blog_article') body.topic = input;
   else if (type === 'photo_caption') body.photoNote = input;
   else if (type === 'qa_generate') body.count = 5;
   else if (type === 'post') body.customInstruction = input;
@@ -10812,9 +10814,12 @@ async function generateMonthlyPlan() {
   // 月内に分散した投稿日（今日から6日おき）
   const baseDate = new Date();
   for (let i = 0; i < count; i++) {
-    const angle = angles[i];
-    const instruction = `この投稿のテーマ：${angle}`;
-    listEl.innerHTML = `<div class="loading"><div class="spinner"></div>投稿案を作成中… ${i + 1}/${count}本（テーマ：${angle}）</div>`;
+    const raw = angles[i];
+    // 「テーマ｜切り口」形式に対応（切り口＝書くべき具体）。無ければテーマのみ。
+    const [themePart, anglePart] = String(raw).split(/[｜|]/);
+    const theme = (themePart || raw).trim(), hook = (anglePart || '').trim();
+    const instruction = `この投稿のテーマ：「${theme}」${hook ? `。この投稿で必ず書く具体（切り口）：${hook}` : ''}。読者が「役に立った」と思う具体（理由・コツ・シーンのいずれか）を1つ入れ、当たり障りのない一般論にしない。最後に自然な来店/問い合わせのひとことを添える。`;
+    listEl.innerHTML = `<div class="loading"><div class="spinner"></div>投稿案を作成中… ${i + 1}/${count}本（テーマ：${theme}）</div>`;
     try {
       const res = await fetch('/api/generate-content', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
