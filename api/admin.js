@@ -1086,12 +1086,18 @@ export default async function handler(req, res) {
     const content = String(b.content || '').trim();
     if (!title || !content) return res.status(400).json({ error: 'タイトルと本文が必要です' });
     const status = b.status === 'publish' ? 'publish' : 'draft';
+    // メタ説明はexcerptに格納（多くのテーマ/SEOプラグインが説明文として利用）。スラッグ/カテゴリ/アイキャッチも任意で反映。
+    const payload = { title, content, status };
+    if (b.excerpt) payload.excerpt = String(b.excerpt).slice(0, 300);
+    if (b.slug) payload.slug = String(b.slug).toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80);
+    if (Array.isArray(b.categories) && b.categories.length) payload.categories = b.categories.map(Number).filter(Boolean);
+    if (b.featuredMediaId) { const fm = Number(b.featuredMediaId); if (fm) payload.featured_media = fm; }
     try {
       const auth = Buffer.from(`${c.username}:${c.appPassword}`).toString('base64');
       const r = await fetch(`${c.siteUrl}/wp-json/wp/v2/posts`, {
         method: 'POST',
         headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, status }),
+        body: JSON.stringify(payload),
       });
       const t = await r.text();
       let d = {}; try { d = JSON.parse(t); } catch {}
@@ -1100,6 +1106,45 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(502).json({ error: 'HP投稿に失敗しました: ' + e.message });
     }
+  }
+
+  // WPのカテゴリ一覧（アイキャッチ/カテゴリ指定用）
+  if (action === 'wp-terms') {
+    const c = await kvGet(`wp_conn_${req.query.storeId}`);
+    if (!c || !c.siteUrl) return res.status(400).json({ error: 'HP連携が未設定です' });
+    try {
+      const auth = Buffer.from(`${c.username}:${c.appPassword}`).toString('base64');
+      const r = await fetch(`${c.siteUrl}/wp-json/wp/v2/categories?per_page=100&orderby=count&order=desc`, { headers: { Authorization: `Basic ${auth}` } });
+      const t = await r.text(); let d = []; try { d = JSON.parse(t); } catch {}
+      if (!r.ok) return res.status(r.status).json({ error: 'カテゴリの取得に失敗しました' });
+      const categories = (Array.isArray(d) ? d : []).map(x => ({ id: x.id, name: x.name, count: x.count })).filter(x => x.id);
+      return res.json({ categories });
+    } catch (e) { return res.status(502).json({ error: 'カテゴリの取得に失敗しました' }); }
+  }
+
+  // 画像URLをWPメディアにアップロード→アイキャッチ用のmedia IDを返す
+  if (action === 'wp-upload-media' && req.method === 'POST') {
+    const c = await kvGet(`wp_conn_${req.query.storeId}`);
+    if (!c || !c.siteUrl) return res.status(400).json({ error: 'HP連携が未設定です' });
+    const url = String((req.body || {}).imageUrl || '').trim();
+    if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: '画像URLが不正です' });
+    try {
+      const img = await fetch(url);
+      if (!img.ok) return res.status(400).json({ error: '画像の取得に失敗しました' });
+      const buf = Buffer.from(await img.arrayBuffer());
+      if (buf.length > 8 * 1024 * 1024) return res.status(400).json({ error: '画像が大きすぎます（8MBまで）' });
+      const ct = img.headers.get('content-type') || 'image/jpeg';
+      const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+      const auth = Buffer.from(`${c.username}:${c.appPassword}`).toString('base64');
+      const r = await fetch(`${c.siteUrl}/wp-json/wp/v2/media`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': ct, 'Content-Disposition': `attachment; filename="featured-${new Date().getTime()}.${ext}"` },
+        body: buf,
+      });
+      const t = await r.text(); let d = {}; try { d = JSON.parse(t); } catch {}
+      if (!r.ok) return res.status(r.status).json({ error: d.message || 'アイキャッチのアップロードに失敗しました' });
+      return res.json({ id: d.id, url: d.source_url });
+    } catch (e) { return res.status(502).json({ error: 'アイキャッチのアップロードに失敗しました: ' + e.message }); }
   }
 
   // ── ジオコーディング（無料・Nominatim）：地名→座標。任意地点での順位計測に使う ──

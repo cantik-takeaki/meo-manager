@@ -37,6 +37,28 @@ async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 
   } catch (e) { return ''; }
 }
 
+// SEO記事のプレーンテキスト（区切り記号形式）を構造化。JSONより多行本文に強く壊れにくい。
+function parseSeoArticle(raw) {
+  const text = String(raw || '');
+  const grab = (re) => ((text.match(re) || [])[1] || '').trim();
+  const slug = grab(/^\s*SLUG:\s*(.+)$/m).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  const bodyM = text.match(/---BODY---\s*([\s\S]*?)(?=---FAQ---|---LINKS---|$)/);
+  const faqM = text.match(/---FAQ---\s*([\s\S]*?)(?=---LINKS---|$)/);
+  const linksM = text.match(/---LINKS---\s*([\s\S]*)$/);
+  const faq = [];
+  if (faqM) { const re = /Q:\s*(.+?)\s*A:\s*([\s\S]*?)(?=\n\s*Q:|$)/g; let m; while ((m = re.exec(faqM[1]))) faq.push({ q: m[1].trim(), a: m[2].trim() }); }
+  const internalLinks = linksM ? linksM[1].split('\n').map(l => l.replace(/^[-・*●\s]+/, '').trim()).filter(Boolean).slice(0, 8) : [];
+  return {
+    title: grab(/^\s*TITLE:\s*(.+)$/m),
+    metaDescription: grab(/^\s*META:\s*(.+)$/m),
+    slug,
+    targetKeyword: grab(/^\s*KEYWORD:\s*(.+)$/m),
+    body: (bodyM ? bodyM[1] : '').trim(),
+    faq,
+    internalLinks,
+  };
+}
+
 // 業種に合わせた「ご来店/ご依頼/ご購入…」の言い回しと締めの決まり文句を返す
 function bizPhrasing(category, storeName) {
   const c = String(category || '');
@@ -1218,6 +1240,57 @@ ${topText || 'データなし'}
 - 実在感・E-E-A-T：この店の実際の強み・こだわり・対象者・実績の範囲を具体で。捏造・誇大・効果断定は禁止（景表法・No.1等も不可）。
 - 見出しにも要点や検索語を自然に。読みやすい段落構成。
 - 前置き・説明・コードフェンスは書かず、記事本文のみ。`;
+  }
+
+  // ── SEO記事（オンページSEO込み・構造化出力）: HP独立SEOハブ用。タイトル/メタ/スラッグ/本文/FAQ/内部リンクを返す ──
+  if (type === 'seo_article') {
+    const topic = req.body.topic || req.body.section || '';
+    const _len = req.body.length === 'long' ? '1500〜2200字' : req.body.length === 'short' ? '700〜1000字' : '1000〜1600字';
+    let _memo = '';
+    try { _memo = (await kvGet(`meo_memo_${locationId}`)) || ''; } catch (e) {}
+    const kwLine = _targetedKws.length ? _targetedKws.join('、') : (seoKws.join('、') || '');
+    const primaryKw = String(req.body.targetKeyword || _targetedKws[0] || seoKws[0] || '').trim();
+    const seoPrompt = `あなたは検索エンジン最適化（SEO）とローカルSEO（MEO）に精通したWebライター兼SEO編集者です。${storeName}のホームページに載せる、検索上位を狙えるSEO記事を作ってください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【地域/住所】${[knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ')}
+【対応エリア】${knowledge.serviceArea || ''}
+【強み】${strengths}
+【提供サービス】${services}
+【専門性(E-E-A-T)】${knowledge.expertise || ''}
+【ターゲット】${knowledge.targetCustomer || ''}
+【対策キーワード（この記事で上位化を狙う主要語）】${primaryKw || '（業種×地域で検索されやすい語をあなたが選ぶ）'}
+【その他の関連キーワード】${kwLine || '（なし）'}
+【記事テーマ】${topic || '（対策キーワードで検索する人の悩み・目的に直答するテーマを1つ選ぶ）'}
+${_memo ? `【この店の独自情報・学習メモ（最優先で反映・捏造しない）】\n${String(_memo).slice(0, 3000)}` : ''}
+
+【SEOの必須要件】
+- 検索意図に直答（読者の悩み・目的をタイトルと冒頭でとらえ、本文で具体的に解決）。
+- 対策キーワードを「タイトル」「導入文」「見出し(H2)の少なくとも1つ」「本文中」に自然に含める（詰め込み・不自然な反復は禁止）。
+- 地域名（市区町村・最寄り駅・対応エリア）を自然に2〜3回。冒頭に業種×地域を出す（近接性）。
+- E-E-A-T：この店の実際の強み・専門性・実績の範囲を具体で。捏造・誇大・効果断定・No.1等は禁止（景表法）。
+- 本文は ## で見出し(H2)、必要なら ### で小見出し(H3)。1文ずつ改行（1文1行）。全体${_len}。
+- 一般論の羅列にせず、役立つ具体（理由・手順・比較・注意点・事例・費用感の範囲など）を入れる。
+
+【出力形式（この形のプレーンテキストのみ。前置き・説明・コードフェンスは書かない）】
+TITLE: SEOタイトル（32字以内・対策キーワードを含める・クリックしたくなる具体）
+META: メタディスクリプション（90〜120字・対策キーワードと地域を含め、読むメリットを提示）
+SLUG: 英小文字とハイフンだけのURLスラッグ（内容を表す短い語・日本語や空白は不可）
+KEYWORD: この記事の主対策キーワード
+---BODY---
+## 見出し
+本文（1文1行）
+---FAQ---
+Q: 読者が検索しそうな質問
+A: 簡潔で具体的な回答（2〜4文）
+---LINKS---
+- このHP内で関連づけると良いページ/サービスの提案（アンカーテキスト例）`;
+    const raw = await llmComplete(seoPrompt, { maxTokens: 2600, temperature: 0.55 });
+    const seo = parseSeoArticle(raw);
+    if (!seo.title || !seo.body) return res.status(500).json({ error: 'SEO記事の生成に失敗しました。テーマを具体的にして、もう一度お試しください' });
+    if (!seo.targetKeyword) seo.targetKeyword = primaryKw;
+    return res.json({ seo });
   }
 
   // 写真の説明文（GBP写真・SNS用の短いキャプション）

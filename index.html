@@ -603,8 +603,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
         Instagram投稿
       </button>
       <button class="nav-item" onclick="showPanel('hppost', this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M7 13h7"/><path d="M7 16h4"/></svg>
-        HP投稿（ブログ・コラム）
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11h6M11 8v6"/></svg>
+        HP SEO・記事
       </button>
 
       <div class="sidebar-section">MEO / AIO 対策</div>
@@ -2378,18 +2378,18 @@ body.role-viewer [data-edit-action] { display:none !important; }
     <!-- HP投稿（WordPress連携・ブログ/コラム） -->
     <div class="panel" id="panel-hppost">
       <div class="page-header">
-        <div class="page-title">HP投稿（ブログ・コラム）</div>
+        <div class="page-title">ホームページSEO・記事</div>
         <div class="page-sub" id="hpSubtitle">店舗を選択してください</div>
       </div>
 
       <!-- 連携の説明 -->
       <div class="card" style="border-color:rgba(79,125,243,0.28);background:rgba(79,125,243,0.05)">
         <div style="display:flex;gap:10px;align-items:flex-start">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.5-1.5"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <div style="font-size:12.5px;line-height:1.8;color:var(--text-sub)">
-            ホームページ（WordPress）と連携し、<b>AIで作ったブログ・コラム記事をそのままHPに下書き投稿</b>できます。<br>
-            同じ店舗の<b>企業ナレッジ・対策キーワード・学習メモ</b>から生成するので、<b>Instagram投稿とHPコラムのメッセージが揃い</b>、ローカルSEO（MEO）にも効きます。<br>
-            <span style="color:var(--accent-2)">※社外公開は承認制のため、既定は<b>「下書き保存」</b>です。公開はWordPress管理画面で最終確認のうえ行えます（このページからの公開は明示操作のときのみ）。</span>
+            ホームページの<b>SEO対策</b>を行う独立セクションです（投稿管理とは別）。対策キーワードで<b>検索上位を狙うSEO記事（ブログ・コラム）</b>を作り、<b>タイトル・メタ説明・URLスラッグ・見出し・FAQ・内部リンク</b>までオンページSEOを最適化。WordPress（HP）と連携すれば、そのまま<b>下書き投稿</b>できます。<br>
+            同じ店舗の<b>企業ナレッジ・対策キーワード・学習メモ</b>を反映するので、<b>MEO（Googleマップ）と一貫したSEO</b>になります。<br>
+            <span style="color:var(--accent-2)">※社外公開は承認制のため、既定は<b>「下書き保存」</b>です（公開は明示操作のときのみ）。</span>
           </div>
         </div>
       </div>
@@ -2426,37 +2426,73 @@ body.role-viewer [data-edit-action] { display:none !important; }
         </details>
       </div>
 
-      <!-- 記事を作成してHPに投稿 -->
+      <!-- SEO記事を作成してHPに投稿 -->
       <div class="card" id="hpArticleCard" style="display:none">
         <div class="card-header" style="flex-wrap:wrap;gap:6px">
           <div class="card-title" style="display:flex;align-items:center;gap:8px">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-            記事を作成してHPに投稿
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 7h7M9 11h5"/></svg>
+            AIでSEO記事を作成
           </div>
         </div>
-        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">テーマを入れて「AIで記事を作成」。900〜1500字・見出し付きのMEO最適化コラムを生成し、HTMLに整えてWordPressへ<b>下書き保存</b>します。</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input id="hpTopic" type="text" placeholder="記事のテーマ（例：産後の骨盤矯正はいつから？ ／ 空欄ならAIが選定）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:inherit">
-          <button class="btn btn-primary btn-sm" onclick="hpGenArticle(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで記事を作成</button>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">対策キーワードで<b>検索上位を狙うSEO記事</b>を生成します。タイトル・メタ説明・URLスラッグ・見出し・FAQ・内部リンク提案まで自動で最適化。企業ナレッジ／対策キーワード／学習メモを反映します。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px;flex:1;min-width:170px">対策キーワード（上位化を狙う語）
+            <input id="hpKeyword" type="text" placeholder="例：相模原 整体 ／ 空欄なら登録KWから" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:13px;font-family:inherit">
+          </label>
+          <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px;flex:1;min-width:170px">記事テーマ（任意）
+            <input id="hpTopic" type="text" placeholder="例：産後の骨盤矯正はいつから？" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:13px;font-family:inherit">
+          </label>
+          <label style="font-size:11px;color:var(--text-sub);display:flex;flex-direction:column;gap:3px">長さ
+            <select id="hpLen" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 8px;border-radius:8px;font-size:12px;font-family:inherit">
+              <option value="">標準(1000〜1600字)</option>
+              <option value="long">長め(1500〜2200字)</option>
+              <option value="short">短め(700〜1000字)</option>
+            </select>
+          </label>
+          <button class="btn btn-primary btn-sm" onclick="hpGenSeoArticle(this)" style="height:37px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIでSEO記事を作成</button>
         </div>
 
-        <div id="hpArticleBox" style="display:none;margin-top:14px">
-          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-bottom:10px">記事タイトル
-            <input id="hpTitle" type="text" oninput="hpUpdatePreview()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit">
+        <div id="hpArticleBox" style="display:none;margin-top:16px">
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-bottom:10px">記事タイトル <span id="hpTitleLen" style="font-weight:400;color:var(--text-muted)"></span>
+            <input id="hpTitle" type="text" oninput="hpSeoRecheck()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit">
+          </label>
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-bottom:10px">メタディスクリプション（検索結果に出る説明文）<span id="hpMetaLen" style="font-weight:400;color:var(--text-muted)"></span>
+            <textarea id="hpMeta" rows="2" oninput="hpSeoRecheck()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.6;font-family:inherit;resize:vertical"></textarea>
+          </label>
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-bottom:10px">URLスラッグ（英小文字・ハイフン）
+            <input id="hpSlug" type="text" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;font-family:ui-monospace,monospace">
           </label>
           <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px">本文（1文1行・「## 」で見出し）
-            <textarea id="hpBody" rows="12" oninput="hpUpdatePreview()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:8px;font-size:13px;line-height:1.9;font-family:inherit;resize:vertical"></textarea>
+            <textarea id="hpBody" rows="12" oninput="hpSeoRecheck()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:8px;font-size:13px;line-height:1.9;font-family:inherit;resize:vertical"></textarea>
           </label>
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-top:10px">よくある質問（FAQ｜「Q: 」「A: 」の形。FAQ構造化データにも使えます）
+            <textarea id="hpFaq" rows="5" placeholder="Q: 初回はどれくらい時間がかかりますか？&#10;A: 約60分です。丁寧にカウンセリングします。" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:10px 11px;border-radius:8px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+          </label>
+          <div id="hpLinks" style="margin-top:8px"></div>
+
+          <!-- オンページSEOチェック -->
+          <div id="hpSeoCheck" style="margin-top:12px"></div>
+
+          <!-- 公開設定：カテゴリ・アイキャッチ -->
+          <details style="margin-top:12px" open>
+            <summary style="font-size:12.5px;font-weight:700;cursor:pointer;user-select:none;color:var(--accent)">公開設定（カテゴリ・アイキャッチ）</summary>
+            <div style="margin-top:10px">
+              <div style="font-size:11.5px;color:var(--text-sub);margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">カテゴリ <button class="link-btn" onclick="hpLoadCategories(this)" style="font-size:11.5px">WordPressから読み込む</button></div>
+              <div id="hpCategories" style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--text-muted)">「読み込む」でHPのカテゴリを取得して選べます</div>
+              <div style="font-size:11.5px;color:var(--text-sub);margin:12px 0 5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">アイキャッチ画像 <button class="link-btn" onclick="hpLoadFeatured()" style="font-size:11.5px">写真ライブラリから選ぶ</button><span id="hpFeaturedNote" style="font-size:11px;color:var(--text-muted)"></span></div>
+              <div id="hpFeaturedList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            </div>
+          </details>
 
           <details style="margin-top:10px">
             <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none">HP掲載イメージ（HTMLプレビュー）</summary>
-            <div id="hpPreview" style="margin-top:8px;background:#fff;color:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:16px 18px;font-size:14px;line-height:1.9;max-height:360px;overflow:auto"></div>
+            <div id="hpPreview" style="margin-top:8px;background:#fff;color:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:16px 18px;font-size:14px;line-height:1.9;max-height:400px;overflow:auto"></div>
           </details>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
-            <button class="btn btn-primary btn-sm" onclick="hpPublish('draft', this)" data-min-role="editor"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>WordPressに下書き保存</button>
-            <button class="btn btn-outline btn-sm" onclick="hpPublish('publish', this)" data-min-role="admin" style="color:var(--text-muted)">公開する（承認制）</button>
-            <button class="btn btn-outline btn-sm" onclick="var t=document.getElementById('hpTitle').value+'\n\n'+document.getElementById('hpBody').value;navigator.clipboard.writeText(t);showToast('コピーしました','success')">コピー</button>
+            <button class="btn btn-primary btn-sm" onclick="hpPublishSeo('draft', this)" data-min-role="editor"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>WordPressに下書き保存</button>
+            <button class="btn btn-outline btn-sm" onclick="hpPublishSeo('publish', this)" data-min-role="admin" style="color:var(--text-muted)">公開する（承認制）</button>
+            <button class="btn btn-outline btn-sm" onclick="hpCopySeo()">コピー</button>
           </div>
           <div id="hpPubResult" style="margin-top:10px"></div>
         </div>
@@ -5561,17 +5597,73 @@ function _articleToHtml(text) {
   flush();
   return html.trim();
 }
+// FAQテキスト(Q:/A:)を配列化
+function _parseFaqText(t) {
+  const faq = []; const re = /Q:\s*(.+?)\s*A:\s*([\s\S]*?)(?=\n\s*Q:|$)/g; let m;
+  while ((m = re.exec(String(t || '')))) faq.push({ q: m[1].trim(), a: m[2].trim() });
+  return faq;
+}
+// 本文(##見出し・1文1行)＋FAQ → WP用HTML（FAQは見出し＋FAQPage構造化データも付与）
+function _seoBodyToHtml(body, faqText) {
+  let html = _articleToHtml(body);
+  const faq = _parseFaqText(faqText);
+  if (faq.length) {
+    html += '\n<h2>よくある質問</h2>\n';
+    faq.forEach(f => { html += `<h3>${escapeHtml(f.q)}</h3>\n<p>${escapeHtml(f.a).replace(/\n/g, '<br>')}</p>\n`; });
+    const schema = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+    html += `\n<script type="application/ld+json">${JSON.stringify(schema)}</scr` + `ipt>\n`;
+  }
+  return html;
+}
 function hpUpdatePreview() {
   const pv = document.getElementById('hpPreview'); if (!pv) return;
+  const title = document.getElementById('hpTitle')?.value || '';
   const body = document.getElementById('hpBody')?.value || '';
-  pv.innerHTML = _articleToHtml(body) || '<span style="color:#999">本文を入力すると、HP掲載イメージ（HTML）が表示されます</span>';
+  const faq = document.getElementById('hpFaq')?.value || '';
+  const inner = _seoBodyToHtml(body, faq);
+  pv.innerHTML = (title ? `<h1 style="font-size:22px;margin:0 0 12px;line-height:1.4">${escapeHtml(title)}</h1>` : '') + (inner || '<span style="color:#999">本文を入力すると掲載イメージが表示されます</span>');
+}
+// オンページSEOの自己診断＋文字数表示＋プレビュー更新
+function hpSeoRecheck() {
+  hpUpdatePreview();
+  const title = document.getElementById('hpTitle').value.trim();
+  const meta = document.getElementById('hpMeta').value.trim();
+  const body = document.getElementById('hpBody').value.trim();
+  const kw = (document.getElementById('hpKeyword').value.trim() || window._hpArticleKw || '').trim();
+  const tl = document.getElementById('hpTitleLen'); if (tl) tl.textContent = `（${title.length}字／32字前後が目安）`;
+  const ml = document.getElementById('hpMetaLen'); if (ml) ml.textContent = `（${meta.length}字／90〜120字が目安）`;
+  const box = document.getElementById('hpSeoCheck'); if (!box) return;
+  const norm = s => String(s).replace(/[\s　]+/g, '');
+  const bodyLen = norm(body).length;
+  const h2 = (body.match(/^##\s/gm) || []).length;
+  const firstPara = (body.split('\n').find(l => l.trim() && !/^#/.test(l))) || '';
+  const nkw = norm(kw);
+  const inTitle = kw ? norm(title).includes(nkw) : null;
+  const checks = [
+    { ok: title.length > 0 && title.length <= 34, label: `タイトル ${title.length}字` },
+    { ok: inTitle, label: 'タイトルに対策KW' },
+    { ok: meta.length >= 80 && meta.length <= 130, label: `メタ説明 ${meta.length}字` },
+    { ok: kw ? norm(firstPara).includes(nkw) : null, label: '導入文に対策KW' },
+    { ok: kw ? norm(body).includes(nkw) : null, label: '本文に対策KW' },
+    { ok: h2 >= 2, label: `見出しH2 ${h2}個` },
+    { ok: bodyLen >= 700, label: `本文 約${bodyLen}字` },
+    { ok: /Q:/.test(document.getElementById('hpFaq').value), label: 'FAQあり' },
+  ];
+  const ico = ok => ok === null ? '<span style="color:var(--text-muted)">—</span>' : ok ? '<span style="color:var(--accent-2)">✓</span>' : '<span style="color:#d97706">△</span>';
+  const pass = checks.filter(c => c.ok === true).length, total = checks.filter(c => c.ok !== null).length;
+  box.innerHTML = `<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>オンページSEOチェック ${pass}/${total}${kw ? '' : '（対策キーワード未入力＝KW項目は—）'}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px;font-size:11.5px">${checks.map(c => `<div>${ico(c.ok)} ${c.label}</div>`).join('')}</div></div>`;
 }
 // 前の店舗の記事下書きが残って別店舗に投稿される事故を防ぐため、記事編集欄を初期化
 let _hpLoadedStore = null;
 function _hpResetArticleEditor() {
   const box = document.getElementById('hpArticleBox'); if (box) box.style.display = 'none';
-  ['hpTitle', 'hpBody', 'hpTopic'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  ['hpPreview', 'hpPubResult'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+  ['hpTitle', 'hpBody', 'hpTopic', 'hpKeyword', 'hpMeta', 'hpSlug', 'hpFaq'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['hpPreview', 'hpPubResult', 'hpLinks', 'hpSeoCheck', 'hpFeaturedList'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+  const cats = document.getElementById('hpCategories'); if (cats) cats.innerHTML = '<span style="color:var(--text-muted)">「読み込む」でHPのカテゴリを取得して選べます</span>';
+  window._hpFeaturedUrl = ''; window._hpArticleKw = '';
+  const note = document.getElementById('hpFeaturedNote'); if (note) note.textContent = '';
 }
 async function loadHpPost() {
   const hasStore = !!currentLocationId;
@@ -5583,7 +5675,7 @@ async function loadHpPost() {
   const sub = document.getElementById('hpSubtitle');
   if (!hasStore) { if (sub) sub.textContent = '店舗を選択してください'; return; }
   const nm = document.getElementById('currentStoreName')?.textContent || '';
-  if (sub) sub.textContent = (nm ? nm + '｜' : '') + 'ホームページ（WordPress）連携';
+  if (sub) sub.textContent = (nm ? nm + '｜' : '') + 'ホームページSEO・記事（WordPress連携）';
   try {
     const d = await fetch(`/api/admin?action=wp-conn&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
     document.getElementById('wpSite').value = d.siteUrl || '';
@@ -5645,39 +5737,97 @@ async function deleteWpConn() {
     showToast('HP連携を解除しました', 'success'); loadHpPost();
   } catch (e) { showToast('解除に失敗しました', 'error'); }
 }
-async function hpGenArticle(btn) {
+async function hpGenSeoArticle(btn) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const targetKeyword = document.getElementById('hpKeyword').value.trim();
   const topic = document.getElementById('hpTopic').value.trim();
-  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '記事を作成中…（30秒ほど）'; }
+  const length = document.getElementById('hpLen').value;
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = 'SEO記事を作成中…（30秒ほど）'; }
   try {
-    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'blog_article', topic }) }).then(r => r.json());
-    const txt = (d.content || '').trim();
-    if (!txt) { showToast(d.error || '記事を作成できませんでした（企業ナレッジ・対策キーワードを充実させると精度UP）', 'error'); }
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'seo_article', targetKeyword, topic, length }) }).then(r => r.json());
+    const seo = d.seo;
+    if (!seo || !seo.title) { showToast(d.error || 'SEO記事を作成できませんでした（対策キーワード・企業ナレッジを充実させると精度UP）', 'error'); }
     else {
-      const title = _articleTitle(txt);
-      const bodyText = txt.replace(/^#(?!#)\s*.+\n?/, '').trim(); // 先頭のタイトル行を除いた本文
-      document.getElementById('hpTitle').value = title || topic || '';
-      document.getElementById('hpBody').value = bodyText;
+      window._hpArticleKw = seo.targetKeyword || targetKeyword || '';
+      document.getElementById('hpTitle').value = seo.title || '';
+      document.getElementById('hpMeta').value = seo.metaDescription || '';
+      document.getElementById('hpSlug').value = seo.slug || '';
+      document.getElementById('hpBody').value = seo.body || '';
+      document.getElementById('hpFaq').value = (seo.faq || []).map(f => `Q: ${f.q}\nA: ${f.a}`).join('\n\n');
+      const linksEl = document.getElementById('hpLinks');
+      if (linksEl) linksEl.innerHTML = (seo.internalLinks || []).length
+        ? `<div style="font-size:11.5px;color:var(--text-sub);background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:8px 11px"><b>内部リンクの提案</b>（HP内の関連ページへリンクするとSEOに有利）<ul style="margin:5px 0 0;padding-left:18px">${seo.internalLinks.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></div>`
+        : '';
       document.getElementById('hpArticleBox').style.display = '';
-      hpUpdatePreview();
-      showToast('記事を作成しました。確認・編集して投稿してください', 'success');
+      hpSeoRecheck();
+      showToast('SEO記事を作成しました。確認・編集して投稿してください', 'success');
     }
-  } catch (e) { showToast('記事の作成に失敗しました', 'error'); }
+  } catch (e) { showToast('SEO記事の作成に失敗しました', 'error'); }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
 }
-async function hpPublish(status, btn) {
+// WordPressのカテゴリを取得してチェックボックス表示
+async function hpLoadCategories(btn) {
+  if (!currentLocationId) return;
+  const box = document.getElementById('hpCategories');
+  if (box) box.innerHTML = '<span style="color:var(--text-muted)">読み込み中…</span>';
+  try {
+    const d = await fetch(`/api/admin?action=wp-terms&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const cats = d.categories || [];
+    if (!cats.length) { if (box) box.innerHTML = `<span style="color:var(--text-muted)">${d.error ? escapeHtml(d.error) : 'カテゴリがありません（HP未連携の可能性）'}</span>`; return; }
+    if (box) box.innerHTML = cats.map(c => `<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--bg-3);border:1px solid var(--border);border-radius:16px;padding:3px 10px;cursor:pointer"><input type="checkbox" value="${c.id}" class="hpCatChk" style="margin:0;width:14px;height:14px"> ${escapeHtml(c.name)}${c.count != null ? `<span style="color:var(--text-muted)">(${c.count})</span>` : ''}</label>`).join('');
+  } catch (e) { if (box) box.innerHTML = '<span style="color:var(--red)">カテゴリの取得に失敗しました</span>'; }
+}
+function _hpSelectedCats() { return [...document.querySelectorAll('.hpCatChk:checked')].map(c => Number(c.value)).filter(Boolean); }
+// 写真ライブラリからアイキャッチを選ぶ
+async function hpLoadFeatured() {
+  if (!currentLocationId) return;
+  const box = document.getElementById('hpFeaturedList');
+  if (box) box.innerHTML = '<span style="color:var(--text-muted);font-size:12px">読み込み中…</span>';
+  try {
+    const d = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const list = d.media || [];
+    let html = `<div onclick="hpPickFeatured('',this)" class="hpFeatItem" style="width:64px;height:64px;border-radius:8px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-sub);cursor:pointer;text-align:center">なし</div>`;
+    html += list.slice(0, 24).map(m => { const u = m.url || m.secure_url || m.thumbnail || m.src || ''; return u ? `<img src="${escapeHtml(u)}" onclick="hpPickFeatured('${escapeHtml(u)}',this)" class="hpFeatItem" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer">` : ''; }).join('');
+    if (box) box.innerHTML = html;
+    if (!list.length && box) box.innerHTML += '<span style="color:var(--text-muted);font-size:12px;align-self:center">ライブラリに画像がありません（投稿画像作成で追加できます）</span>';
+  } catch (e) { if (box) box.innerHTML = '<span style="color:var(--red);font-size:12px">画像の取得に失敗しました</span>'; }
+}
+function hpPickFeatured(url, el) {
+  window._hpFeaturedUrl = url || '';
+  document.querySelectorAll('#hpFeaturedList .hpFeatItem').forEach(x => x.style.borderColor = 'transparent');
+  if (el) el.style.borderColor = 'var(--accent)';
+  const note = document.getElementById('hpFeaturedNote');
+  if (note) note.textContent = url ? '選択中（公開時にWordPressへアップロードしてアイキャッチに設定）' : 'アイキャッチなし';
+}
+function hpCopySeo() {
+  const t = document.getElementById('hpTitle').value, m = document.getElementById('hpMeta').value, b = document.getElementById('hpBody').value, f = document.getElementById('hpFaq').value;
+  navigator.clipboard.writeText(`${t}\n\n【メタ説明】${m}\n\n${b}${f ? `\n\n【FAQ】\n${f}` : ''}`);
+  showToast('コピーしました', 'success');
+}
+async function hpPublishSeo(status, btn) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
   if (!canEdit()) return;
   const title = document.getElementById('hpTitle').value.trim();
   const bodyText = document.getElementById('hpBody').value.trim();
   if (!title || !bodyText) return showToast('タイトルと本文を入力してください', 'error');
   if (status === 'publish' && !confirm('この記事をホームページに「公開」します。\n社外公開は承認制です。下書き保存を推奨しますが、公開してよろしいですか？')) return;
-  const content = _articleToHtml(bodyText);
+  const content = _seoBodyToHtml(bodyText, document.getElementById('hpFaq').value);
+  const excerpt = document.getElementById('hpMeta').value.trim();
+  const slug = document.getElementById('hpSlug').value.trim();
+  const categories = _hpSelectedCats();
   const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = status === 'publish' ? '公開中…' : '下書き保存中…'; }
   const rEl = document.getElementById('hpPubResult');
   if (rEl) rEl.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">WordPressに送信しています…</div>';
   try {
-    const d = await fetch(`/api/admin?action=wp-publish&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content, status }) }).then(r => r.json());
+    let featuredMediaId = 0;
+    if (window._hpFeaturedUrl) {
+      if (rEl) rEl.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">アイキャッチをアップロード中…</div>';
+      const up = await fetch(`/api/admin?action=wp-upload-media&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: window._hpFeaturedUrl }) }).then(r => r.json());
+      if (up.id) featuredMediaId = up.id; else showToast(up.error || 'アイキャッチのアップロードに失敗（記事は投稿します）', 'error');
+    }
+    const payload = { title, content, status, excerpt, slug, categories };
+    if (featuredMediaId) payload.featuredMediaId = featuredMediaId;
+    const d = await fetch(`/api/admin?action=wp-publish&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
     if (d.success) {
       const label = d.status === 'publish' ? 'ホームページに公開しました' : '下書きとして保存しました';
       if (rEl) rEl.innerHTML = `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:9px;padding:11px 13px;font-size:12.5px;line-height:1.8">
@@ -9883,7 +10033,7 @@ function switchPanel(name, triggerEl) {
   }
   const titles = {
     dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
-    posts: '投稿管理', instagram: 'Instagram投稿', hppost: 'HP投稿', citation: 'サイテーション',
+    posts: '投稿管理', instagram: 'Instagram投稿', hppost: 'ホームページSEO・記事', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
     rankmgr: '順位管理', rankreport: '順位レポート', insights: 'インサイト', settings: '設定',
   };
