@@ -5470,14 +5470,53 @@ async function scRun(btn) {
   try {
     const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
     const txt = d.content || d.error || '生成できませんでした';
+    const _reflectIco = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>';
+    // 生成結果を投稿の入力欄へ流し込む導線。ブログ記事＝HP投稿へ、それ以外＝新規投稿(GBP)へ。
+    const _reflectBtn = d.content
+      ? (type === 'blog_article'
+        ? `<button class="btn btn-primary btn-sm" onclick="scToHpPost()" data-min-role="editor">${_reflectIco}HP投稿に反映</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="scToNewPost()" data-min-role="editor">${_reflectIco}新規投稿に反映</button>`)
+      : '';
     res.innerHTML = scKwBadge(d.kw) + `<textarea readonly style="width:100%;min-height:150px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit;line-height:1.8;resize:vertical">${escapeHtml(txt)}</textarea>
-      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap">
+        ${_reflectBtn}
         <button class="btn btn-outline btn-sm" onclick="scRun(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>再生成</button>
         <button class="btn btn-outline btn-sm" onclick="var ta=document.querySelector('#scResult textarea');navigator.clipboard.writeText(ta.value);showToast('コピーしました','success')">コピー</button>
       </div>`
       + (d.content ? kbFindingsHtml(kbCheckText(txt)) : '');
   } catch (e) { res.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">生成に失敗しました: ${escapeHtml(e.message)}</div>`; }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; else btn.textContent = '生成'; }
+}
+// 「AIでMEOコンテンツを作成」の生成結果を新規投稿(GBP)の入力欄へ流し込む
+function scToNewPost() {
+  const ta = document.querySelector('#scResult textarea');
+  const pt = document.getElementById('postText');
+  if (!ta || !pt) return;
+  if (!canEdit()) return;
+  pt.value = ta.value;
+  if (typeof updatePostCount === 'function') updatePostCount();
+  (pt.closest('.card') || pt).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => pt.focus(), 300);
+  showToast('新規投稿に反映しました。写真や公開先（Google/Instagram）を選んで投稿してください', 'success');
+}
+// ブログ・コラム記事はHP投稿ページへ流し込む（タイトル＋本文に分割）
+function scToHpPost() {
+  const ta = document.querySelector('#scResult textarea');
+  if (!ta) return;
+  if (!canEdit()) return;
+  const txt = ta.value;
+  const title = _articleTitle(txt);
+  const bodyText = txt.replace(/^#(?!#)\s*.+\n?/, '').trim();
+  showPanel('hppost');
+  setTimeout(() => {
+    const t = document.getElementById('hpTitle'), b = document.getElementById('hpBody'), box = document.getElementById('hpArticleBox');
+    if (t) t.value = title || '';
+    if (b) b.value = bodyText;
+    if (box) box.style.display = '';
+    hpUpdatePreview();
+    (document.getElementById('hpArticleCard') || document.body).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('HP投稿に反映しました。内容を確認してWordPressに下書き保存できます', 'success');
+  }, 80);
 }
 
 // ─── HP投稿（WordPress連携） ───
