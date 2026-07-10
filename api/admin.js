@@ -73,25 +73,67 @@ async function fetchLocalResults(keyword, { location, ll } = {}) {
       return { list, calls: 1 };
     } catch (e) { return { error: e.message, calls: 1 }; }
   }
-  // 既定: SerpApi（無料枠）。google_localは location 文字列で計測。
+  // 既定: SerpApi（無料枠）。
+  //  ・ll(座標)あり → google_maps エンジンで"その正確な地点"から計測（店舗の実所在地・新宿駅など任意地点に対応）
+  //  ・ll なし     → google_local で地点文字列(市区の中心)から計測
   // calls = 実際に投げたSerpApiリクエスト数（再試行で2回になり得る）。呼び出し側はこの数で枠を加算し過少計上を防ぐ。
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
   if (!SERPAPI_KEY) return { error: 'SERPAPI_KEY未設定', calls: 0 };
   let calls = 0;
-  const call = async (loc) => {
+  const parseList = (data) => (data.local_results || []).map((item, i) => ({
+    position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null, place_id: item.place_id || '',
+  }));
+  // 座標指定（google_maps）: "lat,lng[,zoom]" → SerpApi形式 "@lat,lng,zoomz"
+  const callMaps = async (coord) => {
+    calls++;
+    const p = String(coord).replace(/^@/, '').split(',');
+    const zoom = String(p[2] || '14').replace(/z$/i, '').trim() || '14';
+    const llParam = `@${String(p[0]).trim()},${String(p[1]).trim()},${zoom}z`;
+    const params = new URLSearchParams({ engine: 'google_maps', type: 'search', q: keyword, ll: llParam, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
+    const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+    return r.json();
+  };
+  // 地点文字列（google_local）
+  const callLocal = async (loc) => {
     calls++;
     const params = new URLSearchParams({ engine: 'google_local', q: keyword, hl: 'ja', gl: 'jp', api_key: SERPAPI_KEY });
     if (loc) params.set('location', loc);
     const r = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
     return r.json();
   };
-  let data = await call(location);
-  if (data.error && /location/i.test(data.error) && location) data = await call(''); // 不正地点はKWの地域語頼みで再試行
+  let data;
+  if (ll && /,/.test(String(ll))) {
+    data = await callMaps(ll);
+    if (data.error && location) data = await callLocal(location); // 座標で取れなければ地点文字列にフォールバック
+  } else {
+    data = await callLocal(location);
+    if (data.error && /location/i.test(data.error) && location) data = await callLocal(''); // 不正地点はKWの地域語頼みで再試行
+  }
   if (data.error) return { error: data.error, calls };
-  const list = (data.local_results || []).map((item, i) => ({
-    position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null, place_id: item.place_id || '',
-  }));
-  return { list, calls };
+  return { list: parseList(data), calls };
+}
+
+// 地名→座標（無料・OpenStreetMap Nominatim）。KVキャッシュで再取得を抑制。Nominatim規約に従いUAを明示。
+async function geocodeQuery(q) {
+  const query = String(q || '').trim();
+  if (!query) return null;
+  // 既に "lat,lng" 形式ならそのまま座標として扱う（地図クリック等で座標直指定された場合）
+  const m = query.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(\d{2,3}\.\d+)\s*$/);
+  if (m) return { lat: Number(m[1]), lng: Number(m[2]), label: query };
+  const cacheKey = `geocode_${query}`;
+  const cached = await kvGet(cacheKey);
+  if (cached) return cached;
+  try {
+    const params = new URLSearchParams({ q: query, format: 'json', limit: '1', countrycodes: 'jp', 'accept-language': 'ja' });
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: { 'User-Agent': 'rakuraku-meo/1.0 (https://meo.cantik.co.jp; cantik.co.jp)' },
+    });
+    const d = await r.json();
+    if (!Array.isArray(d) || !d.length) return null;
+    const out = { lat: Number(d[0].lat), lng: Number(d[0].lon), label: d[0].display_name || query };
+    if (Number.isFinite(out.lat) && Number.isFinite(out.lng)) { await kvSet(cacheKey, out); return out; }
+    return null;
+  } catch (e) { return null; }
 }
 
 // SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
@@ -1060,8 +1102,16 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── 簡易ジオグリッド：近隣エリア文字列ごとに順位を計測（自店の"場所による見え方"）──
-  // 各エリア＝SerpApi 1回。枠ガード必須（上限到達で停止）。自動では回さない（フロントの手動実行のみ）。
+  // ── ジオコーディング（無料・Nominatim）：地名→座標。任意地点での順位計測に使う ──
+  if (action === 'geocode') {
+    const g = await geocodeQuery(req.query.q);
+    if (!g) return res.status(404).json({ error: '地点が見つかりませんでした。もう少し具体的に（例：新宿駅／渋谷区道玄坂）お試しください' });
+    return res.json(g);
+  }
+
+  // ── 簡易ジオグリッド：指定した地点ごとに順位を計測（自店の"場所による見え方"）──
+  // 各地点＝SerpApi 1回。枠ガード必須（上限到達で停止）。自動では回さない（フロントの手動実行のみ）。
+  // 地点は地名(新宿駅・相模原市中央区 等)でOK＝内部でジオコーディングし"その座標"から計測（google_maps）。
   if (req.method === 'GET' && action === 'geo-rank') {
     const { keyword, store, storeId } = req.query;
     const areas = String(req.query.areas || '').split('|').map(s => s.trim()).filter(Boolean).slice(0, 9);
@@ -1080,16 +1130,19 @@ export default async function handler(req, res) {
       // 途中でも上限に達したら停止（再試行で1件2回呼ぶ場合があるため事前チェックだけに頼らない＝枠突入を防ぐ）
       if (useSerp && used >= SERPAPI_LIMIT) { results.push({ area, rank: null, error: '取得枠に達したため中断' }); continue; }
       try {
-        const { list, error, calls } = await fetchLocalResults(keyword, { location: area });
+        // 地名を座標化して"その地点"から計測（google_maps）。座標化できなければ従来の地点文字列でフォールバック
+        const geo = await geocodeQuery(area);
+        const opts = geo ? { ll: `${geo.lat},${geo.lng},14z` } : { location: area };
+        const { list, error, calls } = await fetchLocalResults(keyword, opts);
         if (useSerp && calls) { used += calls; await kvSet(usedKey, used); } // 実リクエスト数で加算（エラー時も消費済み）
-        if (error) { results.push({ area, rank: null, error }); continue; }
+        if (error) { results.push({ area, rank: null, error, point: geo ? { lat: geo.lat, lng: geo.lng } : null }); continue; }
         let rank = null;
         (list || []).forEach((item, i) => {
           if (rank) return;
           const t = _normName(item.title);
           if (t && (t.includes(target) || target.includes(t))) rank = item.position || (i + 1);
         });
-        results.push({ area, rank });
+        results.push({ area, rank, point: geo ? { lat: geo.lat, lng: geo.lng } : null, byCoord: !!geo });
       } catch (e) { results.push({ area, rank: null, error: e.message }); }
     }
     return res.json({ keyword, results, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });

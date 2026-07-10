@@ -1355,12 +1355,12 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>エリア別順位（場所による見え方）</div>
           <span id="geoUsage" style="font-size:11px;color:var(--text-sub)"></span>
         </div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">検索する<b>場所</b>で順位は変わります。近隣エリアごとに自店の順位を測り「どこで強い／弱い」を可視化します。<b>各エリア＝取得1回分の枠</b>を使います（自動では回りません）。</p>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">検索する<b>場所</b>で順位は変わります。指定した地点ごとに自店の順位を測り「どこで強い／弱い」を可視化します。<b>駅名・地名でOK</b>（例：新宿駅）＝その地点の<b>正確な座標から計測</b>します。<b>各地点＝取得1回分の枠</b>を使います（自動では回りません）。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-          <input id="geoKeyword" type="text" placeholder="キーワード（例：相模原市 ホームページ制作）" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
+          <input id="geoKeyword" type="text" placeholder="キーワード（例：新宿区 整体）" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px">
         </div>
-        <label style="font-size:11px;color:var(--text-sub);display:block;margin-bottom:4px">計測するエリア（1行に1つ・「市区,都道府県,Japan」の英語表記が確実）</label>
-        <textarea id="geoAreas" rows="4" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:ui-monospace,monospace;resize:vertical" placeholder="Sagamihara,Kanagawa,Japan&#10;Zama,Kanagawa,Japan&#10;Machida,Tokyo,Japan"></textarea>
+        <label style="font-size:11px;color:var(--text-sub);display:block;margin-bottom:4px">計測する地点（1行に1つ・駅名や地名でOK。例：新宿駅／渋谷区道玄坂／相模原市中央区。緯度,経度の直接指定も可）</label>
+        <textarea id="geoAreas" rows="4" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;font-family:ui-monospace,monospace;resize:vertical" placeholder="新宿駅&#10;渋谷駅&#10;新宿区役所&#10;35.6896,139.7006"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="fillGeoAreas()">近隣エリアを自動入力</button>
           <button class="btn btn-primary btn-sm" id="geoRunBtn" onclick="runGeoRank()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>エリア別に順位を取得</button>
@@ -10195,8 +10195,8 @@ function fillGeoAreas() {
     const raw = [k.address, k.serviceArea, k.nearbyLandmarks].filter(Boolean).join('、');
     const areas = (raw.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー]+?[市区町村]/g) || []).filter((v, i, a) => a.indexOf(v) === i).slice(0, 6);
     const ta = document.getElementById('geoAreas');
-    if (areas.length) { ta.value = areas.map(a => a + ',Japan').join('\n'); showToast('近隣エリアを入力しました。英語表記が確実です（必要に応じて修正してください）', 'success'); }
-    else showToast('企業ナレッジに地域情報が少ないため、手動でエリアを入力してください', 'error');
+    if (areas.length) { ta.value = areas.join('\n'); showToast('近隣エリアを入力しました。駅名などに変えると、その地点の座標から計測します', 'success'); }
+    else showToast('企業ナレッジに地域情報が少ないため、手動で地点を入力してください（駅名・地名でOK）', 'error');
   }).catch(() => showToast('エリアの自動入力に失敗しました', 'error'));
 }
 async function runGeoRank() {
@@ -10226,9 +10226,14 @@ function renderGeoResults(results) {
     const col = rk == null ? 'var(--text-muted)' : rk <= 3 ? 'var(--accent-2)' : rk <= 10 ? '#d97706' : 'var(--red)';
     const bg = rk == null ? 'var(--bg-3)' : rk <= 3 ? 'rgba(16,185,129,.12)' : rk <= 10 ? 'rgba(217,119,6,.12)' : 'rgba(239,68,68,.10)';
     const label = rk == null ? '圏外' : rk + '位';
+    // その地点の実座標から測れたか（byCoord）を小さく明示。文字列フォールバック時は「エリア中心」
+    const pin = r.byCoord
+      ? '<span title="この地点の正確な座標から計測" style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;color:var(--accent-2)"><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="2.5"/></svg>実座標</span>'
+      : '<span title="正確な座標が取れずエリア中心から計測" style="font-size:9.5px;color:var(--text-muted)">エリア中心</span>';
     return `<div style="background:${bg};border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
       <div style="font-size:20px;font-weight:800;color:${col};font-variant-numeric:tabular-nums">${label}</div>
       <div style="font-size:11px;color:var(--text-sub);margin-top:3px;word-break:break-all">${escapeHtml((r.area || '').replace(/,\s*Japan$/i, ''))}</div>
+      <div style="margin-top:2px">${pin}</div>
     </div>`;
   };
   const ranked = results.filter(r => r.rank != null).map(r => r.rank);
