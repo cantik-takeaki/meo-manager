@@ -1,8 +1,41 @@
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
 import { kvGet } from './_kv.js';
 
-// 生成モデル（高性能なllama-3.3-70b。Groqで無料・日本語の質が高い）
+// 生成モデル（既定はllama-3.3-70b。GEMINI_API_KEYがあればGemini優先＝日本語の質が上がる）
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+// 生成の共通呼び出し。GEMINI_API_KEYがあればGemini（高品質）、無ければ/失敗時はGroq(llama-3.3-70b)にフォールバック。
+// 返り値は本文テキスト（トリム済み）。既存の呼び出し側はJSONを indexOf('{') 抽出しているのでプロバイダ差を吸収できる。
+async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9 } = {}) {
+  const GEMINI = process.env.GEMINI_API_KEY;
+  if (GEMINI) {
+    try {
+      const body = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        // thinkingBudget:0 で思考トークン消費を止め、空応答と遅延を回避（flash/lite両対応）
+        generationConfig: { maxOutputTokens: maxTokens, temperature, topP, thinkingConfig: { thinkingBudget: 0 } },
+      };
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      const text = (d?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+      if (text) return text;
+      // Geminiが空/エラー時はGroqへフォールスルー
+    } catch (e) { /* Groqにフォールバック */ }
+  }
+  const GROQ = process.env.GROQ_API_KEY;
+  if (!GROQ) return '';
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${GROQ}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature, top_p: topP }),
+    });
+    const d = await r.json();
+    return (d.choices?.[0]?.message?.content || '').trim();
+  } catch (e) { return ''; }
+}
 
 // 業種に合わせた「ご来店/ご依頼/ご購入…」の言い回しと締めの決まり文句を返す
 function bizPhrasing(category, storeName) {
@@ -798,6 +831,7 @@ ${context}
 
 【ルール】
 - 18文字以内。短く印象的に
+- 「笑顔」「幸せ」「あなたのための」「上質なひととき」等のありきたりな常套句は使わない。この店ならではの具体（提供内容・こだわり・地域・利用シーンのいずれか）を感じさせる言葉にする
 - 店の実情報に基づく。架空の事実や誇大表現・効果断定はしない
 - 鉤括弧や記号で囲わない。キャッチコピーの言葉だけを出力`;
   }
@@ -1290,23 +1324,18 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500,
-        temperature: type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85,
-        top_p: 0.9,
-      }),
-    });
-    const data = await r.json();
-    let content = data.choices?.[0]?.message?.content?.trim();
+    const _maxTok = type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500;
+    const _temp = type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85;
+    let content = (await llmComplete(prompt, { maxTokens: _maxTok, temperature: _temp }))?.trim();
     if (!content) return res.status(500).json({ error: 'AI生成失敗' });
+    // 弱点カテゴリ（キャッチコピー・長文ブログ）は2パス目でルーブリックに沿って推敲し品質を底上げ
+    if (type === 'catchcopy' || type === 'blog_article') {
+      const refinePrompt = type === 'catchcopy'
+        ? `次のキャッチコピーを、より具体的で情景が浮かぶ・その店ならではの一言に推敲してください。ありきたりな言い回し（「笑顔」「幸せ」「あなたのための」等の常套句）や誇大表現は避け、店の実際の魅力が伝わる言葉に。18文字以内・言葉だけを出力。\n\n元の案：${content}`
+        : `次の記事を推敲して品質を上げてください。改善点：①一般論・当たり障りのない繰り返しを削り、具体（理由・手順・事例・数字の範囲・シーン）に置き換える ②各見出しの中身を「この店・この地域ならでは」にする ③冗長を削って密度を上げる。構成（見出し・長さの目安）は保つ。捏造・誇大表現はしない。推敲後の本文のみ出力。\n\n${content}`;
+      const refined = await llmComplete(refinePrompt, { maxTokens: _maxTok, temperature: type === 'catchcopy' ? 0.6 : 0.5 });
+      if (refined && refined.length > (type === 'catchcopy' ? 3 : 200)) content = refined.trim();
+    }
     // 口コミ下書きは「。」ごとに改行し、店名の書き出しを念のため除去（モデルが入れた場合の保険）
     if (type === 'review_draft') {
       content = content
