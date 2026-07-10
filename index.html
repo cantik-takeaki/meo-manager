@@ -602,6 +602,10 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
         Instagram投稿
       </button>
+      <button class="nav-item" onclick="showPanel('hppost', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M7 13h7"/><path d="M7 16h4"/></svg>
+        HP投稿（ブログ・コラム）
+      </button>
 
       <div class="sidebar-section">MEO / AIO 対策</div>
       <button class="nav-item" onclick="showPanel('citation', this)">
@@ -2371,6 +2375,99 @@ body.role-viewer [data-edit-action] { display:none !important; }
       </div>
     </div>
 
+    <!-- HP投稿（WordPress連携・ブログ/コラム） -->
+    <div class="panel" id="panel-hppost">
+      <div class="page-header">
+        <div class="page-title">HP投稿（ブログ・コラム）</div>
+        <div class="page-sub" id="hpSubtitle">店舗を選択してください</div>
+      </div>
+
+      <!-- 連携の説明 -->
+      <div class="card" style="border-color:rgba(79,125,243,0.28);background:rgba(79,125,243,0.05)">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.5-1.5"/></svg>
+          <div style="font-size:12.5px;line-height:1.8;color:var(--text-sub)">
+            ホームページ（WordPress）と連携し、<b>AIで作ったブログ・コラム記事をそのままHPに下書き投稿</b>できます。<br>
+            同じ店舗の<b>企業ナレッジ・対策キーワード・学習メモ</b>から生成するので、<b>Instagram投稿とHPコラムのメッセージが揃い</b>、ローカルSEO（MEO）にも効きます。<br>
+            <span style="color:var(--accent-2)">※社外公開は承認制のため、既定は<b>「下書き保存」</b>です。公開はWordPress管理画面で最終確認のうえ行えます（このページからの公開は明示操作のときのみ）。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- HP連携設定 -->
+      <div class="card" id="hpConnCard" style="display:none">
+        <details id="hpConnDetails">
+          <summary style="font-size:14px;font-weight:700;cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            HP連携設定（WordPress）<span id="hpConnBadge" style="font-size:11px;font-weight:600;margin-left:auto"></span>
+          </summary>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+            <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px">サイトURL
+              <input id="wpSite" type="text" placeholder="例：https://example.co.jp" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px">WordPress ユーザー名（またはメール）
+              <input id="wpUser" type="text" autocomplete="off" placeholder="管理者のユーザー名" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:13px;font-family:inherit">
+            </label>
+            <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px">アプリケーションパスワード
+              <input id="wpPass" type="password" autocomplete="new-password" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:13px;font-family:inherit">
+            </label>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.7;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px">
+              <b>アプリケーションパスワードの発行方法</b><br>
+              WordPress管理画面 → ユーザー → プロフィール → 下部の「アプリケーションパスワード」に名前（例：ラクラクMEO）を入力し「新規追加」。表示された<b>空白入りのパスワードをそのまま貼り付け</b>てください（通常のログインPWではありません）。<br>
+              ※通信はSSL(https)必須。REST APIが有効なこと（多くのWordPressは既定で有効）。
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" onclick="saveWpConn(this)" data-min-role="editor"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>連携を保存</button>
+              <button class="btn btn-outline btn-sm" onclick="testWpConn(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>接続テスト</button>
+              <button class="btn btn-outline btn-sm" onclick="deleteWpConn()" data-min-role="editor" style="margin-left:auto;color:var(--text-muted)">連携を解除</button>
+            </div>
+            <div id="wpConnStatus" style="font-size:12px"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- 記事を作成してHPに投稿 -->
+      <div class="card" id="hpArticleCard" style="display:none">
+        <div class="card-header" style="flex-wrap:wrap;gap:6px">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            記事を作成してHPに投稿
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 10px">テーマを入れて「AIで記事を作成」。900〜1500字・見出し付きのMEO最適化コラムを生成し、HTMLに整えてWordPressへ<b>下書き保存</b>します。</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="hpTopic" type="text" placeholder="記事のテーマ（例：産後の骨盤矯正はいつから？ ／ 空欄ならAIが選定）" style="flex:1;min-width:240px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:inherit">
+          <button class="btn btn-primary btn-sm" onclick="hpGenArticle(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで記事を作成</button>
+        </div>
+
+        <div id="hpArticleBox" style="display:none;margin-top:14px">
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px;margin-bottom:10px">記事タイトル
+            <input id="hpTitle" type="text" oninput="hpUpdatePreview()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit">
+          </label>
+          <label style="font-size:11.5px;color:var(--text-sub);display:flex;flex-direction:column;gap:4px">本文（1文1行・「## 」で見出し）
+            <textarea id="hpBody" rows="12" oninput="hpUpdatePreview()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:8px;font-size:13px;line-height:1.9;font-family:inherit;resize:vertical"></textarea>
+          </label>
+
+          <details style="margin-top:10px">
+            <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none">HP掲載イメージ（HTMLプレビュー）</summary>
+            <div id="hpPreview" style="margin-top:8px;background:#fff;color:#1a1a1a;border:1px solid var(--border);border-radius:8px;padding:16px 18px;font-size:14px;line-height:1.9;max-height:360px;overflow:auto"></div>
+          </details>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="hpPublish('draft', this)" data-min-role="editor"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>WordPressに下書き保存</button>
+            <button class="btn btn-outline btn-sm" onclick="hpPublish('publish', this)" data-min-role="admin" style="color:var(--text-muted)">公開する（承認制）</button>
+            <button class="btn btn-outline btn-sm" onclick="var t=document.getElementById('hpTitle').value+'\n\n'+document.getElementById('hpBody').value;navigator.clipboard.writeText(t);showToast('コピーしました','success')">コピー</button>
+          </div>
+          <div id="hpPubResult" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- 未連携時の案内 -->
+      <div class="card" id="hpNoStoreCard">
+        <div class="empty-state"><p>上部の店舗切替から店舗を選ぶと、その店舗のHP連携・記事投稿ができます。</p></div>
+      </div>
+    </div>
+
     <!-- Protection -->
     <div class="panel" id="panel-protection">
       <div class="page-header">
@@ -2590,6 +2687,17 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <div class="page-header">
         <div class="page-title">投稿管理</div>
         <div class="page-sub" id="postsSubtitle">店舗を選択してください</div>
+      </div>
+
+      <!-- 発信チャネルの連携ガイド（GBP投稿 / Instagram / HPブログ） -->
+      <div class="card" style="border-color:rgba(79,125,243,0.28);background:rgba(79,125,243,0.05);padding:12px 14px">
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M4 11a9 9 0 019 9"/><path d="M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
+          <div style="flex:1;min-width:220px;font-size:12px;line-height:1.8;color:var(--text-sub)">
+            <b>3つの発信チャネルは連携しています。</b>同じ<b>企業ナレッジ・対策キーワード・学習メモ</b>から生成するので、メッセージが揃います。<br>
+            ・<b>GBP投稿</b>＝下の「AIでMEOコンテンツを作成」→「GBP投稿文」／　・<b>Instagram</b>＝<button class="link-btn" onclick="showPanel('instagram')" style="padding:0;font-size:12px">Instagram投稿</button>　／　・<b>HPのブログ・コラム</b>＝<button class="link-btn" onclick="showPanel('hppost')" style="padding:0;font-size:12px">HP投稿</button>からWordPressへ直接下書き保存
+          </div>
+        </div>
       </div>
 
       <!-- AIでMEOコンテンツを作成（対策キーワードを自然に織り込む・投稿管理へ移設） -->
@@ -4068,6 +4176,7 @@ function selectLocation(idx, keepPanel) {
   loadKpi();
   _postImages = [];
   loadPostImages();
+  loadHpPost();
   loadDashboardRankings().then(loadDiagnosis);
   loadKwMgr();
   gbpCheck();
@@ -5369,6 +5478,146 @@ async function scRun(btn) {
       + (d.content ? kbFindingsHtml(kbCheckText(txt)) : '');
   } catch (e) { res.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">生成に失敗しました: ${escapeHtml(e.message)}</div>`; }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; else btn.textContent = '生成'; }
+}
+
+// ─── HP投稿（WordPress連携） ───
+// 記事本文から先頭の「# タイトル」を抜き出す（## 見出しは除外）
+function _articleTitle(text) { const m = String(text || '').match(/^#(?!#)\s*(.+)/m); return m ? m[1].trim() : ''; }
+// 記事テキスト（## 見出し＋1文1行）→ WordPress用HTMLへ変換
+function _articleToHtml(text) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = String(text || '').split('\n');
+  let html = '', para = [];
+  const flush = () => { if (para.length) { html += '<p>' + para.map(esc).join('<br>\n') + '</p>\n'; para = []; } };
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { flush(); continue; }
+    const h = line.match(/^#{2,3}\s*(.+)/);          // ## / ### → 見出し
+    if (h) { flush(); html += '<h2>' + esc(h[1].trim()) + '</h2>\n'; continue; }
+    if (/^#(?!#)\s/.test(line)) { flush(); continue; } // # タイトル行は本文に含めない
+    para.push(line);
+  }
+  flush();
+  return html.trim();
+}
+function hpUpdatePreview() {
+  const pv = document.getElementById('hpPreview'); if (!pv) return;
+  const body = document.getElementById('hpBody')?.value || '';
+  pv.innerHTML = _articleToHtml(body) || '<span style="color:#999">本文を入力すると、HP掲載イメージ（HTML）が表示されます</span>';
+}
+async function loadHpPost() {
+  const hasStore = !!currentLocationId;
+  document.getElementById('hpConnCard').style.display = hasStore ? '' : 'none';
+  document.getElementById('hpArticleCard').style.display = hasStore ? '' : 'none';
+  document.getElementById('hpNoStoreCard').style.display = hasStore ? 'none' : '';
+  const sub = document.getElementById('hpSubtitle');
+  if (!hasStore) { if (sub) sub.textContent = '店舗を選択してください'; return; }
+  const nm = document.getElementById('currentStoreName')?.textContent || '';
+  if (sub) sub.textContent = (nm ? nm + '｜' : '') + 'ホームページ（WordPress）連携';
+  try {
+    const d = await fetch(`/api/admin?action=wp-conn&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    document.getElementById('wpSite').value = d.siteUrl || '';
+    document.getElementById('wpUser').value = d.username || '';
+    document.getElementById('wpPass').value = ''; // PWは保持・表示しない
+    renderWpConnStatus(d.connected, d.siteUrl);
+    const det = document.getElementById('hpConnDetails'); if (det) det.open = !d.connected; // 未連携なら開いておく
+  } catch (e) { renderWpConnStatus(false, ''); }
+}
+function renderWpConnStatus(connected, siteUrl) {
+  const badge = document.getElementById('hpConnBadge');
+  if (badge) badge.innerHTML = connected
+    ? '<span style="color:var(--accent-2)">✓ 連携済み</span>'
+    : '<span style="color:var(--text-muted)">未連携</span>';
+  const el = document.getElementById('wpConnStatus');
+  if (el) el.innerHTML = connected
+    ? `<span style="color:var(--accent-2);font-weight:600">✓ 連携済み</span> <span style="color:var(--text-muted)">${escapeHtml(siteUrl || '')}</span>`
+    : '<span style="color:var(--text-muted)">未連携です。サイトURL・ユーザー名・アプリケーションパスワードを入力して「連携を保存」を押してください。</span>';
+}
+async function saveWpConn(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!canEdit()) return;
+  const siteUrl = document.getElementById('wpSite').value.trim();
+  const username = document.getElementById('wpUser').value.trim();
+  const appPassword = document.getElementById('wpPass').value.trim();
+  if (!siteUrl || !username) return showToast('サイトURLとユーザー名を入力してください', 'error');
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
+  try {
+    const r = await fetch(`/api/admin?action=wp-conn&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ siteUrl, username, appPassword }) }).then(r => r.json());
+    if (r.success) { showToast('HP連携を保存しました', 'success'); document.getElementById('wpPass').value = ''; loadHpPost(); }
+    else showToast(r.error || '保存に失敗しました（アプリケーションパスワードが未設定の可能性）', 'error');
+  } catch (e) { showToast('保存に失敗しました', 'error'); }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+async function testWpConn(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const el = document.getElementById('wpConnStatus');
+  if (el) el.innerHTML = '<span style="color:var(--text-muted)">接続を確認しています…（保存済みの連携情報でテストします）</span>';
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '確認中…'; }
+  try {
+    const d = await fetch(`/api/admin?action=wp-test&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    if (d.ok) {
+      if (el) el.innerHTML = `<span style="color:var(--accent-2);font-weight:600">✓ 接続OK</span> <span style="color:var(--text-muted)">${escapeHtml(d.name || '')}${d.canPublish === false ? ' ／ この権限では公開不可（下書きのみ可）' : ''}</span>`;
+      showToast('接続に成功しました', 'success');
+    } else {
+      if (el) el.innerHTML = `<span style="color:var(--red)">✕ ${escapeHtml(d.error || '接続に失敗しました')}</span>`;
+      showToast(d.error || '接続に失敗しました', 'error');
+    }
+  } catch (e) { if (el) el.innerHTML = '<span style="color:var(--red)">✕ 接続テストに失敗しました</span>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+async function deleteWpConn() {
+  if (!currentLocationId) return;
+  if (!canEdit()) return;
+  if (!confirm('この店舗のHP連携（接続情報）を解除します。よろしいですか？')) return;
+  try {
+    await fetch(`/api/admin?action=wp-conn&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'DELETE' });
+    ['wpSite', 'wpUser', 'wpPass'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    showToast('HP連携を解除しました', 'success'); loadHpPost();
+  } catch (e) { showToast('解除に失敗しました', 'error'); }
+}
+async function hpGenArticle(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const topic = document.getElementById('hpTopic').value.trim();
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '記事を作成中…（30秒ほど）'; }
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'blog_article', topic }) }).then(r => r.json());
+    const txt = (d.content || '').trim();
+    if (!txt) { showToast(d.error || '記事を作成できませんでした（企業ナレッジ・対策キーワードを充実させると精度UP）', 'error'); }
+    else {
+      const title = _articleTitle(txt);
+      const bodyText = txt.replace(/^#(?!#)\s*.+\n?/, '').trim(); // 先頭のタイトル行を除いた本文
+      document.getElementById('hpTitle').value = title || topic || '';
+      document.getElementById('hpBody').value = bodyText;
+      document.getElementById('hpArticleBox').style.display = '';
+      hpUpdatePreview();
+      showToast('記事を作成しました。確認・編集して投稿してください', 'success');
+    }
+  } catch (e) { showToast('記事の作成に失敗しました', 'error'); }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+async function hpPublish(status, btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!canEdit()) return;
+  const title = document.getElementById('hpTitle').value.trim();
+  const bodyText = document.getElementById('hpBody').value.trim();
+  if (!title || !bodyText) return showToast('タイトルと本文を入力してください', 'error');
+  if (status === 'publish' && !confirm('この記事をホームページに「公開」します。\n社外公開は承認制です。下書き保存を推奨しますが、公開してよろしいですか？')) return;
+  const content = _articleToHtml(bodyText);
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = status === 'publish' ? '公開中…' : '下書き保存中…'; }
+  const rEl = document.getElementById('hpPubResult');
+  if (rEl) rEl.innerHTML = '<div style="font-size:12px;color:var(--text-sub)">WordPressに送信しています…</div>';
+  try {
+    const d = await fetch(`/api/admin?action=wp-publish&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content, status }) }).then(r => r.json());
+    if (d.success) {
+      const label = d.status === 'publish' ? 'ホームページに公開しました' : '下書きとして保存しました';
+      if (rEl) rEl.innerHTML = `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:9px;padding:11px 13px;font-size:12.5px;line-height:1.8">
+        <span style="color:var(--accent-2);font-weight:700">✓ ${label}</span>（記事ID: ${d.id}）<br>
+        <a href="${escapeHtml(d.editLink || '#')}" target="_blank" rel="noopener" style="color:var(--accent)">WordPressで編集・確認する →</a>${d.link ? ` ／ <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener" style="color:var(--accent)">記事を見る</a>` : ''}
+      </div>`;
+      showToast(label, 'success');
+    } else { if (rEl) rEl.innerHTML = `<div style="color:var(--red);font-size:12.5px">${escapeHtml(d.error || '投稿に失敗しました')}</div>`; showToast(d.error || '投稿に失敗しました', 'error'); }
+  } catch (e) { if (rEl) rEl.innerHTML = '<div style="color:var(--red);font-size:12.5px">投稿に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
 }
 
 // ── アンケート編集 ──
@@ -9564,7 +9813,7 @@ function switchPanel(name, triggerEl) {
   }
   const titles = {
     dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
-    posts: '投稿管理', instagram: 'Instagram投稿', citation: 'サイテーション',
+    posts: '投稿管理', instagram: 'Instagram投稿', hppost: 'HP投稿', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
     rankmgr: '順位管理', rankreport: '順位レポート', insights: 'インサイト', settings: '設定',
   };
@@ -9575,6 +9824,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'citation') loadCitation();
   if (name === 'aio') loadAio();
   if (name === 'instagram') { closeImageGen(); loadMedia(); }
+  if (name === 'hppost') loadHpPost();
   if (name === 'posts') loadPostImages();
   if (name === 'rankmgr') loadRankMgr();
   if (name === 'rankreport') loadRankReport();
@@ -9671,7 +9921,7 @@ function refreshCurrentPanel(btn) {
 // 現在のパネルに対応した使い方ガイド(help.html)のセクションを新しいタブで開く
 const PANEL_HELP_ANCHOR = {
   dashboard: 'dashboard', clients: 'client-report', stores: 'stores', reviews: 'reviews',
-  posts: 'posts', instagram: 'posts', citation: 'gbp-optimize', aio: 'gbp-optimize',
+  posts: 'posts', instagram: 'posts', hppost: 'posts', citation: 'gbp-optimize', aio: 'gbp-optimize',
   protection: 'gbp-optimize', knowledge: 'start', rankmgr: 'keywords', rankreport: 'report',
   settings: 'settings',
 };

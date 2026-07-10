@@ -990,6 +990,75 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── HP(WordPress)連携：接続情報の保存／接続テスト／記事の投稿 ──
+  // アプリケーションパスワードはサーバ側KV(wp_conn_${storeId})に保管。公開は承認制のため既定は下書き(draft)。
+  if (action === 'wp-conn') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `wp_conn_${storeId}`;
+    if (req.method === 'GET') {
+      const c = (await kvGet(key)) || {};
+      // アプリパスワードは返さない（設定済みか否か＋URL/ユーザー名だけ返す）
+      return res.json({ connected: !!(c.siteUrl && c.appPassword), siteUrl: c.siteUrl || '', username: c.username || '' });
+    }
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const existing = (await kvGet(key)) || {};
+      let siteUrl = String(b.siteUrl || '').trim().replace(/\s+/g, '').replace(/\/+$/, '');
+      if (siteUrl && !/^https?:\/\//i.test(siteUrl)) siteUrl = 'https://' + siteUrl;
+      let appPassword = String(b.appPassword || '').replace(/\s+/g, ''); // WordのアプリPWは空白区切り表示→詰める
+      if (!appPassword && existing.appPassword) appPassword = existing.appPassword; // 空欄なら既存PWを維持（URL/ユーザー名だけ更新可）
+      const conn = { siteUrl, username: String(b.username || '').trim(), appPassword };
+      if (!conn.siteUrl || !conn.username || !conn.appPassword) return res.status(400).json({ error: 'サイトURL・ユーザー名・アプリケーションパスワードは必須です' });
+      await kvSet(key, conn);
+      return res.json({ success: true });
+    }
+    if (req.method === 'DELETE') { await kvDel(key); return res.json({ success: true }); }
+    return res.status(405).json({ error: 'method' });
+  }
+
+  // 接続テスト（/wp-json/wp/v2/users/me を叩いて認証と権限を確認）
+  if (action === 'wp-test') {
+    const c = await kvGet(`wp_conn_${req.query.storeId}`);
+    if (!c || !c.siteUrl) return res.status(400).json({ error: 'HP連携が未設定です' });
+    try {
+      const auth = Buffer.from(`${c.username}:${c.appPassword}`).toString('base64');
+      const r = await fetch(`${c.siteUrl}/wp-json/wp/v2/users/me?context=edit`, { headers: { Authorization: `Basic ${auth}` } });
+      const t = await r.text();
+      if (!r.ok) return res.json({ ok: false, status: r.status, error: r.status === 401 ? 'ユーザー名またはアプリケーションパスワードが違います' : `接続失敗(${r.status})` });
+      let u = {}; try { u = JSON.parse(t); } catch {}
+      const caps = u.capabilities || {};
+      return res.json({ ok: true, name: u.name || u.slug || '', canPublish: caps.publish_posts !== false });
+    } catch (e) {
+      return res.json({ ok: false, error: 'サイトに接続できません（URLとREST API有効化をご確認ください）' });
+    }
+  }
+
+  // 記事投稿（既定=下書き。status=publish のときのみ公開＝承認制で明示指定）
+  if (action === 'wp-publish' && req.method === 'POST') {
+    const c = await kvGet(`wp_conn_${req.query.storeId}`);
+    if (!c || !c.siteUrl) return res.status(400).json({ error: 'HP連携が未設定です' });
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    const content = String(b.content || '').trim();
+    if (!title || !content) return res.status(400).json({ error: 'タイトルと本文が必要です' });
+    const status = b.status === 'publish' ? 'publish' : 'draft';
+    try {
+      const auth = Buffer.from(`${c.username}:${c.appPassword}`).toString('base64');
+      const r = await fetch(`${c.siteUrl}/wp-json/wp/v2/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content, status }),
+      });
+      const t = await r.text();
+      let d = {}; try { d = JSON.parse(t); } catch {}
+      if (!r.ok) return res.status(r.status).json({ error: d.message || `投稿失敗(${r.status})` });
+      return res.json({ success: true, id: d.id, link: d.link, status: d.status, editLink: `${c.siteUrl}/wp-admin/post.php?post=${d.id}&action=edit` });
+    } catch (e) {
+      return res.status(502).json({ error: 'HP投稿に失敗しました: ' + e.message });
+    }
+  }
+
   // ── 簡易ジオグリッド：近隣エリア文字列ごとに順位を計測（自店の"場所による見え方"）──
   // 各エリア＝SerpApi 1回。枠ガード必須（上限到達で停止）。自動では回さない（フロントの手動実行のみ）。
   if (req.method === 'GET' && action === 'geo-rank') {
