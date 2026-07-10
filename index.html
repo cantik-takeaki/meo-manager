@@ -2607,8 +2607,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17a1 1 0 001 1h6a1 1 0 001-1v-2.3A7 7 0 0012 2z"/><path d="M9 21h6"/></svg>
             独自情報・学習メモ（使うほど精度UP）<span id="scMemoState" style="font-size:11px;font-weight:500;color:var(--text-sub);margin-left:auto"></span>
           </summary>
-          <p style="font-size:11px;color:var(--text-sub);line-height:1.7;margin:8px 0 6px">この店だけの情報（強み・こだわり・季節ネタ・実績の範囲・避けたい表現やトーンなど）を書き溜めると、<b>ここのコンテンツも新規投稿も、すべての生成が毎回これを読み込んで賢くなります</b>。書けば書くほど精度が上がります。</p>
-          <textarea id="scMemo" rows="5" oninput="scMemoState()" placeholder="例：&#10;・地元産の食材にこだわり、朝仕入れのみ提供&#10;・30〜40代の家族連れ・記念日利用が多い&#10;・「日本一」など誇大表現は使わない／落ち着いた丁寧トーン&#10;・相模原市中央区＋座間市・大和市からの来店が中心" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
+          <p style="font-size:11px;color:var(--text-sub);line-height:1.7;margin:8px 0 6px">この店だけの情報（強み・こだわり・季節ネタ・実績の範囲・避けたい表現やトーンなど）を書き溜めると、<b>GBP説明文・投稿・HP・商品・Q&amp;Aなど主要な生成が毎回これを読み込んで賢くなります</b>。書けば書くほど精度が上がります（最大4000字）。</p>
+          <textarea id="scMemo" rows="5" maxlength="4000" oninput="scMemoState()" placeholder="例：&#10;・地元産の食材にこだわり、朝仕入れのみ提供&#10;・30〜40代の家族連れ・記念日利用が多い&#10;・「日本一」など誇大表現は使わない／落ち着いた丁寧トーン&#10;・相模原市中央区＋座間市・大和市からの来店が中心" style="width:100%;box-sizing:border-box;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:12.5px;line-height:1.7;font-family:inherit;resize:vertical"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" onclick="saveMeoMemo()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>メモを保存</button>
             <button class="btn btn-outline btn-sm" onclick="suggestMeoMemo(event)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで要点を下書き</button>
@@ -5283,7 +5283,7 @@ function scGenerate(ev) { return scRun(ev?.currentTarget || document.getElementB
 function scMemoState(saved) {
   const s = document.getElementById('scMemoState'); if (!s) return;
   const len = (document.getElementById('scMemo')?.value || '').length;
-  s.textContent = saved ? '保存しました ✓' : (len ? `${len}文字` : '未入力');
+  s.textContent = saved ? '保存しました ✓' : (len ? `${len}/4000文字` : '未入力');
 }
 async function loadMeoMemo() {
   const ta = document.getElementById('scMemo'); if (!ta || !currentLocationId) return;
@@ -5301,17 +5301,20 @@ async function saveMeoMemo() {
 }
 async function suggestMeoMemo(ev) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const ta = document.getElementById('scMemo');
+  const cur = (ta.value || '').trim();
+  // 既存メモはAIに渡して"統合・重複排除"させ、結果で置き換える（重複追記を防ぐ／画面の未保存編集も反映）
+  if (cur && !confirm('現在のメモを、AIが整理・補強した内容に置き換えます（重複は避けて統合します）。よろしいですか？')) return;
   const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '作成中…'; }
   try {
-    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'memo_suggest' }) }).then(r => r.json());
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'memo_suggest', existingMemo: cur }) }).then(r => r.json());
     const txt = (d.content || '').trim();
     if (!txt) showToast('下書きを作れませんでした（企業ナレッジを充実させると精度が上がります）', 'error');
     else {
-      const ta = document.getElementById('scMemo');
-      ta.value = ta.value.trim() ? (ta.value.trim() + '\n' + txt) : txt;
+      ta.value = txt.slice(0, 4000); // 統合済みなので置き換え（重複追記なし）
       scMemoState();
       const box = document.getElementById('scMemoBox'); if (box) box.open = true;
-      showToast('要点を下書きしました。確認・修正して「メモを保存」を押してください', 'success');
+      showToast('要点を整理しました。確認・修正して「メモを保存」を押してください', 'success');
     }
   } catch (e) { showToast('下書きの取得に失敗しました', 'error'); }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }

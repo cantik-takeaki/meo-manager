@@ -1195,7 +1195,8 @@ GBPのカテゴリはGoogleが用意した固定リストから選びます。�
   // 独自情報・学習メモのAI下書き（ナレッジ＋対策KW＋既存メモから、生成に効く"要点メモ"を蒸留）
   if (type === 'memo_suggest') {
     const kn = await kvGet(`knowledge_${locationId}`) || {};
-    const existing = String((await kvGet(`meo_memo_${locationId}`)) || '').trim();
+    // 画面上の（未保存を含む）現在メモを優先。無ければ保存済みKVを使う
+    const existing = String(req.body.existingMemo != null ? req.body.existingMemo : ((await kvGet(`meo_memo_${locationId}`)) || '')).trim();
     prompt = `あなたはMEO（Googleマップ集客）の専門家です。この店舗の「コンテンツ生成用の要点メモ」を作ります。
 これは今後あらゆる文章生成（GBP説明文・投稿・HP・Q&A等）で毎回読み込む"種"になるので、AIが良い文章を書くために役立つ具体情報だけを箇条書きで蒸留してください。
 
@@ -1231,7 +1232,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       // 蓄積した独自情報・学習メモ（ナレッジ＋キーワードに加え、使うほど賢くなる材料）。必ず反映。
       try {
         const _memo = await kvGet(`meo_memo_${locationId}`);
-        if (_memo && String(_memo).trim()) prompt += `\n\n【この店の独自情報・蓄積メモ（事実として必ず踏まえ、内容に反映する）】\n${String(_memo).trim().slice(0, 2500)}`;
+        if (_memo && String(_memo).trim()) prompt += `\n\n【この店の独自情報・蓄積メモ（事実として必ず踏まえ、内容に反映する）】\n${String(_memo).trim().slice(0, 4000)}`;
       } catch (e) { /* メモ取得失敗は無視 */ }
       if (_toneLine) prompt += _toneLine;
       if (_lengthLine) prompt += _lengthLine;
