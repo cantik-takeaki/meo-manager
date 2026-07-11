@@ -135,6 +135,20 @@ async function geocodeQuery(q) {
     return null;
   } catch (e) { return null; }
 }
+// 地名→複数候補（無料・Nominatim）。ユーザーが正しい地点を選べるよう候補配列を返す＝「必ず検索できる」を担保。
+async function geocodeCandidates(q, limit = 5) {
+  const query = String(q || '').trim();
+  if (!query) return [];
+  const m = query.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(\d{2,3}\.\d+)\s*$/);
+  if (m) return [{ lat: Number(m[1]), lng: Number(m[2]), label: `座標 ${m[1]}, ${m[2]}` }];
+  try {
+    const params = new URLSearchParams({ q: query, format: 'json', limit: String(limit), countrycodes: 'jp', 'accept-language': 'ja' });
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, { headers: { 'User-Agent': 'rakuraku-meo/1.0 (https://meo.cantik.co.jp; cantik.co.jp)' } });
+    const d = await r.json();
+    if (!Array.isArray(d)) return [];
+    return d.map(x => ({ lat: Number(x.lat), lng: Number(x.lon), label: x.display_name || query })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng));
+  } catch (e) { return []; }
+}
 
 // SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
 async function recordCompRanks(storeId, keyword, selfRank, list) {
@@ -1147,11 +1161,28 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(502).json({ error: 'アイキャッチのアップロードに失敗しました: ' + e.message }); }
   }
 
-  // ── ジオコーディング（無料・Nominatim）：地名→座標。任意地点での順位計測に使う ──
+  // ── ジオコーディング（無料・Nominatim）：地名→座標＋候補。任意地点での順位計測に使う ──
   if (action === 'geocode') {
-    const g = await geocodeQuery(req.query.q);
-    if (!g) return res.status(404).json({ error: '地点が見つかりませんでした。もう少し具体的に（例：新宿駅／渋谷区道玄坂）お試しください' });
-    return res.json(g);
+    const cands = await geocodeCandidates(req.query.q, 5);
+    if (!cands.length) return res.status(404).json({ error: '地点が見つかりませんでした。別の言い方（例：新宿駅／渋谷区道玄坂／市区名）でお試しください', candidates: [] });
+    return res.json({ ...cands[0], candidates: cands });
+  }
+
+  // ── 順位計測の基準地点（店舗ごと）。未設定なら店舗のGBP座標を使う（フロントで判定） ──
+  if (action === 'rank-point') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `rank_point_${storeId}`;
+    if (req.method === 'GET') return res.json({ point: (await kvGet(key)) || null });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const lat = Number(b.lat), lng = Number(b.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: '座標が不正です' });
+      await kvSet(key, { lat, lng, label: String(b.label || '').slice(0, 120) });
+      return res.json({ success: true, point: { lat, lng, label: String(b.label || '').slice(0, 120) } });
+    }
+    if (req.method === 'DELETE') { await kvDel(key); return res.json({ success: true }); }
+    return res.status(405).json({ error: 'method' });
   }
 
   // ── 簡易ジオグリッド：指定した地点ごとに順位を計測（自店の"場所による見え方"）──

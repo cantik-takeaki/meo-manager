@@ -1349,6 +1349,25 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <p style="font-size:11px;color:var(--text-muted);margin-top:10px">※自動取得はSerpApi経由。地点は「市区,都道府県,Japan」形式（英語）が確実です。</p>
       </div>
 
+      <!-- 順位の計測地点（任意地点／地図クリック）: 対策KW順位・エリア別順位の基準地点 -->
+      <div class="card" id="rankPointCard" style="display:none;border-color:rgba(79,125,243,0.3)">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>順位の計測地点</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:8px">順位は<b>この地点から</b>計測します。既定は<b>店舗の所在地</b>。駅名や任意の場所を指定すると、その地点から見た順位になります（<b>対策キーワード順位・エリア別順位の両方</b>に適用）。</p>
+        <div id="rankPointCurrent" style="font-size:12.5px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:8px">現在の計測地点：<b>店舗の所在地</b>（既定）</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="rankPointInput" type="text" placeholder="地点を検索（例：新宿駅／渋谷区道玄坂／緯度,経度）" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')rankPointSearch(this)">
+          <button class="btn btn-primary btn-sm" onclick="rankPointSearch(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>検索</button>
+          <button class="btn btn-outline btn-sm" onclick="rankPointOpenMap()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg>地図で選ぶ</button>
+          <button class="btn btn-outline btn-sm" onclick="rankPointReset()" style="color:var(--text-muted)">店舗の所在地に戻す</button>
+        </div>
+        <div id="rankPointCandidates" style="margin-top:8px"></div>
+        <div id="rankPointMap" style="display:none;height:300px;margin-top:10px;border-radius:8px;overflow:hidden;border:1px solid var(--border)"></div>
+        <div id="rankPointMapControls" style="display:none;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span id="rankPointMapCoord" style="font-size:12px;color:var(--text-sub)">地図をクリックして地点を選んでください</span>
+          <button class="btn btn-primary btn-sm" onclick="rankPointSaveMap()">この地点に設定</button>
+        </div>
+      </div>
+
       <!-- エリア別順位（簡易ジオグリッド）: 検索する場所による見え方を可視化。各エリア=取得1回分の枠 -->
       <div class="card" id="geoRankCard" style="display:none;border-color:rgba(79,125,243,0.3)">
         <div class="card-header" style="flex-wrap:wrap;gap:6px">
@@ -4204,6 +4223,7 @@ function selectLocation(idx, keepPanel) {
   loadHpPost();
   loadDashboardRankings().then(loadDiagnosis);
   loadKwMgr();
+  loadRankPoint();
   gbpCheck();
   loadActionLog();
   const ac = document.getElementById('assistantCard'); if (ac) { ac.style.display = 'block'; document.getElementById('askAnswer').textContent = ''; }
@@ -5295,8 +5315,9 @@ async function aiFetchRanks(ev) {
   const addr = currentLocation?.storefrontAddress || {};
   const pref = addr.administrativeArea || '';
   const city = addr.locality || '';       // 市区町村
-  const gll = currentLocation?.latlng;    // {latitude, longitude}（GBP連携店のみ）
-  const llParam = (gll && gll.latitude && gll.longitude) ? `&ll=${gll.latitude},${gll.longitude},14z` : '';
+  // 計測地点：指定地点があればそれ、無ければ店舗のGBP座標（_rankLlParamが判定）
+  const _rll = _rankLlParam();
+  const llParam = _rll ? `&ll=${_rll}` : '';
   const store = currentLocation?.title || '';
   const today = new Date().toISOString().slice(0, 10);
   let ok = 0, fail = 0, firstErr = '';
@@ -6407,8 +6428,8 @@ async function runCompetitorAnalysis() {
   try {
     const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '', storeId: currentLocationId || '' });
     if (loc) p.set('location', loc);
-    const _cll = currentLocation?.latlng; // 店舗座標があれば実所在地基準で計測（精度向上）
-    if (_cll && _cll.latitude && _cll.longitude) p.set('ll', `${_cll.latitude},${_cll.longitude},14z`);
+    const _rll = _rankLlParam(); // 指定地点→無ければ店舗座標
+    if (_rll) p.set('ll', _rll);
     const d = await fetch('/api/admin?' + p.toString()).then(r => r.json());
     if (d.error) { box.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
     const top = d.top || [];
@@ -10404,6 +10425,100 @@ function fillGeoAreas() {
     if (areas.length) { ta.value = areas.join('\n'); showToast('近隣エリアを入力しました。駅名などに変えると、その地点の座標から計測します', 'success'); }
     else showToast('企業ナレッジに地域情報が少ないため、手動で地点を入力してください（駅名・地名でOK）', 'error');
   }).catch(() => showToast('エリアの自動入力に失敗しました', 'error'));
+}
+// ─── 順位の計測地点（任意地点／地図クリック） ───
+function renderRankPoint() {
+  const el = document.getElementById('rankPointCurrent'); if (!el) return;
+  const rp = window._rankPoint;
+  el.innerHTML = rp
+    ? `現在の計測地点：<b style="color:var(--accent)">指定地点</b> <span style="color:var(--text-sub)">${escapeHtml(rp.label || `${(+rp.lat).toFixed(4)}, ${(+rp.lng).toFixed(4)}`)}</span>`
+    : '現在の計測地点：<b>店舗の所在地</b>（既定）';
+}
+async function loadRankPoint() {
+  window._rankPoint = null;
+  const card = document.getElementById('rankPointCard');
+  if (card) card.style.display = currentLocationId ? '' : 'none';
+  const cand = document.getElementById('rankPointCandidates'); if (cand) cand.innerHTML = '';
+  const map = document.getElementById('rankPointMap'); if (map) map.style.display = 'none';
+  const mc = document.getElementById('rankPointMapControls'); if (mc) mc.style.display = 'none';
+  if (!currentLocationId) return;
+  try { const d = await fetch(`/api/admin?action=rank-point&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); window._rankPoint = d.point || null; } catch (e) {}
+  renderRankPoint();
+}
+// 計測に使う ll 文字列（指定地点 → 無ければ店舗座標 → 無ければ空）
+function _rankLlParam() {
+  const rp = window._rankPoint;
+  if (rp && Number.isFinite(+rp.lat) && Number.isFinite(+rp.lng)) return `${rp.lat},${rp.lng},14z`;
+  const g = currentLocation?.latlng;
+  if (g && g.latitude && g.longitude) return `${g.latitude},${g.longitude},14z`;
+  return '';
+}
+async function _rankPointSave(lat, lng, label) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!canEdit()) return;
+  try {
+    const r = await fetch(`/api/admin?action=rank-point&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat, lng, label }) }).then(r => r.json());
+    if (r.success) { window._rankPoint = r.point; renderRankPoint(); document.getElementById('rankPointCandidates').innerHTML = ''; showToast('計測地点を設定しました。以後この地点から順位を計測します', 'success'); }
+    else showToast(r.error || '設定に失敗しました', 'error');
+  } catch (e) { showToast('設定に失敗しました', 'error'); }
+}
+async function rankPointSearch(btn) {
+  const q = document.getElementById('rankPointInput').value.trim();
+  if (!q) return showToast('地点名を入力してください', 'error');
+  const box = document.getElementById('rankPointCandidates');
+  box.innerHTML = '<span style="color:var(--text-sub);font-size:12px">検索中…</span>';
+  try {
+    const d = await fetch(`/api/admin?action=geocode&q=${encodeURIComponent(q)}`).then(r => r.json());
+    const cands = d.candidates || [];
+    if (!cands.length) { box.innerHTML = `<span style="color:var(--red);font-size:12px">${escapeHtml(d.error || '見つかりませんでした')}</span>`; return; }
+    const pin = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="var(--accent)" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    box.innerHTML = '<div style="font-size:11px;color:var(--text-sub);margin-bottom:5px">候補から選んでください：</div>' + cands.map(c => {
+      const lbl = String(c.label || '').replace(/'/g, '’').replace(/"/g, '');
+      return `<div onclick="_rankPointSave(${c.lat},${c.lng},'${escapeHtml(lbl)}')" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;font-size:12px;background:var(--bg-2)">${pin}${escapeHtml(c.label)}</div>`;
+    }).join('');
+  } catch (e) { box.innerHTML = '<span style="color:var(--red);font-size:12px">検索に失敗しました</span>'; }
+}
+async function rankPointReset() {
+  if (!currentLocationId) return;
+  if (!canEdit()) return;
+  try {
+    await fetch(`/api/admin?action=rank-point&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'DELETE' });
+    window._rankPoint = null; renderRankPoint(); document.getElementById('rankPointCandidates').innerHTML = '';
+    showToast('計測地点を店舗の所在地に戻しました', 'success');
+  } catch (e) {}
+}
+// Leaflet を必要時にだけ読み込む（地図クリックでの地点指定）
+let _leafletLoading = null;
+function _loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (_leafletLoading) return _leafletLoading;
+  _leafletLoading = new Promise((resolve, reject) => {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.onload = () => resolve(); s.onerror = () => reject(new Error('leaflet load failed')); document.head.appendChild(s);
+  });
+  return _leafletLoading;
+}
+let _rankMap = null, _rankMapMarker = null, _rankMapPick = null;
+async function rankPointOpenMap() {
+  const mapEl = document.getElementById('rankPointMap'), ctrl = document.getElementById('rankPointMapControls');
+  mapEl.style.display = 'block'; ctrl.style.display = 'flex';
+  try { await _loadLeaflet(); } catch (e) { showToast('地図の読み込みに失敗しました（通信環境をご確認ください）', 'error'); mapEl.style.display = 'none'; ctrl.style.display = 'none'; return; }
+  const rp = window._rankPoint, g = currentLocation?.latlng;
+  const c = rp ? { lat: +rp.lat, lng: +rp.lng } : (g && g.latitude ? { lat: g.latitude, lng: g.longitude } : { lat: 35.681, lng: 139.767 });
+  if (!_rankMap) {
+    _rankMap = L.map(mapEl).setView([c.lat, c.lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(_rankMap);
+    _rankMap.on('click', (e) => {
+      _rankMapPick = { lat: e.latlng.lat, lng: e.latlng.lng };
+      if (_rankMapMarker) _rankMapMarker.setLatLng(e.latlng); else _rankMapMarker = L.marker(e.latlng).addTo(_rankMap);
+      document.getElementById('rankPointMapCoord').textContent = `選択: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}（「この地点に設定」で確定）`;
+    });
+  } else { _rankMap.setView([c.lat, c.lng], 15); }
+  setTimeout(() => _rankMap.invalidateSize(), 200);
+}
+async function rankPointSaveMap() {
+  if (!_rankMapPick) return showToast('地図をクリックして地点を選んでください', 'error');
+  await _rankPointSave(_rankMapPick.lat, _rankMapPick.lng, `地図で指定 (${_rankMapPick.lat.toFixed(4)}, ${_rankMapPick.lng.toFixed(4)})`);
 }
 async function runGeoRank() {
   const store = (selectedClientStore || {}).storeName || currentLocation?.title;
