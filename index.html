@@ -2767,6 +2767,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
               </select>
               <input id="scInput" type="text" placeholder="（任意）投稿のテーマ・伝えたいこと" style="flex:1;min-width:200px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
               <button class="btn btn-primary btn-sm" id="scGenBtn" onclick="postGenerate(this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで文章生成</button>
+              <button class="btn btn-outline btn-sm" onclick="postGenerateBoth(this)" title="1つのテーマからGBP投稿とInstagram用の文章＋ハッシュタグをまとめて生成し、両方に投稿する設定にします"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>GBP＋IG一括生成</button>
             </div>
             <details style="margin-top:10px">
               <summary style="font-size:12px;color:var(--text-sub);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>詳細設定（トーン・長さ・キーワード）</summary>
@@ -5447,6 +5448,39 @@ async function postGenerate(btn) {
   } catch (e) { if (badge) badge.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px 0">生成に失敗しました</div>'; }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; else btn.textContent = 'AIで文章生成'; }
 }
+// 1テーマから GBP＋Instagram を一括生成：投稿文（両媒体共通）＋Instagram用ハッシュタグを作り、両方の投稿先をON
+async function postGenerateBoth(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const input = document.getElementById('scInput').value.trim();
+  const badge = document.getElementById('postGenBadge');
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '一括生成中…'; }
+  if (badge) badge.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px 0">GBP＋Instagram用の文章とハッシュタグを生成しています…</div>';
+  try {
+    const body = { locationId: currentLocationId, type: 'post', customInstruction: input,
+      tone: document.getElementById('scTone')?.value || '', length: document.getElementById('scLength')?.value || '', kwFocus: document.getElementById('scKwFocus')?.value || 'all' };
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+    if (d.error || !d.content) { if (badge) badge.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 0">生成に失敗しました: ${escapeHtml(d.error || '不明なエラー')}</div>`; }
+    else {
+      const pt = document.getElementById('postText');
+      pt.value = d.content; if (typeof updatePostCount === 'function') updatePostCount();
+      // 両方の投稿先をON（同じ本文をGBPとInstagramへ／ハッシュタグはInstagramのみ）
+      const g = document.getElementById('targetGoogle'), ig = document.getElementById('targetInstagram');
+      if (g) g.checked = true; if (ig) ig.checked = true;
+      // Instagram用ハッシュタグ（テーマをヒントに）
+      const hEl = document.getElementById('postHashtags');
+      if (hEl) {
+        try {
+          const h = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'hashtags', photoNote: input }) }).then(r => r.json());
+          if (h.content) { hEl.value = (typeof _cleanHashtags === 'function' ? _cleanHashtags(h.content) : h.content) || h.content; if (typeof updateHashCount === 'function') updateHashCount('postHashtags', 'postHashCount'); }
+        } catch (e) {}
+      }
+      if (badge) badge.innerHTML = scKwBadge(d.kw) + kbFindingsHtml(kbCheckText(d.content)) + '<div style="font-size:11px;color:var(--accent-2);margin-top:6px">✓ GBP・Instagram両方に投稿する設定にしました（同じ本文・ハッシュタグはInstagramのみ付与）。内容を確認して投稿してください</div>';
+      pt.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      showToast('GBP＋Instagram用に一括生成しました', 'success');
+    }
+  } catch (e) { if (badge) badge.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px 0">生成に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
 // ── 独自情報・学習メモ（全コンテンツ生成が毎回読み込む蓄積・使うほど精度UP）──
 function scMemoState(saved) {
   const s = document.getElementById('scMemoState'); if (!s) return;
@@ -7544,7 +7578,7 @@ async function genHashtagsInto(inputId, countId, noteEl) {
   updateHashCount(inputId, countId);
 }
 function genIgHashtags() { return genHashtagsInto('igHashtags', 'igHashCount', 'igPhotoNote'); }
-function genPostHashtags() { return genHashtagsInto('postHashtags', 'postHashCount', 'postGenTopic'); }
+function genPostHashtags() { return genHashtagsInto('postHashtags', 'postHashCount', 'scInput'); }
 function genDraftHashtags(id) { return genHashtagsInto('drafthash-' + id, 'drafthashcount-' + id, 'draft-' + id); }
 
 async function publishIgPost() {
