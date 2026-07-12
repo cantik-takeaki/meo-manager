@@ -423,6 +423,49 @@ export default async function handler(req, res) {
     return res.json({ changes });
   }
 
+  // ── LINE公式連携：チャネルアクセストークンの保管／全友だちへの配信（承認制・明示送信のみ） ──
+  if (action === 'line-conn') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `line_conn_${storeId}`;
+    if (req.method === 'GET') { const c = await kvGet(key); return res.json({ connected: !!(c && c.token) }); }
+    if (req.method === 'POST') {
+      const t = String((req.body || {}).token || '').trim();
+      if (!t) return res.status(400).json({ error: 'チャネルアクセストークンが必要です' });
+      await kvSet(key, { token: t });
+      return res.json({ success: true });
+    }
+    if (req.method === 'DELETE') { await kvDel(key); return res.json({ success: true }); }
+    return res.status(405).json({ error: 'method' });
+  }
+  // 接続テスト（Botのプロフィール/クォータ確認）
+  if (action === 'line-test') {
+    const c = await kvGet(`line_conn_${req.query.storeId}`);
+    if (!c || !c.token) return res.status(400).json({ error: 'LINE連携が未設定です' });
+    try {
+      const r = await fetch('https://api.line.me/v2/bot/info', { headers: { Authorization: `Bearer ${c.token}` } });
+      const d = await r.json();
+      if (!r.ok) return res.json({ ok: false, error: d.message || `接続失敗(${r.status})` });
+      return res.json({ ok: true, name: d.displayName || '', userId: d.userId || '' });
+    } catch (e) { return res.json({ ok: false, error: 'LINEに接続できません' }); }
+  }
+  // 全友だちへ配信（社外送信＝承認制。フロントの明示操作でのみ実行）
+  if (action === 'line-broadcast' && req.method === 'POST') {
+    const c = await kvGet(`line_conn_${req.query.storeId}`);
+    if (!c || !c.token) return res.status(400).json({ error: 'LINE連携が未設定です' });
+    const text = String((req.body || {}).text || '').trim();
+    if (!text) return res.status(400).json({ error: 'メッセージが空です' });
+    try {
+      const r = await fetch('https://api.line.me/v2/bot/message/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
+      });
+      if (r.status === 200) return res.json({ success: true });
+      const t = await r.text(); let d = {}; try { d = JSON.parse(t); } catch {}
+      return res.status(r.status).json({ error: d.message ? `LINE送信失敗: ${d.message}` : `LINE送信失敗(${r.status})` });
+    } catch (e) { return res.status(502).json({ error: 'LINE送信に失敗しました: ' + e.message }); }
+  }
+
   // ── 口コミPOP: 保存デザインテンプレ（Canva/アップロード画像を再利用） ──
   // 画像はCloudinary(/api/posts?action=media)に保管し、ここにはURL＋QR配置などのメタのみ。全店舗共通。
   if (action === 'pop-templates') {
