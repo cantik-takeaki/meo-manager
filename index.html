@@ -6522,7 +6522,7 @@ async function runCompetitorAnalysis() {
 
 // ─── MEO診断の共通ロジック（ダッシュボード診断とAIコンサルで共用・重複ハードコード解消） ───
 // フォーム充足だけでなくGBP実データ（カテゴリ/サイト）と順位実績も加点に含める（見かけ倒しスコアの是正）
-function _meoDiag(k, rk, rv, gbpConnected, loc) {
+function _meoDiag(k, rk, rv, gbpConnected, loc, gbpReal) {
   const kw = (k.keywords || []).filter(Boolean);
   const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
   const kwCount = new Set([...kw, ...rkKw]).size;
@@ -6550,6 +6550,11 @@ function _meoDiag(k, rk, rv, gbpConnected, loc) {
       { label: 'GBPサブカテゴリ', w: 6, ok: !!(cats.additionalCategories && cats.additionalCategories.length) },
       { label: 'GBPウェブサイト', w: 4, ok: !!loc.websiteUri },
     );
+  }
+  // GBP実データ：写真の有無・鮮度（活性シグナル＝MEOで重要。取得できた店舗のみ加点）
+  if (gbpReal && typeof gbpReal.photoCount === 'number') {
+    items.push({ label: 'GBP写真あり', w: 6, ok: gbpReal.photoCount > 0 });
+    items.push({ label: '写真が新しい(60日内)', w: 6, ok: gbpReal.photoDays != null && gbpReal.photoDays <= 60 });
   }
   // 順位実績（最新計測でTOP10圏内が1つでもあるか）
   const hist = rk.history || [];
@@ -6589,7 +6594,15 @@ async function loadDiagnosis() {
       rv = r.stats || {};
     } catch (e) {}
   }
-  const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, currentLocation);
+  // GBPの実データ（写真の枚数・鮮度）を取得して診断に合流（活性シグナル）
+  let gbpReal = null;
+  if (gbpConnected && currentLocation?.name) {
+    try {
+      const ph = await fetch(`/api/posts?action=gbp-photo&locationName=${encodeURIComponent(currentLocation.name)}`).then(r => r.json());
+      if (!ph.error) { const days = ph.latest ? Math.floor((Date.now() - new Date(ph.latest).getTime()) / 86400000) : null; gbpReal = { photoCount: ph.count || 0, photoDays: days }; }
+    } catch (e) {}
+  }
+  const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, currentLocation, gbpReal);
 
   document.getElementById('meoScoreNum').textContent = score;
   const le = document.getElementById('meoScoreLabel');
