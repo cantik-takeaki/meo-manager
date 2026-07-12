@@ -1135,6 +1135,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <div style="font-size:11px;color:var(--text-sub);margin-top:4px">企業ナレッジから商品・サービスの下書きを一括生成。GBP管理画面の「商品」に貼り付けて登録できます（GBPは自動登録APIが無いため、貼り付けは手動です）。</div>
           <div id="gbpProductResult" style="margin-top:8px"></div>
         </div>
+        <!-- BANリスク・チェック（停止回避／MEOレポートA1）-->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>BANリスク・チェック（停止回避）</div>
+            <button class="btn btn-outline btn-sm" onclick="runBanRiskLint()">チェックする</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:4px">Googleガイドライン違反（店名へのキーワード詰め込み・誇大表現・カテゴリ/住所の不備）を検出します。近年は<b>店名のキーワード詰め込みがプロフィール停止の最多トリガー</b>です。</div>
+          <div id="banRiskResult" style="margin-top:8px"></div>
+        </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
           <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
           <div style="margin-top:4px;line-height:1.9"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>写真（外観/内観/メニューを月数枚）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>商品・サービス登録（価格つき）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Q&Aの自作／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><path d="M7 7h.01"/></svg>属性（バリアフリー等）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>説明文／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9h4"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>投稿（週1）</div>
@@ -6493,6 +6502,60 @@ function gbpCheck() {
   // 写真の鮮度を非同期で読み込む（カテゴリ提案はボタン起動）
   loadPhotoFreshness();
   const cr = document.getElementById('gbpCatResult'); if (cr) cr.innerHTML = '';
+  const br = document.getElementById('banRiskResult'); if (br) br.innerHTML = '';
+}
+
+// ── BANリスク・チェック（停止回避／MEO順位分析レポートA1）──
+// 順位の土台＝プロフィールが停止されないこと。店名KW詰め込み・誇大表現・カテゴリ/住所不備を検出する守り機能。
+async function runBanRiskLint() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const box = document.getElementById('banRiskResult');
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">チェック中…</div>';
+  const loc = currentLocation || {};
+  const title = String(loc.title || '');
+  const cats = loc.categories || {};
+  const kws = (window._kwData?.keywords || []).filter(Boolean);
+  const norm = s => String(s).replace(/[\s　]+/g, '');
+  const risks = [];
+  // 1) 店名へのキーワード・装飾の詰め込み（近年の停止最多トリガー）
+  const sepHit = /[【】\[\]｜|／\/★☆!！<>＜＞]/.test(title);
+  const kwInName = kws.filter(k => String(k).split(/[\s　・\/／]+/).filter(t => t.length >= 2).some(t => norm(title).includes(norm(t))));
+  if (sepHit || kwInName.length >= 1 || title.length > 24) {
+    risks.push({
+      level: (sepHit || kwInName.length >= 2) ? 'high' : 'mid',
+      title: '店名にキーワード・装飾が入っている可能性',
+      detail: '店名は「実際の看板の名称」だけにするのがGoogleのガイドラインです。地域名・サービス名・記号（【】｜/★!）・キャッチコピーを店名に足すと停止リスク（近年の最多トリガー）。' + (kwInName.length ? '検出した対策KW: ' + kwInName.slice(0, 3).join('、') : sepHit ? '店名に装飾記号を検出。' : '店名がやや長めです。'),
+      fix: 'Googleビジネスプロフィール → ビジネス名 を、実際の店名だけに修正',
+      current: title
+    });
+  }
+  // 2) 主要カテゴリ未設定（関連性の最大レバー）
+  if (!cats.primaryCategory) risks.push({ level: 'mid', title: '主要カテゴリが未設定', detail: '関連性の最大レバーが未設定＝そもそも順位が伸びにくい状態です。', fix: 'GBP → カテゴリ → 主要カテゴリを最も具体的に1つ設定' });
+  // 3) 住所未設定（距離シグナルの土台）
+  if (!loc.storefrontAddress) risks.push({ level: 'low', title: '住所が未設定/非表示', detail: '距離シグナルの土台です。来店型なら正確な住所を、サービス提供型ならエリアを設定します。', fix: 'GBP → 住所（またはサービス提供地域）' });
+  // 4) 誇大・NG表現（説明文・強み・サービス）＝景表法/薬機法チェッカーを流用
+  let kbFindings = [];
+  try {
+    const k = await fetch(`/api/admin?action=knowledge&locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+    const text = [k && k.description, k && k.strengths, k && k.services, k && k.catchcopy].filter(Boolean).join('　');
+    if (text && typeof kbCheckText === 'function') kbFindings = kbCheckText(text);
+  } catch (e) {}
+  if (kbFindings.length) risks.push({ level: 'mid', title: `誇大・NG表現の疑い（${kbFindings.length}件）`, detail: '「No.1」「必ず」「完治」等はGoogleガイドライン・景表法・薬機法に抵触します。説明文/強みを言い換えましょう。', fix: '下記の該当語を根拠のある表現に修正', kb: kbFindings });
+  // 描画
+  if (!risks.length) {
+    box.innerHTML = `<div style="font-size:12.5px;color:var(--accent-2);padding:9px 11px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:8px">${ICO_OK}目立ったBANリスクは検出されませんでした。この調子で運用してください。</div>`;
+    return;
+  }
+  const cOf = l => l === 'high' ? 'var(--red)' : l === 'mid' ? '#d97706' : 'var(--text-sub)';
+  const lOf = l => l === 'high' ? 'リスク高' : l === 'mid' ? 'リスク中' : 'リスク低';
+  box.innerHTML = risks.map(r => `<div style="border:1px solid var(--border);border-left:3px solid ${cOf(r.level)};border-radius:8px;padding:9px 11px;margin-bottom:7px;background:var(--bg-3)">
+      <div style="font-size:12.5px;font-weight:700"><span style="color:${cOf(r.level)}">[${lOf(r.level)}]</span> ${escapeHtml(r.title)}</div>
+      <div style="font-size:11.5px;color:var(--text-sub);margin-top:3px;line-height:1.65">${escapeHtml(r.detail)}</div>
+      ${r.current ? `<div style="font-size:11px;color:var(--text-sub);margin-top:3px">現在の店名: 「${escapeHtml(r.current)}」</div>` : ''}
+      <div style="font-size:11.5px;color:var(--accent);margin-top:4px">→ ${escapeHtml(r.fix)}</div>
+      ${r.kb ? kbFindingsHtml(r.kb) : ''}
+    </div>`).join('');
 }
 
 // ── 写真の鮮度（GBP活性シグナル）：最終追加日と枚数を表示し、古ければ催促 ──
