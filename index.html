@@ -3897,7 +3897,14 @@ async function init() {
     const _q = new URLSearchParams(location.search);
     if (_q.get('ig_connected')) {
       const u = _q.get('iguser');
-      showToast(`Instagram連携が完了しました${u ? '（@' + u + '）' : ''}`, 'success');
+      const kverr = _q.get('kverr');
+      const savedTo = _q.get('ig_connected'); // 実際に保存した店舗ID（診断用）
+      if (kverr) {
+        // 保存に失敗している＝「完了」ではない。実態を出す（従来は誤って成功表示だった）
+        showToast('Instagram認証は通りましたが保存に失敗しました（' + kverr + '）。もう一度お試しください', 'error');
+      } else {
+        showToast(`Instagram連携が完了しました${u ? '（@' + u + '）' : ''}／保存先店舗ID: ${savedTo}`, 'success');
+      }
       history.replaceState({}, '', location.pathname);
     } else if ((_q.get('error') || '').startsWith('ig_')) {
       showToast('Instagram連携に失敗: ' + _q.get('error'), 'error');
