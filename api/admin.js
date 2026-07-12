@@ -388,6 +388,41 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 競合の動き（変化検知）：comp_historyから各競合の口コミ数/評価/順位の増減を算出 ──
+  // ※GBP/SerpApiの制約で競合の"新規投稿・写真"は取得不可。口コミ数・評価・順位の推移のみ監視できる。
+  if (req.method === 'GET' && action === 'comp-changes') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const hist = await kvGet(`comp_history_${storeId}`) || [];
+    const comps = await kvGet(`competitors_${storeId}`) || [];
+    const nameById = {}; comps.forEach(c => { nameById[c.id] = c.name; });
+    const sorted = [...hist].sort((a, b) => (a.date < b.date ? -1 : 1));
+    // 競合IDごとに、値のある観測の系列を作る
+    const series = {};
+    sorted.forEach(h => (h.comps || []).forEach(c => {
+      if (c.id == null) return;
+      (series[c.id] = series[c.id] || []).push({ date: h.date, reviews: c.reviews, rating: c.rating, rank: c.rank });
+    }));
+    const changes = [];
+    Object.keys(series).forEach(id => {
+      const s = series[id].filter(x => x.reviews != null || x.rating != null || x.rank != null);
+      if (s.length < 2) return;
+      const last = s[s.length - 1], first = s[0];
+      const revDelta = (last.reviews != null && first.reviews != null) ? last.reviews - first.reviews : null;
+      const ratDelta = (last.rating != null && first.rating != null) ? Math.round((last.rating - first.rating) * 10) / 10 : null;
+      const rankDelta = (last.rank != null && first.rank != null) ? first.rank - last.rank : null; // +で順位UP
+      if (!revDelta && !ratDelta && !rankDelta) return;
+      changes.push({
+        id, name: nameById[id] || '競合', from: first.date, to: last.date, points: s.length,
+        reviews: { from: first.reviews, to: last.reviews, delta: revDelta },
+        rating: { from: first.rating, to: last.rating, delta: ratDelta },
+        rank: { from: first.rank, to: last.rank, delta: rankDelta },
+      });
+    });
+    changes.sort((a, b) => Math.abs(b.reviews.delta || 0) - Math.abs(a.reviews.delta || 0));
+    return res.json({ changes });
+  }
+
   // ── 口コミPOP: 保存デザインテンプレ（Canva/アップロード画像を再利用） ──
   // 画像はCloudinary(/api/posts?action=media)に保管し、ここにはURL＋QR配置などのメタのみ。全店舗共通。
   if (action === 'pop-templates') {
