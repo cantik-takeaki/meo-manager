@@ -2322,7 +2322,17 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <button class="btn btn-outline" onclick="document.getElementById('mediaVideoInput').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M17 9h5M2 15h5M17 15h5"/></svg>動画をアップロード</button>
         <button class="btn btn-outline" onclick="toggleImageGen()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 000 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0022 10 10 10 0 0012 2z"/></svg>画像を生成</button>
         <button class="btn btn-outline" id="mediaSelToggle" onclick="toggleMediaSelMode()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>選択して削除</button>
+        <button class="btn btn-outline" onclick="toggleUrlImport()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.5-1.5"/></svg>URLから取り込む</button>
         <span id="mediaUploadStatus" style="font-size:12px;color:var(--text-sub);margin-left:12px"></span>
+
+        <div id="urlImportPanel" style="display:none;margin-top:12px;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px">お店の食べログ・ぐるなび・公式サイト等のURLを入れると、掲載画像を取り込めます。<b style="color:var(--red)">※他者が撮影・権利を持つ写真の利用可否は必ずご確認ください</b>（自店の写真・許可済みのみ）。</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="urlImportInput" type="text" placeholder="ページのURL（https://…）" style="flex:1;min-width:220px;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')extractImagesFromUrl(this)">
+            <button class="btn btn-primary btn-sm" onclick="extractImagesFromUrl(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>画像を探す</button>
+          </div>
+          <div id="urlImportGrid" style="margin-top:10px"></div>
+        </div>
 
         <div id="mediaSelBar" style="display:none;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;background:var(--bg-3);border:1px solid var(--border);border-radius:10px;padding:8px 12px">
           <span id="mediaSelCount" style="font-size:13px;font-weight:700;color:var(--text)">0件選択中</span>
@@ -6735,6 +6745,47 @@ async function loadIgInsights() {
   }
 }
 
+// ── 外部ページ（食べログ等）から写真を取り込む ──
+function toggleUrlImport() {
+  const p = document.getElementById('urlImportPanel');
+  if (p) p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+}
+async function extractImagesFromUrl(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const url = document.getElementById('urlImportInput').value.trim();
+  if (!url) return showToast('URLを入力してください', 'error');
+  const grid = document.getElementById('urlImportGrid');
+  grid.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">画像を探しています…</div>';
+  const bh = btn?.innerHTML; if (btn) btn.disabled = true;
+  try {
+    const d = await fetch(`/api/posts?action=extract-images&url=${encodeURIComponent(url)}`).then(r => r.json());
+    const imgs = d.images || [];
+    if (!imgs.length) { grid.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px">${escapeHtml(d.error || '画像が見つかりませんでした')}</div>`; }
+    else {
+      grid.innerHTML = `<div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">${imgs.length}枚見つかりました。取り込む写真を選んでください：</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;max-height:320px;overflow:auto">${imgs.map(u => `<label style="position:relative;cursor:pointer;display:inline-block"><input type="checkbox" class="urlImgChk" value="${escapeHtml(u)}" style="position:absolute;top:4px;left:4px;width:16px;height:16px;z-index:1"><img src="${escapeHtml(u)}" loading="lazy" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.closest('label').style.display='none'"></label>`).join('')}</div>
+        <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="importSelectedFromUrl(this)" data-min-role="editor">選んだ写真をライブラリに保存</button></div>`;
+    }
+  } catch (e) { grid.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px">画像の取得に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+async function importSelectedFromUrl(btn) {
+  if (!canEdit()) return;
+  const urls = [...document.querySelectorAll('.urlImgChk:checked')].map(c => c.value);
+  if (!urls.length) return showToast('写真を選んでください', 'error');
+  if (!confirm(`${urls.length}枚をライブラリに保存します。\n※権利者の許可がある写真か、自店の写真かをご確認ください。よろしいですか？`)) return;
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
+  let ok = 0, fail = 0;
+  for (const u of urls) {
+    try {
+      const r = await fetch(`/api/posts?action=media&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: u, note: '外部URLから取込' }) }).then(r => r.json());
+      if (r.success || r.item || r.media || r.url) ok++; else fail++;
+    } catch (e) { fail++; }
+  }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+  showToast(`${ok}枚をライブラリに保存しました${fail ? `（${fail}枚失敗）` : ''}`, ok ? 'success' : 'error');
+  if (ok) { document.getElementById('urlImportGrid').innerHTML = ''; if (typeof loadMedia === 'function') loadMedia(); }
+}
 async function loadMedia() {
   const gallery = document.getElementById('mediaGallery');
   const sub = document.getElementById('instagramSubtitle');

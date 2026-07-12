@@ -158,6 +158,31 @@ export default async function handler(req, res) {
 
   // ── クライアント別 写真ライブラリ（Cloudinary保管＋KVで一覧管理） ──
   // storeId（クライアント）ごとに写真を蓄積。Instagram用に正方形URLも保持。
+  // 外部ページ（食べログ等）から画像URLを抽出（取り込み候補を返す。著作権は利用者確認）
+  if (action === 'extract-images' && req.method === 'GET') {
+    const url = String(req.query.url || '').trim();
+    if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'URLは http(s):// から始まる形式で入力してください' });
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; rakuraku-meo image import)' } });
+      if (!r.ok) return res.status(400).json({ error: `ページを取得できませんでした（${r.status}）` });
+      const html = await r.text();
+      const base = new URL(url);
+      const found = new Set();
+      // og:image / twitter:image（順序どちらでも）
+      for (const m of html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:image(?::url)?|twitter:image)["'][^>]*content=["']([^"']+)["']/gi)) found.add(m[1]);
+      for (const m of html.matchAll(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image(?::url)?|twitter:image)["']/gi)) found.add(m[1]);
+      // img src / data-src（拡張子付きのみ＝アイコン等のノイズを抑制）
+      for (const m of html.matchAll(/<img[^>]+(?:data-src|data-original|src)=["']([^"']+\.(?:jpe?g|png|webp)(?:\?[^"']*)?)["']/gi)) found.add(m[1]);
+      const images = [...found]
+        .map(u => { try { return new URL(u.replace(/&amp;/g, '&'), base).href; } catch { return null; } })
+        .filter(u => u && /^https?:/i.test(u))
+        .filter((u, i, a) => a.indexOf(u) === i)
+        .slice(0, 40);
+      if (!images.length) return res.status(404).json({ error: 'このページから画像を取得できませんでした（ログインが必要／画像が動的読み込みの可能性）' });
+      return res.json({ images });
+    } catch (e) { return res.status(502).json({ error: '画像の抽出に失敗しました' }); }
+  }
+
   if (action === 'media') {
     const sid = storeId || 'default';
     const key = `media_${sid}`;
