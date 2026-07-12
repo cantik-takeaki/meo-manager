@@ -852,6 +852,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div id="reviewPaceWrap" style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px"></div>
         <!-- レビューKWカバレッジ（MEO順位分析レポートE1・最優先）：口コミ本文の対策KWは関連性＋レビュー信号の双方に効く -->
         <div id="reviewKwWrap" style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px"></div>
+        <!-- 返信率・返信スピードSLA（MEO順位分析レポートE2）：Googleは返信を推奨・視認性シグナル -->
+        <div id="reviewSlaWrap" style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px"></div>
       </div>
 
       <div class="filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -3199,6 +3201,26 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div id="insReadout">グラフの線／点をタップ・カーソルを合わせると、その日の日付とチェック中の各指標の数値が出ます。</div>
         <div id="insChart"></div>
         <div id="insDailyNote" style="font-size:11px;color:var(--text-sub);margin-top:8px"></div>
+      </div>
+      <!-- E3: エンゲージ × 順位の重ね合わせ（MEO順位分析レポートE3・行動シグナル×順位の相関） -->
+      <div class="card" id="insOverlayCard">
+        <div class="card-header" style="flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="font-size:13px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:5px"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>エンゲージ × 順位の重ね合わせ</div>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);margin:2px 0 8px">お客さんの行動（電話・ルート・クリック）と平均順位を同じ期間で重ねて、「どの施策の後に伸びたか」を確認できます。追加の取得枠は使いません。</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:2px 0 8px">
+          <label style="font-size:12.5px;color:var(--text-sub)">重ねる指標：</label>
+          <select id="insOvMetric" onchange="renderInsOverlay()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:12.5px;font-family:inherit;cursor:pointer">
+            <option value="impressions">表示回数(合計)</option>
+            <option value="calls">電話</option>
+            <option value="directions">ルート案内</option>
+            <option value="web">ウェブクリック</option>
+          </select>
+          <label style="font-size:12.5px;color:var(--text-sub);display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="insOvLogs" checked onchange="renderInsOverlay()">施策ログを表示</label>
+        </div>
+        <div id="insOverlayReadout" style="font-size:12.5px;color:var(--text);background:var(--bg-3);border-radius:8px;padding:8px 12px;margin-bottom:9px;line-height:1.8;display:none"></div>
+        <div id="insOverlayChart" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
+        <div id="insOverlayNote" style="font-size:11px;color:var(--text-sub);margin-top:8px"></div>
       </div>
     </div>
 
@@ -6327,7 +6349,7 @@ async function loadActionLog() {
   const sid = _logSid();
   try {
     const logs = (await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(sid)}`).then(r => r.json())).logs || [];
-    window._actionLogs = logs;
+    window._actionLogs = logs; window._actionLogsSid = sid; // どの店舗のログかを記録（重ね合わせで他店舗のログ混入を防ぐ）
     const box = document.getElementById('actionLogList');
     box.innerHTML = logs.length ? logs.map(l => `<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
       <span style="color:var(--text-sub);font-size:12px;white-space:nowrap">${l.date}</span>
@@ -8294,6 +8316,7 @@ async function loadInsightsPage(opts) {
     const card = (label, val, hot) => `<div style="background:var(--bg-2,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:var(--text-sub)">${label}</div><div style="font-size:24px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;color:${hot ? 'var(--accent)' : 'var(--text)'}">${(val || 0).toLocaleString()}</div></div>`;
     if (grid) grid.innerHTML = card('表示回数(合計)', s.impressions, true) + card('Maps表示', s.mapsImpressions) + card('検索表示', s.searchImpressions) + card('電話', s.calls) + card('ルート案内', s.directionRequests) + card('ウェブクリック', s.websiteClicks);
     renderInsChart();
+    renderInsOverlay();
   } catch (e) { if (chart) chart.innerHTML = `<p style="font-size:12px;color:var(--red);padding:10px">取得に失敗しました: ${escapeHtml(e.message)}</p>`; }
 }
 function loadInsightsPageCustom() {
@@ -8388,6 +8411,119 @@ function _insChartSvg(dates, series) {
   dates.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const [, mm, dd] = d.split('-'); g += `<text x="${X(i).toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${+mm}/${+dd}</text>`; } });
   const yrs = [...new Set(dates.map(d => d.slice(0, 4)))]; g += `<text x="${PL}" y="${H - 6}" font-size="9.5" fill="var(--text-muted)">${yrs.join('〜')}年</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;height:${H}px;display:block">${g}</svg>`;
+}
+
+// ── E3: エンゲージ × 順位の重ね合わせ（MEO順位分析レポートE3）──
+// 既存のインサイト日別系列 × 順位履歴(平均順位) × 施策ログ を同一時間軸・二軸で重ねる。追加API/枠消費なし。
+window._insRankCache = window._insRankCache || {};
+async function renderInsOverlay() {
+  const box = document.getElementById('insOverlayChart'); if (!box) return;
+  const note = document.getElementById('insOverlayNote'), ro = document.getElementById('insOverlayReadout');
+  if (ro) { ro.style.display = 'none'; ro.innerHTML = ''; }
+  if (!currentLocation || !currentLocation.name || !(_insPageData && _insPageData.series)) {
+    box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">店舗と期間を選ぶと表示されます。</p>';
+    if (note) note.innerHTML = ''; return;
+  }
+  const metricKey = (document.getElementById('insOvMetric') || {}).value || 'impressions';
+  const metric = INS_METRICS.find(m => m.key === metricKey) || INS_METRICS[0];
+  const eng = _insDaily(metricKey); // [{date,value}] 昇順
+  if (!eng.length) {
+    box.innerHTML = '<p style="font-size:12px;color:var(--text-sub);padding:10px">この期間の日別データがありません。</p>';
+    if (note) note.innerHTML = ''; return;
+  }
+  const t0 = Date.parse(eng[0].date), t1 = Date.parse(eng[eng.length - 1].date);
+  // 順位履歴（storeIdキャッシュ・全期間を持ち、表示時に期間で絞る）
+  const sid = currentLocation.storeId || currentLocationId;
+  let R = window._insRankCache[sid];
+  if (!R) {
+    try { R = await fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(sid)}`).then(r => r.json()); } catch (e) { R = { history: [], keywords: [], meta: {} }; }
+    window._insRankCache[sid] = R;
+  }
+  const kws = R.keywords || [], meta = R.meta || {};
+  const rankPts = [];
+  (R.history || []).forEach(h => {
+    const t = Date.parse(h.date);
+    if (!(t >= t0 && t <= t1)) return; // インサイト期間内のみ
+    const vals = [];
+    (h.rankings || []).forEach((v, i) => {
+      const kw = kws[i];
+      // kw==null は keywords 配列外＝古い履歴列。平均から除外（enabled判定より前に弾く）
+      if (kw != null && Number.isFinite(v) && v >= 1 && (meta[kw] ? meta[kw].enabled !== false : true)) vals.push(v);
+    });
+    if (vals.length) rankPts.push({ date: h.date, avg: vals.reduce((a, b) => a + b, 0) / vals.length, n: vals.length });
+  });
+  // 施策ログ（期間内）
+  let logs = [];
+  const logChk = document.getElementById('insOvLogs');
+  if (logChk && logChk.checked) {
+    // 施策ログも店舗キーで扱う。キャッシュがこの店舗のものでなければ必ず再取得（他店舗ログの混入を防ぐ）
+    let all = (window._actionLogsSid === sid) ? window._actionLogs : null;
+    if (!all) { try { all = (await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(sid)}`).then(r => r.json())).logs || []; window._actionLogs = all; window._actionLogsSid = sid; } catch (e) { all = []; } }
+    logs = (all || []).filter(l => { const t = Date.parse(l.date); return t >= t0 && t <= t1; });
+  }
+  window._insOvState = { eng, rankPts, logs, metric };
+  box.innerHTML = _insOverlaySvg(eng, rankPts, logs, metric, t0, t1);
+  _insOvEnsureHandler();
+  // note ＋ 簡易相関
+  let corr = '';
+  if (rankPts.length >= 2) {
+    const first = rankPts[0].avg, last = rankPts[rankPts.length - 1].avg;
+    const third = Math.max(1, Math.ceil(eng.length / 3));
+    const engFirst = eng.slice(0, third).reduce((a, p) => a + p.value, 0);
+    const engLast = eng.slice(-third).reduce((a, p) => a + p.value, 0);
+    if (last < first - 0.3 && engLast > engFirst) corr = `<b style="color:var(--accent-2)">この期間、平均順位が ${first.toFixed(1)}位→${last.toFixed(1)}位 に改善し、${escapeHtml(metric.label)}も増加傾向です。</b>施策が効いている可能性があります。`;
+    else if (last > first + 0.3) corr = `平均順位が ${first.toFixed(1)}位→${last.toFixed(1)}位 に下降。GBP最適化・口コミ・投稿の継続を。`;
+    else corr = `平均順位 ${first.toFixed(1)}位→${last.toFixed(1)}位（ほぼ横ばい）。`;
+  }
+  if (note) note.innerHTML = rankPts.length
+    ? `<span style="color:${metric.color}">■</span>左軸=${escapeHtml(metric.label)}（回数）　<span style="color:#ef4444">●</span>右軸=平均順位（上ほど上位・圏外は除外・記録${rankPts.length}日分）　<span style="color:var(--text-muted)">┊</span>縦線=施策<br>${corr}<br><span style="color:var(--text-muted)">※直近2〜3日はGoogleの反映待ちで少なく出ることがあります</span>`
+    : `<span style="color:${metric.color}">■</span>${escapeHtml(metric.label)}の推移。<b>順位の記録がまだありません</b> ——「順位」ページで順位を計測すると、ここに平均順位が重なって表示されます。`;
+}
+function _insOverlaySvg(eng, rankPts, logs, metric, t0, t1) {
+  const n = eng.length;
+  const W = Math.max(560, n * 11 + 70), H = 250, PL = 46, PR = 44, PT = 14, PB = 40;
+  const X = ds => { const t = Date.parse(ds); return (t1 === t0) ? (PL + (W - PL - PR) / 2) : PL + (W - PL - PR) * (t - t0) / (t1 - t0); };
+  const emax = Math.max(1, ...eng.map(p => p.value));
+  const eY = v => PT + (H - PT - PB) * (1 - v / emax);
+  const maxR = 20;
+  const rY = r => PT + (H - PT - PB) * (Math.min(Math.max(r, 1), maxR) - 1) / (maxR - 1);
+  let g = '';
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => { const val = Math.round(emax * (1 - f)); const yy = PT + (H - PT - PB) * f; g += `<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W - PR}" y2="${yy.toFixed(1)}" stroke="var(--border)" stroke-width="1"/><text x="${PL - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="9.5" fill="var(--text-sub)">${val.toLocaleString()}</text>`; });
+  [1, 5, 10, 15, 20].forEach(r => { const yy = rY(r); g += `<text x="${W - PR + 6}" y="${(yy + 4).toFixed(1)}" text-anchor="start" font-size="9.5" fill="#ef4444">${r}位</text>`; });
+  (logs || []).forEach(l => { const x = X(l.date); g += `<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H - PB}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/><circle cx="${x.toFixed(1)}" cy="${PT}" r="3" fill="var(--text-muted)"/>`; });
+  let path = '';
+  eng.forEach((p, i) => { path += (i ? 'L' : 'M') + X(p.date).toFixed(1) + ',' + eY(p.value).toFixed(1) + ' '; });
+  g += `<path d="${path}" fill="none" stroke="${metric.color}" stroke-width="2.2" stroke-linejoin="round"/>`;
+  if (n <= 62) eng.forEach(p => { g += `<circle cx="${X(p.date).toFixed(1)}" cy="${eY(p.value).toFixed(1)}" r="2.2" fill="${metric.color}"/>`; });
+  if (rankPts.length) {
+    let rpath = '';
+    rankPts.forEach((p, i) => { rpath += (i ? 'L' : 'M') + X(p.date).toFixed(1) + ',' + rY(p.avg).toFixed(1) + ' '; });
+    if (rankPts.length >= 2) g += `<path d="${rpath}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linejoin="round"/>`;
+    rankPts.forEach(p => { g += `<circle cx="${X(p.date).toFixed(1)}" cy="${rY(p.avg).toFixed(1)}" r="3.4" fill="#ef4444" stroke="#fff" stroke-width="1"/>`; });
+  }
+  const cw = (W - PL - PR) / Math.max(1, n);
+  eng.forEach(p => { const cx = X(p.date); g += `<rect x="${(cx - cw / 2).toFixed(1)}" y="${PT}" width="${Math.max(8, cw).toFixed(1)}" height="${(H - PT - PB).toFixed(1)}" fill="transparent" data-d="${p.date}" style="cursor:pointer"/>`; });
+  const step = Math.max(1, Math.ceil(n / (W > 720 ? 14 : 8)));
+  eng.forEach((p, i) => { if (i % step === 0 || i === n - 1) { const [, mm, dd] = p.date.split('-'); g += `<text x="${X(p.date).toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" fill="var(--text-sub)">${+mm}/${+dd}</text>`; } });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;height:${H}px;display:block">${g}</svg>`;
+}
+function _insOvEnsureHandler() {
+  const c = document.getElementById('insOverlayChart'); if (!c || c._ovHandler) return;
+  c._ovHandler = true;
+  const h = e => { const t = (e.target.closest && e.target.closest('[data-d]')); if (t) _insOvReadout(t.getAttribute('data-d')); };
+  c.addEventListener('pointermove', h); c.addEventListener('pointerdown', h);
+}
+function _insOvReadout(dateStr) {
+  const el = document.getElementById('insOverlayReadout'); const st = window._insOvState; if (!el || !st) return;
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const wd = ['日', '月', '火', '水', '木', '金', '土'][new Date(y, (m || 1) - 1, d || 1).getDay()];
+  const engV = (st.eng.find(p => p.date === dateStr) || {}).value;
+  const rp = st.rankPts.find(p => p.date === dateStr);
+  const dayLogs = st.logs.filter(l => l.date === dateStr);
+  let s = `<b style="color:var(--accent)">${y}年${m}月${d}日（${wd}）</b>　<span style="color:${st.metric.color}">${escapeHtml(st.metric.label)}：<b>${Number(engV || 0).toLocaleString()}</b></span>`;
+  if (rp) s += `　<span style="color:#ef4444">平均順位：<b>${rp.avg.toFixed(1)}位</b>（${rp.n}KW）</span>`;
+  if (dayLogs.length) s += `<br><span style="color:var(--text-sub)">施策：${dayLogs.map(l => escapeHtml(l.text || '')).join(' ／ ')}</span>`;
+  el.style.display = 'block'; el.innerHTML = s;
 }
 
 // AIインサイト異常検知・傾向分析
@@ -9832,6 +9968,52 @@ async function renderReviewKwCoverage() {
     </div>` : `<div style="font-size:11.5px;color:var(--accent-2);margin-top:8px">${ICO_OK}主要KWは口コミ本文にカバーされています。良い状態です。</div>`}
     <p style="font-size:11px;color:var(--text-muted);margin-top:6px">対象：本文のある実口コミ ${total}件。口コミ本文に含まれる業種語・地域名は、関連性とレビュー信号の双方に効きます（第三者調査）。</p>`;
 }
+
+// ── E2: 返信率SLA・返信スピード＋未返信アラート（MEO順位分析レポートE2）──
+// Google公式が返信を推奨＝視認性シグナル。返信率/平均返信日数/未返信をKPI化し、48-72h超・ネガ未返信を警告。
+function renderReplySla() {
+  const box = document.getElementById('reviewSlaWrap'); if (!box) return;
+  const reviews = (allReviews || []).filter(r => !/^demo\//.test(r.name || ''));
+  if (!reviews.length) { box.innerHTML = ''; return; }
+  const now = Date.now();
+  const total = reviews.length;
+  // 返信済み判定は既存カード(rsReplied)と同一の !!r.reviewReply に揃える（数値の食い違いを防ぐ）
+  const replied = reviews.filter(r => r.reviewReply);
+  const rate = Math.round(replied.length / total * 100);
+  // 平均返信日数（createTime → reviewReply.updateTime）
+  const days = [];
+  replied.forEach(r => {
+    if (r.createTime && r.reviewReply.updateTime) {
+      const dd = (new Date(r.reviewReply.updateTime).getTime() - new Date(r.createTime).getTime()) / 86400000;
+      if (dd >= 0 && dd < 3650) days.push(dd);
+    }
+  });
+  const avgDays = days.length ? (days.reduce((a, b) => a + b, 0) / days.length) : null;
+  // 未返信のSLA（48〜72h）。判定基準を返信率(replied)と揃え、replied+unreplied===total を常に成立させる
+  const unreplied = reviews.filter(r => !r.reviewReply);
+  const hoursSince = r => r.createTime ? (now - new Date(r.createTime).getTime()) / 3600000 : 0;
+  const over72 = unreplied.filter(r => hoursSince(r) >= 72);
+  const over48 = unreplied.filter(r => hoursSince(r) >= 48 && hoursSince(r) < 72);
+  const negUnreplied = unreplied.filter(r => starRatingToNum(r.starRating) <= 2);
+  const rateCol = rate >= 90 ? 'var(--accent-2)' : rate >= 70 ? '#d97706' : 'var(--red)';
+  const cell = (label, val, sub, col) => `<div style="text-align:center;min-width:96px"><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:${col || 'var(--text)'}">${val}</div><div style="font-size:11px;color:var(--text-sub)">${label}</div>${sub ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:1px">${sub}</div>` : ''}</div>`;
+  let alerts = '';
+  if (negUnreplied.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);border-radius:8px;font-size:12px;color:var(--red);font-weight:700">★1〜2の低評価に未返信が ${negUnreplied.length}件 — 最優先で返信を（ネガティブの放置は信頼を大きく損ないます）</div>`;
+  if (over72.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px;font-size:12px;color:#d97706"><b>72時間以上 未返信が ${over72.length}件</b> — 推奨SLA（48〜72h）超過です。「未返信すべてに返信生成」でまとめて対応できます。</div>`;
+  else if (over48.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.2);border-radius:8px;font-size:12px;color:#d97706">48時間以上 未返信が ${over48.length}件 — 72hを超える前に返信しましょう。</div>`;
+  if (!alerts && !unreplied.length) alerts = `<div style="font-size:11.5px;color:var(--accent-2);margin-top:6px">${ICO_OK}すべての口コミに返信済みです。返信率は順位・信頼の両面で有利に働きます。</div>`;
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>返信率・返信スピード（SLA）</div>
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+      ${cell('返信率', rate + '%', `${replied.length}/${total}件`, rateCol)}
+      ${cell('平均返信日数', avgDays == null ? '—' : avgDays < 1 ? '当日' : avgDays.toFixed(1) + '日', avgDays == null ? '返信日時待ち' : '早いほど有利', (avgDays != null && avgDays <= 2) ? 'var(--accent-2)' : undefined)}
+      ${cell('未返信', unreplied.length + '件', over72.length ? `72h超 ${over72.length}件` : '', unreplied.length ? 'var(--gold)' : 'var(--accent-2)')}
+    </div>
+    ${alerts}
+    <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Googleは口コミへの返信を推奨。返信率と返信の速さは視認性・信頼のシグナルです（実口コミ${total}件で集計）。</p>`;
+}
 async function editReviewGoal() {
   const cur = _reviewGoal || '';
   const v = prompt('口コミの月間獲得目標（件数）を入力してください', cur);
@@ -9936,6 +10118,7 @@ function renderReviewStats() {
   document.getElementById('rsUnreplied').textContent = reviews.length - replied;
   renderReviewPace();
   renderReviewKwCoverage();
+  renderReplySla();
   // ★分布 横バー（5→1）
   const max = Math.max(1, ...Object.values(dist));
   document.getElementById('rsDist').innerHTML = [5, 4, 3, 2, 1].map(s => {
@@ -10999,13 +11182,45 @@ async function runGeoRank() {
     const q = `keyword=${encodeURIComponent(keyword)}&store=${encodeURIComponent(store)}&storeId=${encodeURIComponent(storeId)}&areas=${encodeURIComponent(areas.join('|'))}`;
     const d = await fetch(`/api/admin?action=geo-rank&${q}`).then(r => r.json());
     if (d.error) box.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px">${escapeHtml(d.error)}</div>`;
-    else { box.innerHTML = renderGeoResults(d.results || []); loadGeoUsage(); }
+    else {
+      // 距離要因タグは「対象店舗＝いま読み込んでいるロケーション」のときだけ実店舗座標を基準にする（別店舗分析での取り違えを防ぐ）
+      const g = (storeId === currentLocationId && currentLocation && currentLocation.latlng) ? currentLocation.latlng : null;
+      const originLL = (g && Number.isFinite(+g.latitude) && Number.isFinite(+g.longitude)) ? { lat: +g.latitude, lng: +g.longitude } : null;
+      box.innerHTML = renderGeoResults(d.results || [], originLL); loadGeoUsage();
+    }
   } catch (e) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">取得に失敗しました: ${escapeHtml(e.message)}</div>`; }
   if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
 }
-function renderGeoResults(results) {
+// ── E4: ジオグリッドの「負けている場所と理由」判定（MEO順位分析レポートE4）──
+// 2点間のkm距離（haversine）
+function _haversineKm(a, b) {
+  if (!a || !b) return null;
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+// 各地点を 勝ち / 距離負け / プロフィール負け / 要改善 に分類（相対中央値で近遠を分ける）
+// storeLatLng＝計測対象店舗の実座標。渡された時のみ距離要因(距離負け/プロフィール負け)を判定する。
+// 対象店舗の座標が不明（別店舗を分析中・latlng無し）なら距離判定はせず「要改善」に寄せる（誤診断を防ぐ）。
+function classifyGeoFactors(results, storeLatLng) {
+  const origin = (storeLatLng && Number.isFinite(+storeLatLng.lat) && Number.isFinite(+storeLatLng.lng)) ? { lat: +storeLatLng.lat, lng: +storeLatLng.lng } : null;
+  const dists = results.map(r => (origin && r.point && Number.isFinite(+r.point.lat) && Number.isFinite(+r.point.lng)) ? _haversineKm(origin, { lat: +r.point.lat, lng: +r.point.lng }) : null);
+  const valid = dists.filter(d => d != null && Number.isFinite(d)).sort((a, b) => a - b);
+  const med = valid.length >= 2 ? valid[Math.floor(valid.length / 2)] : null;
+  return results.map((r, i) => {
+    const rk = r.rank;
+    if (rk != null && rk <= 3) return { kind: 'win', label: '勝ち', color: 'var(--accent-2)', bg: 'rgba(16,185,129,.14)' };
+    const d = dists[i];
+    if (d == null || med == null) return { kind: 'unknown', label: '要改善', color: 'var(--text-sub)', bg: 'var(--bg-3)' };
+    if (d > med) return { kind: 'distance', label: '距離負け', color: '#6366f1', bg: 'rgba(99,102,241,.14)', km: d };
+    return { kind: 'profile', label: 'プロフィール負け', color: '#d97706', bg: 'rgba(217,119,6,.14)', km: d };
+  });
+}
+function renderGeoResults(results, storeLatLng) {
   if (!results.length) return '<div style="font-size:12px;color:var(--text-sub)">結果がありません</div>';
-  const cell = r => {
+  const _factors = classifyGeoFactors(results, storeLatLng);
+  const cell = (r, ft) => {
     const rk = r.rank;
     const col = rk == null ? 'var(--text-muted)' : rk <= 3 ? 'var(--accent-2)' : rk <= 10 ? '#d97706' : 'var(--red)';
     const bg = rk == null ? 'var(--bg-3)' : rk <= 3 ? 'rgba(16,185,129,.12)' : rk <= 10 ? 'rgba(217,119,6,.12)' : 'rgba(239,68,68,.10)';
@@ -11014,10 +11229,12 @@ function renderGeoResults(results) {
     const pin = r.byCoord
       ? '<span title="この地点の正確な座標から計測" style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;color:var(--accent-2)"><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="2.5"/></svg>実座標</span>'
       : '<span title="正確な座標が取れずエリア中心から計測" style="font-size:9.5px;color:var(--text-muted)">エリア中心</span>';
+    const ftTag = ft ? `<div style="margin-top:5px"><span style="display:inline-block;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:10px;color:${ft.color};background:${ft.bg}">${ft.label}</span></div>` : '';
     return `<div style="background:${bg};border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
       <div style="font-size:20px;font-weight:800;color:${col};font-variant-numeric:tabular-nums">${label}</div>
       <div style="font-size:11px;color:var(--text-sub);margin-top:3px;word-break:break-all">${escapeHtml((r.area || '').replace(/,\s*Japan$/i, ''))}</div>
       <div style="margin-top:2px">${pin}</div>
+      ${ftTag}
     </div>`;
   };
   const ranked = results.filter(r => r.rank != null).map(r => r.rank);
@@ -11025,8 +11242,16 @@ function renderGeoResults(results) {
   const note = ranked.length
     ? `最高${best}位${worst !== best ? `・最低${worst}位` : ''}。近いエリアで上位・離れると下がるのが自然です。上位を広げたいエリアは、その地域名を対策キーワードや投稿に入れて関連性を高めましょう。`
     : 'どのエリアでも圏外でした。まずGBPの基本最適化と口コミ獲得を進めましょう。';
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px">${results.map(cell).join('')}</div>
-    <p style="font-size:11.5px;color:var(--text-sub);margin-top:10px;line-height:1.6">${note}</p>`;
+  // 要因タグの凡例（勝ち/プロフィール負け/距離負け）。負けの内訳が1件以上あるときだけ出す
+  const hasLoss = _factors.some(f => f.kind === 'distance' || f.kind === 'profile');
+  const dot = c => `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};vertical-align:0;margin-right:4px"></i>`;
+  const legend = hasLoss ? `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:10.5px;color:var(--text-sub);line-height:1.7">
+      <span>${dot('var(--accent-2)')}勝ち（1〜3位）</span>
+      <span>${dot('#d97706')}プロフィール負け＝近いのに下位（カテゴリ・口コミ・投稿で関連性を強化）</span>
+      <span>${dot('#6366f1')}距離負け＝遠くて下位（その地域名を対策KW/投稿に入れる・エリアページ/拠点で対応）</span>
+    </div>` : '';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px">${results.map((r, i) => cell(r, _factors[i])).join('')}</div>
+    <p style="font-size:11.5px;color:var(--text-sub);margin-top:10px;line-height:1.6">${note}</p>${legend}`;
 }
 
 // 1キーワードの順位をSerpApiで自動取得
