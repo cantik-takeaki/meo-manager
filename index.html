@@ -10277,6 +10277,9 @@ async function scheduleNewPost() {
 // Google／Instagramへの投稿を行う共通処理（新規投稿・予約投稿の両方で使用）
 async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {}) {
   const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
+  // Instagram連携は currentLocationId をキーに保存/判定している。IG投稿も同じキーを使う
+  // （GBP連携店は currentLocation.storeId が空になり、投稿だけ「未連携」になる不具合の修正）
+  const igSid = currentLocationId ? '&storeId=' + encodeURIComponent(currentLocationId) : sid;
   const okMsg = [];
   if (toGoogle) {
     try {
@@ -10302,13 +10305,13 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
     try {
       const video = (images || []).find(m => m.isVideo);
       if (video) {
-        const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+        const res = await fetch(`/api/posts?action=instagram&sub=publish${igSid}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoUrl: video.url, caption: igCaption }),
         });
         const data = await res.json();
         if (data.creationId) {
           showToast('動画を処理中…公開まで少しお待ちください', 'success');
-          const ok = await pollAndFinalizeIg(data.creationId, sid);
+          const ok = await pollAndFinalizeIg(data.creationId, igSid);
           okMsg.push(ok ? 'Instagram：動画(リール)を投稿しました' : 'Instagram：動画は処理中（完了後に公開）');
         } else if (data.success) okMsg.push('Instagram：動画を投稿しました');
         else okMsg.push('Instagram：失敗（' + (data.error || '') + '）');
@@ -10318,7 +10321,7 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
         let body;
         if ((images || []).length >= 2) body = { imageUrls: images.map(pick), caption: igCaption };
         else { const m = images[0]; body = { imageUrl: pick(m), caption: igCaption }; }
-        const res = await fetch(`/api/posts?action=instagram&sub=publish${sid}`, {
+        const res = await fetch(`/api/posts?action=instagram&sub=publish${igSid}`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         const data = await res.json();
