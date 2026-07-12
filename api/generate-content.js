@@ -1323,6 +1323,35 @@ A: 簡潔で具体的な回答（2〜4文）
     return res.json({ ideas });
   }
 
+  // ── GBP「商品・サービス」の一括下書き（企業ナレッジから）──
+  if (type === 'product_batch') {
+    const kwLine = _targetedKws.length ? _targetedKws.join('、') : (seoKws.join('、') || '');
+    const pbPrompt = `あなたは${storeName}のGoogleビジネスプロフィール(GBP)運用担当です。GBPの「商品・サービス」に登録する項目を、企業ナレッジから一括で下書きしてください。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【提供サービス/メニュー】${services || '（未登録）'}
+【強み】${strengths}
+【地域】${[knowledge.address, knowledge.serviceArea].filter(Boolean).join(' ')}
+【対策キーワード】${kwLine || '（なし）'}
+
+【条件】
+- 実際に提供している内容だけを項目化する（捏造・誇大・効果断定はしない）。8〜15項目。
+- 各項目：名称は簡潔に。説明は60〜120字で、検索される語と魅力・特徴を自然に（地域名も可）。価格は分かる範囲で（不明なら空）。
+- 景表法・薬機法に反する表現（No.1・必ず・完治 等）は使わない。
+
+【出力（各行この形だけ・前置き/番号/説明文は書かない）】
+- 名称: <商品/サービス名> | 価格: <例：3,000円／不明なら空> | 説明: <60〜120字>`;
+    const raw = await llmComplete(pbPrompt, { maxTokens: 2000, temperature: 0.5 });
+    const items = [];
+    String(raw || '').split('\n').forEach(line => {
+      const m = line.match(/名称[:：]\s*(.+?)\s*[|｜]\s*価格[:：]\s*(.*?)\s*[|｜]\s*説明[:：]\s*(.+)$/);
+      if (m) items.push({ name: m[1].trim(), price: m[2].trim(), desc: m[3].trim() });
+    });
+    if (!items.length) return res.status(500).json({ error: '商品・サービスを作成できませんでした。企業ナレッジの「提供サービス」欄を充実させてください' });
+    return res.json({ items });
+  }
+
   // 写真の説明文（GBP写真・SNS用の短いキャプション）
   if (type === 'photo_caption') {
     const note = req.body.photoNote || sourceText || '';

@@ -1126,6 +1126,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
           <div style="font-size:11px;color:var(--text-sub);margin-top:4px">カテゴリは関連性の最重要レバー。対策キーワードと業種から主・副カテゴリの候補を提案します。</div>
           <div id="gbpCatResult" style="margin-top:8px"></div>
         </div>
+        <!-- 商品・サービスの一括下書き（AI）-->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>商品・サービスの一括下書き（AI）</div>
+            <button class="btn btn-outline btn-sm" onclick="genProductBatch(event)" data-min-role="editor">AIで一括作成</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:4px">企業ナレッジから商品・サービスの下書きを一括生成。GBP管理画面の「商品」に貼り付けて登録できます（GBPは自動登録APIが無いため、貼り付けは手動です）。</div>
+          <div id="gbpProductResult" style="margin-top:8px"></div>
+        </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-sub)">
           <b>※ 手動で確認・充実させたい項目（MEOに効きます）</b>
           <div style="margin-top:4px;line-height:1.9"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>写真（外観/内観/メニューを月数枚）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>商品・サービス登録（価格つき）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Q&Aの自作／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><path d="M7 7h.01"/></svg>属性（バリアフリー等）／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>説明文／<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9h4"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>投稿（週1）</div>
@@ -6384,6 +6393,29 @@ function photoFreshHtml(days, count) {
 }
 
 // ── GBPカテゴリのAI提案（対策KW×業種から主/副カテゴリ候補）──
+// GBP「商品・サービス」の一括下書き（企業ナレッジから・貼付は手動）
+async function genProductBatch(ev) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  if (!canEdit()) return;
+  const btn = ev?.currentTarget; const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '作成中…'; }
+  const box = document.getElementById('gbpProductResult');
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:6px">商品・サービスの下書きを作成中…</div>';
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'product_batch' }) }).then(r => r.json());
+    const items = d.items || [];
+    if (!items.length) { box.innerHTML = `<div style="font-size:12px;color:var(--red)">${escapeHtml(d.error || '作成できませんでした')}</div>`; }
+    else {
+      const rows = items.map(it => `<div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;background:var(--bg-2)">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:13px">${escapeHtml(it.name)}</b>${it.price ? `<span style="font-size:12px;color:var(--accent);white-space:nowrap">${escapeHtml(it.price)}</span>` : ''}</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:3px;line-height:1.6">${escapeHtml(it.desc)}</div>
+      </div>`).join('');
+      window._gbpProductsText = items.map(it => `${it.name}${it.price ? `（${it.price}）` : ''}\n${it.desc}`).join('\n\n');
+      box.innerHTML = `<div style="font-size:11px;color:var(--accent-2);margin-bottom:6px">${items.length}件の下書きを作成しました。GBP管理画面→「商品」に貼り付けて登録してください。</div>${rows}
+        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(window._gbpProductsText||'');showToast('全項目をコピーしました','success')">全部コピー</button>`;
+    }
+  } catch (e) { box.innerHTML = '<div style="font-size:12px;color:var(--red)">作成に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
 async function suggestGbpCategories(ev) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
   const box = document.getElementById('gbpCatResult');
