@@ -1117,6 +1117,8 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <div class="card" id="gbpCheckCard" style="display:none">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>GBP最適化チェック</div><span id="gbpCheckScore" style="font-size:13px;color:var(--accent-2);font-weight:600"></span></div>
         <div id="gbpCheckList"></div>
+        <!-- 営業時間・特別営業時間の監視（MEO順位分析レポートE5・「検索時に営業中」が個別要因第5位） -->
+        <div id="bizHoursCheck" style="margin-top:12px"></div>
         <!-- 写真の鮮度（GBP活性シグナル） -->
         <div id="gbpPhotoFresh" style="margin-top:12px"></div>
         <!-- カテゴリ最適化（AI提案） -->
@@ -6503,8 +6505,77 @@ function gbpCheck() {
       </div>` : '');
   // 写真の鮮度を非同期で読み込む（カテゴリ提案はボタン起動）
   loadPhotoFreshness();
+  renderBizHoursCheck();
   const cr = document.getElementById('gbpCatResult'); if (cr) cr.innerHTML = '';
   const br = document.getElementById('banRiskResult'); if (br) br.innerHTML = '';
+}
+
+// ── 営業時間・特別営業時間の監視（MEO順位分析レポートE5）──
+// 「検索時点で営業中」が個別ランキング要因第5位。祝日/特別営業時間の未設定・古い時間を検知。
+const JP_HOLIDAYS = {
+  '2026-07-20': '海の日', '2026-08-11': '山の日', '2026-09-21': '敬老の日', '2026-09-22': '国民の休日',
+  '2026-09-23': '秋分の日', '2026-10-12': 'スポーツの日', '2026-11-03': '文化の日', '2026-11-23': '勤労感謝の日',
+  '2026-12-31': '大晦日(店休が多い)', '2027-01-01': '元日', '2027-01-11': '成人の日', '2027-02-11': '建国記念の日',
+  '2027-02-23': '天皇誕生日', '2027-03-21': '春分の日', '2027-04-29': '昭和の日', '2027-05-03': '憲法記念日',
+  '2027-05-04': 'みどりの日', '2027-05-05': 'こどもの日'
+};
+function _hhmmOf(t) { return typeof t === 'string' ? (t.length === 4 ? t.slice(0, 2) + ':' + t.slice(2) : t) : (t && t.hours != null ? String(t.hours).padStart(2, '0') + ':' + String(t.minutes || 0).padStart(2, '0') : null); }
+function _minOf(hhmm) { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ''); return m ? (+m[1] * 60 + +m[2]) : null; }
+function renderBizHoursCheck() {
+  const box = document.getElementById('bizHoursCheck'); if (!box) return;
+  const loc = currentLocation || {};
+  const periods = (loc.regularHours && loc.regularHours.periods) || [];
+  if (!periods.length) { box.innerHTML = ''; return; } // 営業時間未設定は上のチェック項目で既に警告済み
+  // JST基準の現在
+  const jst = new Date(Date.now() + 9 * 3600 * 1000);
+  const DOW = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const today = DOW[jst.getUTCDay()];
+  const nowMin = jst.getUTCHours() * 60 + jst.getUTCMinutes();
+  const todayStr = jst.toISOString().slice(0, 10);
+  // 1) いま営業中か（本日の周期から判定。日跨ぎ close<open も考慮）
+  let openNow = false;
+  periods.filter(p => p.openDay === today).forEach(p => {
+    const o = _minOf(_hhmmOf(p.openTime)), c = _minOf(_hhmmOf(p.closeTime));
+    if (o == null || c == null) return;
+    if (c > o) { if (nowMin >= o && nowMin < c) openNow = true; }
+    else { if (nowMin >= o || nowMin < c) openNow = true; } // 翌日跨ぎ
+  });
+  // 特別営業時間（祝日等）の設定状況
+  const sph = (loc.specialHours && loc.specialHours.specialHourPeriods) || [];
+  const sphDates = new Set(sph.map(s => s.startDate ? `${s.startDate.year}-${String(s.startDate.month).padStart(2, '0')}-${String(s.startDate.day).padStart(2, '0')}` : '').filter(Boolean));
+  // 2) 直近45日以内の祝日で特別営業時間が未設定のもの
+  const upcoming = Object.entries(JP_HOLIDAYS).filter(([d]) => {
+    const diff = (new Date(d + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000;
+    return diff >= 0 && diff <= 45;
+  });
+  const missingHol = upcoming.filter(([d]) => !sphDates.has(d));
+  // 3) 特別営業時間の鮮度（設定済みが全て過去日）
+  const futureSph = [...sphDates].filter(d => d >= todayStr);
+  const staleSph = sphDates.size > 0 && futureSph.length === 0;
+  // 描画
+  const statusChip = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:14px;background:${openNow ? 'rgba(16,185,129,.12)' : 'rgba(148,163,184,.15)'};color:${openNow ? 'var(--accent-2)' : 'var(--text-sub)'}"><span style="width:7px;height:7px;border-radius:50%;background:${openNow ? 'var(--accent-2)' : 'var(--text-muted)'}"></span>${openNow ? '現在 営業中' : '現在 営業時間外'}</span>`;
+  let alerts = '';
+  if (missingHol.length) {
+    alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:#d97706">直近の祝日に特別営業時間が未設定（${missingHol.length}件）</div>
+      <div style="font-size:11.5px;color:var(--text-sub);margin-top:3px;line-height:1.7">${missingHol.map(([d, n]) => `${d.slice(5).replace('-', '/')} ${n}`).join(' ／ ')}</div>
+      <div style="font-size:11.5px;color:var(--accent);margin-top:5px">→ GBP →「特別営業時間」で各祝日の営業/休業を設定。「検索時に営業中」はMEO順位の個別要因（第5位）。誤って営業時間外と表示されると来店機会を逃します。</div>
+    </div>`;
+  }
+  if (staleSph) {
+    alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:#d97706">特別営業時間が古い可能性</div>
+      <div style="font-size:11.5px;color:var(--text-sub);margin-top:3px">設定済みの特別営業時間がすべて過去日です。今後の祝日ぶんを設定し直しましょう。</div>
+    </div>`;
+  }
+  if (!alerts) alerts = `<div style="font-size:11.5px;color:var(--accent-2);margin-top:6px">${ICO_OK}直近45日の祝日は特別営業時間が設定済み、または該当なしです。</div>`;
+  box.innerHTML = `<div style="border-top:1px solid var(--border);padding-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>営業時間の鮮度・特別営業時間</div>
+      ${statusChip}
+    </div>
+    ${alerts}
+  </div>`;
 }
 
 // ── BANリスク・チェック（停止回避／MEO順位分析レポートA1）──
