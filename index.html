@@ -1270,10 +1270,10 @@ body.role-viewer [data-edit-action] { display:none !important; }
 
       <div class="card" id="competitorCard">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M3 3v18h18"/><rect x="6" y="10" width="4" height="7"/><rect x="14" y="6" width="4" height="11"/></svg>競合分析</div></div>
-        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。</p>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">キーワードと検索地点を入れると、そのエリアの上位店舗（競合）の評価・口コミ数と自店の順位を比較します（SerpApi：月100回まで無料）。<br><b>検索地点は駅名・地名でOK</b>（例：新宿駅）。ここで指定した地点は<b>対策キーワード順位の「計測地点」と共通</b>になります（＝同じ地点で計測して情報を統一）。</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <input id="compKeyword" type="text" placeholder="キーワード（例：相模原 美容室）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
-          <input id="compLocation" type="text" placeholder="検索地点（任意・空欄でOK／英語例：Sagamihara,Kanagawa,Japan）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+          <input id="compLocation" type="text" placeholder="検索地点（駅名・地名OK 例：新宿駅／空欄なら順位計測と同じ地点）" style="flex:1;min-width:180px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           <button class="btn btn-outline btn-sm" onclick="suggestCompKeywords(event)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで候補</button>
           <button class="btn btn-primary btn-sm" onclick="runCompetitorAnalysis()">分析する</button>
         </div>
@@ -6602,14 +6602,27 @@ async function suggestCompKeywords(ev) {
 async function runCompetitorAnalysis() {
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
   const kw = document.getElementById('compKeyword').value.trim();
-  const loc = document.getElementById('compLocation').value.trim();
+  const locInput = document.getElementById('compLocation').value.trim();
   if (!kw) return showToast('キーワードを入力してください', 'error');
   const box = document.getElementById('compResult');
   box.innerHTML = '<div class="loading"><div class="spinner"></div>競合を分析中…</div>';
   try {
+    // 検索地点：入力があれば駅名/地名を座標化し、対策キーワード順位と共通の「計測地点」として保存（＝情報の統合）
+    let _rll = '';
+    if (locInput) {
+      const g = await fetch(`/api/admin?action=geocode&q=${encodeURIComponent(locInput)}`).then(r => r.json());
+      if (g && g.lat && g.lng) {
+        _rll = `${g.lat},${g.lng},14z`;
+        try {
+          await fetch(`/api/admin?action=rank-point&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: g.lat, lng: g.lng, label: g.label || locInput }) });
+          window._rankPoint = { lat: g.lat, lng: g.lng, label: g.label || locInput };
+          if (typeof renderRankPoint === 'function') renderRankPoint();
+        } catch (e) {}
+      } else { box.innerHTML = `<div style="font-size:12px;color:var(--red)">検索地点「${escapeHtml(locInput)}」が見つかりませんでした。駅名・市区名でお試しください（例：新宿駅／相模原市中央区）</div>`; return; }
+    } else {
+      _rll = _rankLlParam(); // 入力なし＝順位計測と共通の計測地点（無ければ店舗座標）
+    }
     const p = new URLSearchParams({ action: 'fetch-rank', keyword: kw, store: currentLocation.title || '', storeId: currentLocationId || '' });
-    if (loc) p.set('location', loc);
-    const _rll = _rankLlParam(); // 指定地点→無ければ店舗座標
     if (_rll) p.set('ll', _rll);
     const d = await fetch('/api/admin?' + p.toString()).then(r => r.json());
     if (d.error) { box.innerHTML = `<div style="font-size:12px;color:var(--text-sub)">${d.error}</div>`; return; }
