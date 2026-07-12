@@ -1293,6 +1293,36 @@ A: 簡潔で具体的な回答（2〜4文）
     return res.json({ seo });
   }
 
+  // ── 季節・地域イベント連動の投稿ネタ提案（ネタ切れ防止）──
+  if (type === 'event_ideas') {
+    const month = String(req.body.month || '').trim();
+    const kwLine = _targetedKws.length ? _targetedKws.join('、') : (seoKws.join('、') || '');
+    const evPrompt = `あなたは${storeName}のSNS/MEO運用担当です。${month || '今月〜来月'}に投稿する、季節・行事・地域イベントに連動した投稿ネタを提案してください。ネタ切れを防ぐのが目的です。
+
+【店舗名】${storeName}
+【業種】${knowledge.category || ''}
+【地域】${[knowledge.address, knowledge.serviceArea, knowledge.nearbyLandmarks].filter(Boolean).join(' ')}
+【強み/サービス】${[strengths, services].filter(Boolean).join(' / ').slice(0, 300)}
+【ターゲット】${knowledge.targetCustomer || ''}
+【対策キーワード】${kwLine || '（なし）'}
+
+【条件】
+- 季節の変わり目・行事（母の日/父の日/お盆/ハロウィン/年末年始/バレンタイン等）・${knowledge.category || 'この業種'}の需要期・地域の祭りや行事に絡める。
+- この店で実際に投稿できる現実的なネタにする（捏造・誇大・効果断定はしない）。
+- 8〜10個。時期がばらけるように。地域名や業種を自然に含める。
+
+【出力（各行この形だけ・前置き/説明/番号は書かない）】
+- 時期: <例：5月中旬> | きっかけ: <例：母の日> | テーマ: <投稿の具体的な切り口> | ねらい: <なぜ効くか一言>`;
+    const raw = await llmComplete(evPrompt, { maxTokens: 1300, temperature: 0.7 });
+    const ideas = [];
+    String(raw || '').split('\n').forEach(line => {
+      const m = line.match(/時期[:：]\s*(.+?)\s*[|｜]\s*きっかけ[:：]\s*(.+?)\s*[|｜]\s*テーマ[:：]\s*(.+?)\s*[|｜]\s*ねらい[:：]\s*(.+)$/);
+      if (m) ideas.push({ timing: m[1].trim(), trigger: m[2].trim(), theme: m[3].trim(), reason: m[4].trim() });
+    });
+    if (!ideas.length) return res.status(500).json({ error: '投稿ネタを作成できませんでした。企業ナレッジ（地域・業種）を充実させて、もう一度お試しください' });
+    return res.json({ ideas });
+  }
+
   // 写真の説明文（GBP写真・SNS用の短いキャプション）
   if (type === 'photo_caption') {
     const note = req.body.photoNote || sourceText || '';

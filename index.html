@@ -2902,6 +2902,21 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div id="kbCheckResult"></div>
       </div>
 
+      <!-- 季節・地域イベント投稿カレンダー（ネタ提案） -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 15l1 2 3-3"/></svg>季節・イベント投稿カレンダー（ネタ提案）</div></div>
+        <p style="font-size:12px;color:var(--text-sub);margin-bottom:10px">ネタ切れ防止。<b>地域・業種・季節や行事</b>に連動した投稿ネタをAIが提案します。気に入った案は「この案で投稿を作成」で新規投稿にセットできます。</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <select id="eventCalMonth" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
+            <option value="今月〜来月">今月〜来月</option>
+            <option value="来月">来月</option>
+            <option value="1月">1月</option><option value="2月">2月</option><option value="3月">3月</option><option value="4月">4月</option><option value="5月">5月</option><option value="6月">6月</option><option value="7月">7月</option><option value="8月">8月</option><option value="9月">9月</option><option value="10月">10月</option><option value="11月">11月</option><option value="12月">12月</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="genEventIdeas(this)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>投稿ネタを提案</button>
+        </div>
+        <div id="eventCalResult"></div>
+      </div>
+
       <!-- 月間投稿プラン -->
       <div class="card">
         <div class="card-header">
@@ -11399,6 +11414,35 @@ async function generatePost() {
   } catch { ta.value = '生成に失敗しました'; }
 }
 
+// ─── 季節・イベント投稿カレンダー（ネタ提案） ───
+async function genEventIdeas(btn) {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const month = document.getElementById('eventCalMonth').value;
+  const box = document.getElementById('eventCalResult');
+  const bh = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '提案中…'; }
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-sub);padding:8px">季節・地域イベントに合わせた投稿ネタを考えています…</div>';
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'event_ideas', month }) }).then(r => r.json());
+    const ideas = d.ideas || [];
+    if (!ideas.length) { box.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px">${escapeHtml(d.error || 'ネタを作成できませんでした')}</div>`; }
+    else {
+      box.innerHTML = ideas.map(i => `<div style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--bg-2)">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:11px;font-weight:700;background:rgba(79,125,243,.12);color:var(--accent);padding:2px 9px;border-radius:99px">${escapeHtml(i.timing)}</span><span style="font-size:11px;color:var(--text-sub)">${escapeHtml(i.trigger)}</span></div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">${escapeHtml(i.theme)}</div>
+        <div style="font-size:11.5px;color:var(--text-sub)">${escapeHtml(i.reason)}</div>
+        <div style="margin-top:6px"><button class="btn btn-outline btn-sm" data-t="${escapeHtml(String(i.theme).replace(/"/g, '”'))}" onclick="useEventIdea(this.getAttribute('data-t'))">この案で投稿を作成</button></div>
+      </div>`).join('');
+    }
+  } catch (e) { box.innerHTML = '<div style="font-size:12px;color:var(--red);padding:8px">提案に失敗しました</div>'; }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+// 選んだネタを新規投稿のテーマにセット→そこで「AIで文章生成」できる
+function useEventIdea(theme) {
+  const inp = document.getElementById('scInput'); if (inp) inp.value = theme;
+  const st = document.getElementById('scType'); if (st) { st.value = 'post'; if (typeof scOnType === 'function') scOnType(); }
+  (document.getElementById('postGenArea') || inp)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast('テーマを新規投稿にセットしました。「AIで文章生成」で本文を作れます', 'success');
+}
 // ─── 月間投稿プラン（下書き一括生成） ───
 async function generateMonthlyPlan() {
   if (!currentLocation) return showToast('店舗を選択してください', 'error');
