@@ -693,12 +693,16 @@ export default async function handler(req, res) {
 
   // 投稿作成
   if (req.method === 'POST') {
-    const { summary, callToActionType, callToActionUrl, topicType } = req.body;
+    const { summary, callToActionType, callToActionUrl, topicType, mediaUrl } = req.body;
     const body = {
       topicType: topicType || 'STANDARD',
       summary,
       ...(callToActionType && {
         callToAction: { actionType: callToActionType, url: callToActionUrl },
+      }),
+      // 画像を添付（GBP投稿は写真1枚。sourceUrlは公開URL＝Cloudinary）
+      ...(mediaUrl && /^https?:\/\//i.test(mediaUrl) && {
+        media: [{ mediaFormat: 'PHOTO', sourceUrl: mediaUrl }],
       }),
     };
     try {

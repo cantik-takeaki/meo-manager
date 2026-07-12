@@ -10273,13 +10273,17 @@ async function publishToTargets(summary, images, toGoogle, toInstagram, opts = {
   const okMsg = [];
   if (toGoogle) {
     try {
+      // Google投稿にも写真を添付（動画は非対応なので最初の画像を1枚）。Cloudinaryの公開URLを渡す
+      const gImg = (images || []).find(m => m && !m.isVideo);
+      const gMediaUrl = gImg ? (gImg.squareUrl || gImg.url || gImg.portraitUrl || '') : '';
       const res = await fetch(`/api/posts?locationName=${encodeURIComponent(currentLocation.name)}${sid}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary, topicType: opts.topicType || 'STANDARD', callToActionType: opts.cta || '', callToActionUrl: opts.ctaUrl || '' }),
+        body: JSON.stringify({ summary, topicType: opts.topicType || 'STANDARD', callToActionType: opts.cta || '', callToActionUrl: opts.ctaUrl || '', ...(gMediaUrl && { mediaUrl: gMediaUrl }) }),
       });
       const data = await res.json();
-      if (data.pending || data.error) okMsg.push('Google：審査完了後に投稿可（デモ）');
-      else { okMsg.push('Google：投稿しました'); logAction('Googleビジネスプロフィールに投稿'); }
+      if (data.error) okMsg.push('Google：投稿に失敗しました（' + data.error + '）');
+      else if (data.pending) okMsg.push('Google：審査完了後に投稿可（デモ）');
+      else { okMsg.push('Google：投稿しました' + (gMediaUrl ? '（画像つき）' : '')); logAction('Googleビジネスプロフィールに投稿'); }
     } catch { okMsg.push('Google：エラー'); }
   }
   if (toInstagram && window._igConnected !== true) {
