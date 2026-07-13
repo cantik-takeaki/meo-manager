@@ -6987,6 +6987,10 @@ async function loadDiagnosis() {
   }).join('');
 
   const adv = document.getElementById('meoAdvice');
+  // AI助言はスコアが変わらない限りキャッシュ再利用（店舗切替のたびのAPI消費・待ち時間を削減）
+  window._diagAdviceCache = window._diagAdviceCache || {};
+  const _advKey = `${currentLocationId}:${score}`;
+  if (window._diagAdviceCache[_advKey]) { adv.textContent = window._diagAdviceCache[_advKey]; return; }
   adv.textContent = '診断中...';
   try {
     const res = await fetch('/api/generate-content', {
@@ -7003,6 +7007,7 @@ async function loadDiagnosis() {
     });
     const d = await res.json();
     adv.textContent = d.content || d.error || '—';
+    if (d.content) window._diagAdviceCache[_advKey] = d.content; // 成功時のみキャッシュ
   } catch (e) { adv.textContent = '—'; }
 }
 
@@ -8909,7 +8914,7 @@ function renderStoreTable() {
       <td style="text-align:left;font-size:12px">${escapeHtml(company)}</td>
       <td style="text-align:left;font-size:12px;color:var(--text-sub)" title="${escapeHtml(addr)}">${escapeHtml(addrShort)}</td>
       <td>${kw}件</td>
-      <td><span class="st-badge done">有効</span></td>
+      <td>${(l._type === 'gbp' || l.gbpConnected) ? '<span class="st-badge done">GBP連携</span>' : '<span class="st-badge pending">手動登録</span>'}</td>
       <td onclick="event.stopPropagation()"><div style="display:flex;gap:6px;justify-content:center">
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'qr')">QR管理</button>
         <button class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:11px" onclick="storeReviewAction(${i},'log')">回答履歴</button>
@@ -9846,6 +9851,30 @@ function exportMonthlyPdf() {
     return `<tr><td>${esc(kw)}</td><td style="text-align:center;color:#889">${bv != null ? bv + '位' : '—'}</td><td style="text-align:center;color:#889">${(Number.isFinite(pv) && pv >= 1) ? pv + '位' : '—'}</td><td style="text-align:center;font-weight:700">${ct}</td><td style="text-align:center">${dl}</td></tr>`;
   }).join('') : '<tr><td colspan="5" style="color:#889">キーワード未登録</td></tr>';
   const hlItems = (mr.highlights || []).map(h => `<li>${h}</li>`).join(''); // <b>のみ・安全
+  // 平均順位の推移チャート（対象月までの計測履歴・最大12点・印刷セーフな固定色SVG）
+  let trendSvg = '';
+  {
+    const pts = (mr.hist || []).filter(h => String(h.date || '').slice(0, 7) <= month)
+      .map(h => ({ date: (h.date || '').slice(5).replace('-', '/'), avg: _rankSummary(mr.kws, h.rankings || []).avgRank }))
+      .filter(p => p.avg != null).slice(-12);
+    if (pts.length >= 2) {
+      const W = 520, H = 120, PL = 38, PR = 12, PT = 12, PB = 24;
+      const maxR = Math.max(10, ...pts.map(p => p.avg));
+      const X = i => PL + (W - PL - PR) * i / (pts.length - 1);
+      const Y = v => PT + (H - PT - PB) * (v - 1) / (maxR - 1 || 1); // 1位が上
+      let g = '';
+      [1, Math.round((maxR + 1) / 2), Math.round(maxR)].forEach(rv2 => { const yy = Y(rv2); g += `<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W - PR}" y2="${yy.toFixed(1)}" stroke="#e3eaf2" stroke-width="1"/><text x="${PL - 5}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#889">${rv2}位</text>`; });
+      let path = '';
+      pts.forEach((p, i) => { path += (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p.avg).toFixed(1) + ' '; });
+      g += `<path d="${path}" fill="none" stroke="#2e8ff0" stroke-width="2.2" stroke-linejoin="round"/>`;
+      pts.forEach((p, i) => {
+        g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.avg).toFixed(1)}" r="3" fill="#2e8ff0"/>`;
+        const step = Math.max(1, Math.ceil(pts.length / 8));
+        if (i % step === 0 || i === pts.length - 1) g += `<text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="8.5" fill="#889">${esc(p.date)}</text>`;
+      });
+      trendSvg = `<h2>平均順位の推移</h2><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;display:block"><rect x="0" y="0" width="${W}" height="${H}" fill="#fafcff"/>${g}</svg><div style="font-size:10px;color:#889;margin-top:2px">※上ほど上位。対象月までの計測${pts.length}回分（有効キーワードの平均順位）。</div>`;
+    }
+  }
   const plan = ((document.getElementById('mrPlan') || {}).value || '').trim();
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const w = window.open('', '_blank', 'width=820,height=1050');
@@ -9873,6 +9902,7 @@ function exportMonthlyPdf() {
     : '<h2>対策前 → 現在の成果</h2><p style="color:#889">「対策前として記録」が未設定です。ツールで記録すると、対策前からの成果が表示されます。</p>'}
   <h2>今月実施した施策</h2><table><tbody>${actRows}</tbody></table>
   <h2>キーワード順位の動き</h2><table><thead><tr><th>キーワード</th><th style="text-align:center">対策前</th><th style="text-align:center">前回</th><th style="text-align:center">今回</th><th style="text-align:center">対策前比</th></tr></thead><tbody>${rankRows}</tbody></table>
+  ${trendSvg}
   ${hlItems ? `<h2>今月の成果ハイライト</h2><ul>${hlItems}</ul>` : ''}
   ${plan ? `<h2>来月の施策計画</h2><div class="note">${esc(plan)}</div>` : ''}
   <div class="foot">本レポートは株式会社cantikのMEO管理ツール「ラクラクMEO」で作成しました。<br>順位は対象月の最終計測値、口コミ数・GBP指標は最新時点の値です。順位はGoogleマップ上の指定地点からの計測値で、検索環境により実際の表示順位と差が出る場合があります。</div>
