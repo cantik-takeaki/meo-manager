@@ -638,6 +638,10 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6"/></svg>
         インサイト
       </button>
+      <button class="nav-item" onclick="showPanel('monthly', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+        月次レポート
+      </button>
 
       <div class="sidebar-section">アカウント</div>
       <button class="nav-item" onclick="showPanel('settings', this)">
@@ -3224,6 +3228,54 @@ body.role-viewer [data-edit-action] { display:none !important; }
       </div>
     </div>
 
+    <!-- 月次レポート（先方提出用） -->
+    <div class="panel" id="panel-monthly">
+      <div class="page-header">
+        <div><div class="page-title">月次レポート</div><div class="page-sub" id="mrStoreName">店舗を選択してください</div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--text-sub)">対象月 <input id="mrMonth" type="month" onchange="loadMonthlyReport()" style="background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px;margin-left:6px;font-family:inherit"></label>
+          <button class="btn btn-primary btn-sm" onclick="exportMonthlyPdf()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>PDFで保存（先方提出用）</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-sub);margin:-4px 0 14px;line-height:1.7">対策前からの成果・今月の施策・順位の動き・来月の計画を、先方にそのまま渡せる1枚のPDFにまとめます。<br><b style="color:var(--accent)">対策開始時に「対策前として記録」</b>を押しておくと、毎月ここに成果が積み上がります。</p>
+
+      <!-- ① 対策前 → 現在 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>対策前 → 現在の成果</div><div id="mrBaselineMeta" style="font-size:12px;color:var(--text-sub)"></div></div>
+        <div id="mrBaselineBody"><p style="font-size:12px;color:var(--text-sub)">店舗を選択すると表示されます。</p></div>
+      </div>
+
+      <!-- ② 今月実施した施策 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>今月実施した施策</div></div>
+        <p style="font-size:11px;color:var(--text-sub);margin:-2px 0 8px">投稿・口コミ返信などは自動で記録されます。追加の施策は下から手入力できます（先方PDFに掲載）。</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input id="mrActionInput" type="text" placeholder="実施した施策を追加（例：口コミ返信10件／写真5枚追加／商品情報を更新）" style="flex:1;min-width:220px;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')mrAddAction()">
+          <button class="btn btn-outline btn-sm" onclick="mrAddAction()" data-min-role="editor">追加</button>
+        </div>
+        <div id="mrActionsBody"></div>
+      </div>
+
+      <!-- ③ キーワード順位の動き -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 2 4-6"/></svg>キーワード順位の動き</div><div id="mrRankMeta" style="font-size:12px;color:var(--text-sub)"></div></div>
+        <div style="overflow-x:auto"><table class="summary-table"><thead><tr><th style="text-align:left;padding-left:16px">キーワード</th><th>対策前</th><th>前回</th><th>今回</th><th>対策前比</th></tr></thead><tbody id="mrRankBody"></tbody></table></div>
+      </div>
+
+      <!-- ④ 成果ハイライト -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>今月の成果ハイライト</div></div>
+        <div id="mrHighlightBody"></div>
+      </div>
+
+      <!-- ⑤ 来月の施策計画 -->
+      <div class="card">
+        <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M9 16l2 2 4-4"/></svg>来月の施策計画</div><button class="btn btn-outline btn-sm" onclick="mrGenPlan(event)" data-min-role="editor"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで提案</button></div>
+        <textarea id="mrPlan" rows="5" placeholder="来月に行う施策を記入します（「AIで提案」で今の状態に合った下書きも作れます）。先方に「次に何をするか」を示す欄です。" style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13px;font-family:inherit;line-height:1.8;resize:vertical;box-sizing:border-box"></textarea>
+        <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="mrSavePlan()" data-min-role="editor">計画を保存</button></div>
+      </div>
+    </div>
+
     <!-- Settings -->
     <div class="panel" id="panel-settings">
       <div class="page-header">
@@ -4335,6 +4387,7 @@ function selectLocation(idx, keepPanel) {
   loadAio();
   loadInsights();
   if (document.getElementById('panel-insights')?.classList.contains('active')) loadInsightsPage({});
+  if (document.getElementById('panel-monthly')?.classList.contains('active')) loadMonthlyReport();
   loadMedia();
   loadKpi();
   _postImages = [];
@@ -9477,6 +9530,287 @@ function printStoreReport() {
   w.document.close();
 }
 
+// ═══════════ 月次レポート（先方提出用）═══════════
+// 対策前(baseline)を記憶し「対策前→現在」の成果・今月の施策・順位の動き・来月計画を先方PDFにまとめる。
+window._mr = null;
+// 順位配列＋キーワードから 平均/TOP3/TOP10/圏外 を集計
+function _rankSummary(kws, arr) {
+  let sum = 0, n = 0, top3 = 0, top10 = 0, out = 0;
+  (kws || []).forEach((kw, i) => {
+    const v = parseInt((arr || [])[i], 10);
+    if (Number.isFinite(v) && v >= 1) { sum += v; n++; if (v <= 3) top3++; if (v <= 10) top10++; } else out++;
+  });
+  return { avgRank: n ? Math.round(sum / n * 10) / 10 : null, top3, top10, out, measured: n };
+}
+// 対策前と現在を「共通KW」に正規化して集約（平均順位/TOP3/TOP10）。KW集合の変化による水増し/過小を防ぐ
+function _mrCommonSummary(mr) {
+  const b = mr.baseline; if (!b || !b.ranksByKw) return null;
+  const common = mr.kws.filter(kw => Object.prototype.hasOwnProperty.call(b.ranksByKw, kw));
+  const baseArr = common.map(kw => b.ranksByKw[kw]);
+  const curArr = common.map(kw => mr.curByKw[kw]);
+  return { common: common.length, total: mr.kws.length, base: _rankSummary(common, baseArr), cur: _rankSummary(common, curArr) };
+}
+async function loadMonthlyReport() {
+  const panel = document.getElementById('panel-monthly'); if (!panel) return;
+  const sid = currentLocationId, nameEl = document.getElementById('mrStoreName');
+  if (!sid || !currentLocation) {
+    if (nameEl) nameEl.textContent = '店舗を選択してください';
+    ['mrBaselineBody', 'mrActionsBody', 'mrRankBody', 'mrHighlightBody'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">左のサイドバーで店舗を選択してください。</p>'; });
+    return;
+  }
+  if (nameEl) nameEl.textContent = `${currentLocation.title || ''}${currentLocation.company ? ' / ' + currentLocation.company : ''}`;
+  const mEl = document.getElementById('mrMonth'); if (mEl && !mEl.value) mEl.value = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+  const month = (mEl && mEl.value) || new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+  const enc = encodeURIComponent(sid);
+  const [rk, rv, ins, alog, bl, plan] = await Promise.all([
+    fetch(`/api/admin?action=rankings&storeId=${enc}`).then(r => r.json()).catch(() => ({ keywords: [], history: [] })),
+    (currentLocation.name ? fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({})),
+    (currentLocation.name ? fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({})),
+    fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(_logSid())}`).then(r => r.json()).catch(() => ({ logs: [] })),
+    fetch(`/api/admin?action=meo-baseline&storeId=${enc}`).then(r => r.json()).catch(() => ({ baseline: null })),
+    fetch(`/api/admin?action=meo-report-plan&storeId=${enc}&month=${encodeURIComponent(month)}`).then(r => r.json()).catch(() => ({ plan: '' })),
+  ]);
+  // 店舗切替レース防御：await中に対象店舗が変わっていたら破棄（別店舗のデータを現店名で出さない）
+  if (currentLocationId !== sid) return;
+  const kws = (rk.keywords || []).filter(Boolean);
+  const hist = rk.history || [];
+  const nowYm = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
+  const isCurrentMonth = month >= nowYm;
+  // 順位は「対象月までの最終記録」を今回・その前を前回とする（過去月レポートで最新値を誤表示しない）
+  const scoped = hist.filter(h => String(h.date || '').slice(0, 7) <= month);
+  const curArr = (scoped[scoped.length - 1] || {}).rankings || [];
+  const prevArr = (scoped[scoped.length - 2] || {}).rankings || [];
+  const cur = _rankSummary(kws, curArr), prev = _rankSummary(kws, prevArr);
+  const curByKw = Object.fromEntries(kws.map((kw, i) => { const v = parseInt(curArr[i], 10); return [kw, (Number.isFinite(v) && v >= 1) ? v : null]; }));
+  const rvStats = rv.stats || {};
+  const reviewCount = rv.totalReviewCount ?? rvStats.totalCount ?? null;
+  const rating = rv.averageRating || rvStats.averageRating || null;
+  const insSummary = (ins && !ins.error && !ins.pending) ? (ins.summary || null) : null;
+  window._mr = { month, sid, kws, hist, curArr, prevArr, cur, prev, curByKw, reviewCount, rating, insSummary, isCurrentMonth, baseline: bl.baseline || null, alog: alog.logs || [], plan: plan.plan || '' };
+  // 対策前との集約比較（平均順位/TOP3/TOP10）は「共通KW」に正規化（KW追加による水増しを防ぐ）
+  window._mr.cmp = _mrCommonSummary(window._mr);
+  // 現在値スナップショット（対策前として記録する用）＝最新記録で固定（月選択に依存させない）
+  const latestArr = hist[hist.length - 1]?.rankings || [], latest = _rankSummary(kws, latestArr);
+  window._mr.curSnapshot = {
+    month: nowYm, avgRank: latest.avgRank, top3: latest.top3, top10: latest.top10, out: latest.out, measured: latest.measured, reviewCount, rating,
+    insights: insSummary ? { impressions: insSummary.impressions || 0, calls: insSummary.calls || 0, directionRequests: insSummary.directionRequests || 0, websiteClicks: insSummary.websiteClicks || 0 } : null,
+    ranksByKw: Object.fromEntries(kws.map((kw, i) => { const v = parseInt(latestArr[i], 10); return [kw, (Number.isFinite(v) && v >= 1) ? v : null]; })),
+  };
+  window._mr.highlights = mrComputeHighlights();
+  mrRenderBaseline(); mrRenderActions(); mrRenderRankMoves(); mrRenderHighlights();
+  const planEl = document.getElementById('mrPlan'); if (planEl) planEl.value = window._mr.plan;
+}
+function mrRenderBaseline() {
+  const box = document.getElementById('mrBaselineBody'), meta = document.getElementById('mrBaselineMeta'); const mr = window._mr; if (!box || !mr) return;
+  const b = mr.baseline;
+  if (!b) {
+    if (meta) meta.textContent = '対策前 未記録';
+    const oldest = mr.hist[0];
+    box.innerHTML = `<div style="padding:12px 14px;background:var(--bg-3);border-radius:10px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:5px">対策前の状態がまだ記録されていません</div>
+      <p style="font-size:12px;color:var(--text-sub);line-height:1.7">MEO対策の<b>開始時点の数値</b>を「対策前」として記録すると、以降ずっと「対策前 → 現在」で成果を先方に示せます。</p>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="mrCaptureBaseline(false)" data-min-role="editor">現在の数値を「対策前」として記録</button>
+        ${oldest ? `<button class="btn btn-outline btn-sm" onclick="mrCaptureBaseline(true)" data-min-role="editor">最古の順位記録（${escapeHtml((oldest.date || '').slice(0, 10))}）を対策前にする</button>` : ''}
+      </div></div>`;
+    return;
+  }
+  if (meta) meta.innerHTML = `対策前：${escapeHtml(b.month || (b.capturedAt || '').slice(0, 10))} 時点　<button class="link-btn" style="font-size:11px" onclick="mrCaptureBaseline(false)" data-min-role="editor">現在に更新</button>`;
+  const fmt = (v, unit) => v == null ? '—' : (unit === '★' ? '★' + (Math.round(v * 10) / 10) : (typeof v === 'number' ? v.toLocaleString() : v) + (unit || ''));
+  const delta = (bef, aft, lowerBetter) => {
+    if (bef == null || aft == null) return '';
+    const d = lowerBetter ? bef - aft : aft - bef; const a = Math.round(Math.abs(d) * 10) / 10;
+    return d > 0 ? `<span style="color:var(--accent-2);font-weight:700">▲${a}</span>` : d < 0 ? `<span style="color:var(--red)">▼${a}</span>` : '<span style="color:var(--text-muted)">±0</span>';
+  };
+  const ins = mr.insSummary, bi = b.insights, cmp = mr.cmp;
+  // 順位系の比較は共通KWで（cmpが無い＝ranksByKw無い旧baselineは全体値にフォールバック）
+  const cb = (cmp && cmp.common) ? cmp.base : b, cc = (cmp && cmp.common) ? cmp.cur : mr.cur;
+  const cell = (label, bef, aft, lowerBetter, unit) => `<div style="border:1px solid var(--border);border-radius:10px;padding:11px 12px;background:var(--bg-2)">
+    <div style="font-size:11.5px;color:var(--text-sub)">${label}</div>
+    <div style="display:flex;align-items:baseline;gap:7px;margin-top:3px;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--text-muted)">${fmt(bef, unit)}</span>
+      <span style="color:var(--text-muted)">→</span>
+      <span style="font-size:20px;font-weight:800;font-variant-numeric:tabular-nums">${fmt(aft, unit)}</span>
+      <span style="font-size:12px">${delta(bef, aft, lowerBetter)}</span>
+    </div></div>`;
+  const cells = [
+    cell('平均順位', cb.avgRank, cc.avgRank, true, '位'),
+    cell('TOP3のKW', cb.top3, cc.top3, false, '個'),
+    cell('TOP10のKW', cb.top10, cc.top10, false, '個'),
+    cell('口コミ件数', b.reviewCount, mr.reviewCount, false, '件'),
+    cell('平均評価', b.rating, mr.rating, false, '★'),
+    (ins || bi) ? cell('GBP表示回数', bi ? bi.impressions : null, ins ? ins.impressions : null, false, '') : '',
+    (ins || bi) ? cell('電話タップ', bi ? bi.calls : null, ins ? ins.calls : null, false, '') : '',
+    (ins || bi) ? cell('ルート検索', bi ? bi.directionRequests : null, ins ? ins.directionRequests : null, false, '') : '',
+  ].filter(Boolean).join('');
+  const cmpNote = (cmp && cmp.common < cmp.total) ? `平均順位・TOP3/TOP10は<b>対策前と共通の${cmp.common}キーワード</b>で比較しています（公平な比較のため）。` : '';
+  const timeNote = mr.isCurrentMonth ? '順位はその月の最終記録値、口コミ数・GBP指標は最新時点の値です。' : `<b style="color:#d97706">${escapeHtml(mr.month)}を選択中：</b>順位はその月の最終記録値です。口コミ数・GBP指標は履歴を持たないため最新時点の値を表示しています。`;
+  box.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px">${cells}</div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px">▲＝改善（順位は数字が小さいほど上位）。${cmpNote}${timeNote}</p>`;
+}
+function mrRenderActions() {
+  const box = document.getElementById('mrActionsBody'); const mr = window._mr; if (!box || !mr) return;
+  const acts = (mr.alog || []).filter(l => String(l.date || '').startsWith(mr.month));
+  box.innerHTML = acts.length ? acts.map(l => `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--text-sub);font-size:12px;white-space:nowrap">${escapeHtml((l.date || '').slice(5))}</span>
+      <span style="flex:1">${escapeHtml(l.text || '')}</span>
+      <button class="link-btn" style="color:var(--red)" onclick="mrDelAction('${l.id}')" data-min-role="editor">×</button>
+    </div>`).join('') : '<p style="font-size:12px;color:var(--text-muted);padding:8px 0">今月の施策記録はまだありません。投稿・口コミ返信をすると自動で記録されます（上の欄から手入力も可）。</p>';
+}
+function mrRenderRankMoves() {
+  const body = document.getElementById('mrRankBody'), meta = document.getElementById('mrRankMeta'); const mr = window._mr; if (!body || !mr) return;
+  const last = mr.curArr || [], prev = mr.prevArr || [], base = (mr.baseline && mr.baseline.ranksByKw) || {};
+  if (meta) meta.textContent = `${mr.kws.length}キーワード / ${mr.hist.length}回の記録`;
+  body.innerHTML = mr.kws.length ? mr.kws.map((kw, i) => {
+    const cur = parseInt(last[i], 10), pv = parseInt(prev[i], 10), bv = base[kw];
+    const curTxt = (Number.isFinite(cur) && cur >= 1) ? `<span style="color:${rankColorV(cur)};font-weight:600">${cur}位</span>` : '<span style="color:var(--text-muted)">圏外</span>';
+    let dl = '—', rowBg = '';
+    if (bv != null && Number.isFinite(cur) && cur >= 1) { const d = bv - cur; dl = d > 0 ? `<span style="color:var(--accent-2);font-weight:700">▲${d}</span>` : d < 0 ? `<span style="color:var(--red)">▼${-d}</span>` : '±0'; if (d > 0) rowBg = 'background:rgba(16,185,129,.06)'; }
+    else if (bv != null) dl = '<span style="color:var(--red)">圏外</span>';
+    return `<tr style="${rowBg}"><td style="text-align:left;padding-left:16px">${escapeHtml(kw)}</td><td style="color:var(--text-sub)">${bv != null ? bv + '位' : '—'}</td><td style="color:var(--text-sub)">${(Number.isFinite(pv) && pv >= 1) ? pv + '位' : '—'}</td><td>${curTxt}</td><td>${dl}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">キーワード未登録。「順位管理」で登録してください</td></tr>';
+}
+// 成果ハイライトを算出（on-page表示とPDFで共用。<b>のみ・CSS変数を使わずPDFでも崩れない）
+function mrComputeHighlights() {
+  const mr = window._mr; if (!mr) return [];
+  const hl = [], b = mr.baseline, last = mr.curArr || [], cmp = mr.cmp;
+  if (b && b.ranksByKw) {
+    const improved = [];
+    mr.kws.forEach((kw, i) => { const cur = parseInt(last[i], 10), bv = b.ranksByKw[kw]; if (bv != null && Number.isFinite(cur) && cur >= 1 && bv - cur > 0) improved.push({ kw, d: bv - cur, cur }); });
+    improved.sort((a, b) => b.d - a.d);
+    improved.slice(0, 3).forEach(x => hl.push(`「${escapeHtml(x.kw)}」が対策前より<b>${x.d}位上昇</b>し、現在${x.cur}位`));
+    // 集約系は共通KWで比較（KW追加による水増しを防ぐ）
+    const cb = (cmp && cmp.common) ? cmp.base : b, cc = (cmp && cmp.common) ? cmp.cur : mr.cur;
+    if (cb.avgRank != null && cc.avgRank != null && cb.avgRank - cc.avgRank > 0) hl.push(`平均順位が<b>${cb.avgRank}位 → ${cc.avgRank}位</b>に改善`);
+    if (cb.top3 != null && cc.top3 > cb.top3) hl.push(`TOP3のキーワードが<b>${cb.top3} → ${cc.top3}個</b>に増加`);
+    if (cb.top10 != null && cc.top10 > cb.top10) hl.push(`TOP10入りが<b>${cb.top10} → ${cc.top10}個</b>に増加`);
+    if (b.reviewCount != null && mr.reviewCount != null && mr.reviewCount > b.reviewCount) hl.push(`口コミが対策前より<b>${mr.reviewCount - b.reviewCount}件増加</b>（現在${mr.reviewCount}件）`);
+    if (b.insights && mr.insSummary && (mr.insSummary.impressions || 0) > (b.insights.impressions || 0)) hl.push(`GBP表示回数が増加（対策前${(b.insights.impressions || 0).toLocaleString()} → 現在${(mr.insSummary.impressions || 0).toLocaleString()}）`);
+  }
+  const actCount = (mr.alog || []).filter(l => String(l.date || '').startsWith(mr.month)).length;
+  if (actCount) hl.push(`今月は<b>${actCount}件の施策</b>を実施`);
+  return hl;
+}
+function mrRenderHighlights() {
+  const box = document.getElementById('mrHighlightBody'); const mr = window._mr; if (!box || !mr) return;
+  const hl = mr.highlights || [];
+  box.innerHTML = hl.length ? `<ul style="margin:0;padding-left:18px;font-size:13px;line-height:2">${hl.map(h => `<li>${h}</li>`).join('')}</ul>`
+    : `<p style="font-size:12px;color:var(--text-sub);line-height:1.7">${mr.baseline ? '今月はまだ大きな変化の記録がありません。順位計測と施策の記録を続けましょう。' : '「対策前として記録」を押すと、ここに対策前からの成果が自動でまとまります。'}</p>`;
+}
+// 対策前(baseline)を記録。fromEarliest=true なら最古の順位記録を対策前にする（口コミ/インサイトは当時不明のためnull）
+async function mrCaptureBaseline(fromEarliest) {
+  const mr = window._mr; if (!mr || !mr.sid) return showToast('店舗を選択してください', 'error');
+  let payload;
+  if (fromEarliest && mr.hist.length) {
+    const h0 = mr.hist[0], s = _rankSummary(mr.kws, h0.rankings || []);
+    payload = { month: (h0.date || '').slice(0, 7), avgRank: s.avgRank, top3: s.top3, top10: s.top10, out: s.out, measured: s.measured, reviewCount: null, rating: null, insights: null, ranksByKw: Object.fromEntries(mr.kws.map((kw, i) => { const v = parseInt((h0.rankings || [])[i], 10); return [kw, (Number.isFinite(v) && v >= 1) ? v : null]; })) };
+  } else payload = mr.curSnapshot;
+  if (!confirm(fromEarliest ? '最古の順位記録を「対策前」として保存します。よろしいですか？' : '現在の数値を「対策前」として保存します。以後この状態と比較して成果を表示します。よろしいですか？')) return;
+  try {
+    const r = await fetch(`/api/admin?action=meo-baseline&storeId=${encodeURIComponent(mr.sid)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json());
+    if (r.success) { showToast('対策前として記録しました', 'success'); loadMonthlyReport(); }
+    else showToast(r.error || '記録に失敗しました', 'error');
+  } catch (e) { showToast('記録に失敗しました', 'error'); }
+}
+async function mrAddAction() {
+  const inp = document.getElementById('mrActionInput'); const t = (inp && inp.value || '').trim();
+  if (!t) return;
+  try { await logAction(t); if (inp) inp.value = ''; showToast('施策を記録しました', 'success'); await loadMonthlyReport(); }
+  catch (e) { showToast('記録に失敗しました', 'error'); }
+}
+async function mrDelAction(id) {
+  if (!confirm('この施策の記録を削除しますか？')) return;
+  try { await fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(_logSid())}&id=${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadMonthlyReport(); }
+  catch (e) { showToast('削除に失敗しました', 'error'); }
+}
+// 来月の施策計画をAI生成（既存 monthly_report の nextActions を流用）→ textareaに投入（保存は別ボタン）
+async function mrGenPlan(ev) {
+  const mr = window._mr; if (!mr || !mr.sid) return showToast('店舗を選択してください', 'error');
+  const btn = ev && ev.currentTarget, bh = btn && btn.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '生成中…'; }
+  const last = mr.curArr || [], prev = mr.prevArr || [];
+  const rankings = mr.kws.map((kw, i) => { const cur = parseInt(last[i], 10), pv = parseInt(prev[i], 10); return { keyword: kw, rank: Number.isFinite(cur) ? cur : null, diff: (Number.isFinite(cur) && Number.isFinite(pv)) ? pv - cur : null }; });
+  try {
+    const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: mr.sid, type: 'monthly_report', report: { month: mr.month, reviewStats: { totalCount: mr.reviewCount, averageRating: mr.rating }, rankings, insights: mr.insSummary || null, kpi: {} } }) }).then(r => r.json());
+    let ai = null; try { const t = d.content || ''; const s = t.indexOf('{'), e = t.lastIndexOf('}'); if (s !== -1 && e !== -1) ai = JSON.parse(t.slice(s, e + 1)); } catch (e) {}
+    const acts = (ai && ai.nextActions) || [], planEl = document.getElementById('mrPlan');
+    if (acts.length && planEl) { planEl.value = acts.map((a, i) => `${i + 1}. ${a}`).join('\n'); showToast('来月の施策案を作成しました。確認・編集して「計画を保存」してください', 'success'); }
+    else showToast('生成に失敗しました。もう一度お試しください', 'error');
+  } catch (e) { showToast('生成に失敗しました', 'error'); }
+  if (btn) { btn.disabled = false; if (bh) btn.innerHTML = bh; }
+}
+async function mrSavePlan() {
+  const mr = window._mr; if (!mr || !mr.sid) return showToast('店舗を選択してください', 'error');
+  const plan = (document.getElementById('mrPlan') || {}).value || '';
+  try { await fetch(`/api/admin?action=meo-report-plan&storeId=${encodeURIComponent(mr.sid)}&month=${encodeURIComponent(mr.month)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) }); window._mr.plan = plan; showToast('来月の計画を保存しました', 'success'); }
+  catch (e) { showToast('保存に失敗しました', 'error'); }
+}
+// 先方提出用PDF（cantikブランド・印刷ウィンドウ）
+function exportMonthlyPdf() {
+  const mr = window._mr; if (!mr || !mr.sid) return showToast('店舗を選択してください', 'error');
+  if (mr.sid !== currentLocationId) return showToast('店舗が切り替わりました。もう一度開き直してください', 'error');
+  const store = (currentLocation && currentLocation.title) || '当店';
+  const company = (currentLocation && currentLocation.company) ? ' / ' + currentLocation.company : '';
+  const month = mr.month, b = mr.baseline, cmp = mr.cmp;
+  const cb = (cmp && cmp.common) ? cmp.base : b, cc = (cmp && cmp.common) ? cmp.cur : mr.cur;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const last = mr.curArr || [], prev = mr.prevArr || [];
+  const fmt = (v, unit) => v == null ? '—' : (unit === '★' ? '★' + (Math.round(v * 10) / 10) : (typeof v === 'number' ? v.toLocaleString() : v) + (unit || ''));
+  const dlt = (bef, aft, low) => { if (bef == null || aft == null) return ''; const d = low ? bef - aft : aft - bef; const a = Math.round(Math.abs(d) * 10) / 10; return d > 0 ? `<span class="up">▲${a}</span>` : d < 0 ? `<span class="down">▼${a}</span>` : '±0'; };
+  const cmpRow = (label, bef, aft, low, unit) => `<tr><td>${esc(label)}</td><td style="text-align:center;color:#889">${fmt(bef, unit)}</td><td style="text-align:center;color:#aab">→</td><td style="text-align:center;font-weight:700">${fmt(aft, unit)}</td><td style="text-align:center">${dlt(bef, aft, low)}</td></tr>`;
+  const ins = mr.insSummary, bi = b && b.insights;
+  const cmpRows = b ? [
+    cmpRow('平均順位', cb.avgRank, cc.avgRank, true, '位'),
+    cmpRow('TOP3のキーワード', cb.top3, cc.top3, false, '個'),
+    cmpRow('TOP10のキーワード', cb.top10, cc.top10, false, '個'),
+    cmpRow('口コミ件数', b.reviewCount, mr.reviewCount, false, '件'),
+    cmpRow('平均評価', b.rating, mr.rating, false, '★'),
+    (ins || bi) ? cmpRow('GBP表示回数', bi ? bi.impressions : null, ins ? ins.impressions : null, false, '') : '',
+    (ins || bi) ? cmpRow('電話タップ', bi ? bi.calls : null, ins ? ins.calls : null, false, '') : '',
+    (ins || bi) ? cmpRow('ルート検索', bi ? bi.directionRequests : null, ins ? ins.directionRequests : null, false, '') : '',
+  ].join('') : '';
+  const acts = (mr.alog || []).filter(l => String(l.date || '').startsWith(month));
+  const actRows = acts.length ? acts.map(l => `<tr><td style="width:80px;color:#667">${esc((l.date || '').slice(5))}</td><td>${esc(l.text || '')}</td></tr>`).join('') : '<tr><td colspan="2" style="color:#889">記録なし</td></tr>';
+  const rankRows = mr.kws.length ? mr.kws.map((kw, i) => {
+    const cur = parseInt(last[i], 10), pv = parseInt(prev[i], 10), bv = b && b.ranksByKw ? b.ranksByKw[kw] : null;
+    const ct = (Number.isFinite(cur) && cur >= 1) ? cur + '位' : '圏外';
+    let dl = '—'; if (bv != null && Number.isFinite(cur) && cur >= 1) { const d = bv - cur; dl = d > 0 ? `<span class="up">▲${d}</span>` : d < 0 ? `<span class="down">▼${-d}</span>` : '±0'; }
+    return `<tr><td>${esc(kw)}</td><td style="text-align:center;color:#889">${bv != null ? bv + '位' : '—'}</td><td style="text-align:center;color:#889">${(Number.isFinite(pv) && pv >= 1) ? pv + '位' : '—'}</td><td style="text-align:center;font-weight:700">${ct}</td><td style="text-align:center">${dl}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" style="color:#889">キーワード未登録</td></tr>';
+  const hlItems = (mr.highlights || []).map(h => `<li>${h}</li>`).join(''); // <b>のみ・安全
+  const plan = ((document.getElementById('mrPlan') || {}).value || '').trim();
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const w = window.open('', '_blank', 'width=820,height=1050');
+  if (!w) return showToast('ポップアップを許可してください', 'error');
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>MEO月次レポート ${esc(store)} ${esc(month)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans','Yu Gothic',sans-serif;color:#1a2330;padding:30px;font-size:13px;line-height:1.7}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2e8ff0;padding-bottom:14px;margin-bottom:18px}
+    .head h1{font-size:22px;color:#12325b}.head .m{font-size:13px;color:#667;margin-top:4px}
+    .brand{text-align:right;font-size:13px;color:#2e8ff0;font-weight:800}.brand span{display:block;font-size:10px;color:#889;font-weight:400;margin-top:2px}
+    h2{font-size:15px;margin:20px 0 7px;padding-left:9px;border-left:4px solid #2e8ff0;color:#12325b}
+    table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #dde6ee;padding:7px 10px;text-align:left;font-size:12px}th{background:#f4f7fb;color:#445}
+    .up{color:#0a9d63;font-weight:700}.down{color:#d64545}
+    ul{margin:6px 0 0;padding-left:20px}li{margin:3px 0}
+    .note{white-space:pre-wrap;border:1px solid #dde6ee;border-radius:8px;padding:12px;margin-top:6px;background:#fafcff}
+    .foot{margin-top:24px;border-top:1px solid #dde6ee;padding-top:12px;color:#889;font-size:11px;line-height:1.8}
+    .bar{margin-bottom:16px}button{font-size:13px;padding:9px 16px;border-radius:8px;border:none;background:#2e8ff0;color:#fff;font-weight:700;cursor:pointer}
+    @media print{.bar{display:none}body{padding:14px}}
+  </style></head><body>
+  <div class="bar"><button onclick="window.print()">印刷 / PDFに保存</button></div>
+  <div class="head"><div><h1>MEO対策 月次レポート</h1><div class="m">${esc(store)}${esc(company)}　／　対象月：${esc(month)}</div></div><div class="brand">株式会社cantik<span>ラクラクMEO ・ 発行日 ${esc(today)}</span></div></div>
+  ${b ? `<h2>対策前 → 現在の成果</h2><div style="font-size:11px;color:#889;margin-bottom:2px">対策前：${esc(b.month || (b.capturedAt || '').slice(0, 10))} 時点</div>
+  <table><thead><tr><th>項目</th><th style="text-align:center;width:80px">対策前</th><th style="width:26px"></th><th style="text-align:center;width:80px">現在</th><th style="text-align:center;width:64px">変化</th></tr></thead><tbody>${cmpRows}</tbody></table>${(cmp && cmp.common < cmp.total) ? `<div style="font-size:10px;color:#889;margin-top:3px">※平均順位・TOP3/TOP10は対策前と共通の${cmp.common}キーワードで比較しています。</div>` : ''}`
+    : '<h2>対策前 → 現在の成果</h2><p style="color:#889">「対策前として記録」が未設定です。ツールで記録すると、対策前からの成果が表示されます。</p>'}
+  <h2>今月実施した施策</h2><table><tbody>${actRows}</tbody></table>
+  <h2>キーワード順位の動き</h2><table><thead><tr><th>キーワード</th><th style="text-align:center">対策前</th><th style="text-align:center">前回</th><th style="text-align:center">今回</th><th style="text-align:center">対策前比</th></tr></thead><tbody>${rankRows}</tbody></table>
+  ${hlItems ? `<h2>今月の成果ハイライト</h2><ul>${hlItems}</ul>` : ''}
+  ${plan ? `<h2>来月の施策計画</h2><div class="note">${esc(plan)}</div>` : ''}
+  <div class="foot">本レポートは株式会社cantikのMEO管理ツール「ラクラクMEO」で作成しました。<br>順位は対象月の最終計測値、口コミ数・GBP指標は最新時点の値です。順位はGoogleマップ上の指定地点からの計測値で、検索環境により実際の表示順位と差が出る場合があります。</div>
+  </body></html>`);
+  w.document.close();
+}
+
 // ─── クライアント管理（会社単位の一覧⇄詳細） ───
 const _storeKey = (loc) => loc.storeId || (loc.name || '').replace(/\//g, '_');
 // storeId → キーワード数（ダッシュボード集計から）
@@ -10736,7 +11070,7 @@ function switchPanel(name, triggerEl) {
     dashboard: 'ダッシュボード', clients: 'クライアント', stores: '店舗管理', reviews: '口コミ管理',
     posts: '投稿管理', instagram: 'Instagram投稿', hppost: 'ホームページSEO・記事', citation: 'サイテーション',
     aio: 'AIO / LLMO / GEO対策', protection: '改ざん防止', knowledge: '企業ナレッジ',
-    rankmgr: '順位管理', rankreport: '順位レポート', insights: 'インサイト', settings: '設定',
+    rankmgr: '順位管理', rankreport: '順位レポート', insights: 'インサイト', monthly: '月次レポート', settings: '設定',
   };
   const tb = document.getElementById('topbarTitle');
   if (tb && titles[name]) tb.textContent = titles[name];
@@ -10750,6 +11084,7 @@ function switchPanel(name, triggerEl) {
   if (name === 'rankmgr') loadRankMgr();
   if (name === 'rankreport') loadRankReport();
   if (name === 'insights') loadInsightsPage({});
+  if (name === 'monthly') loadMonthlyReport();
   if (name === 'knowledge') loadNotionStatus();
   if (name === 'settings') { loadSettings(); pxLoad(); }
   _stampUpdated();

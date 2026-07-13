@@ -1124,6 +1124,42 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 月次レポート：対策前(baseline)スナップショット。先方報告で「対策前→現在」を出すため記憶する ──
+  if (action === 'meo-baseline') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `meo_baseline_${storeId}`;
+    if (req.method === 'GET') return res.json({ baseline: (await kvGet(key)) || null });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const num = v => (v == null || v === '' || isNaN(+v)) ? null : +v;
+      const baseline = {
+        capturedAt: new Date().toISOString(),
+        month: String(b.month || '').slice(0, 7),
+        avgRank: num(b.avgRank), top3: Number(b.top3) || 0, top10: Number(b.top10) || 0, out: Number(b.out) || 0, measured: Number(b.measured) || 0,
+        reviewCount: num(b.reviewCount), rating: num(b.rating),
+        insights: (b.insights && typeof b.insights === 'object') ? { impressions: Number(b.insights.impressions) || 0, calls: Number(b.insights.calls) || 0, directionRequests: Number(b.insights.directionRequests) || 0, websiteClicks: Number(b.insights.websiteClicks) || 0 } : null,
+        ranksByKw: (b.ranksByKw && typeof b.ranksByKw === 'object') ? Object.fromEntries(Object.entries(b.ranksByKw).slice(0, 60).map(([k, v]) => [String(k).slice(0, 80), num(v)])) : {},
+        note: String(b.note || '').slice(0, 500),
+      };
+      await kvSet(key, baseline);
+      return res.json({ success: true, baseline });
+    }
+  }
+
+  // ── 月次レポート：来月の施策計画（月ごと・編集可）。先方に「次に何をするか」を示す ──
+  if (action === 'meo-report-plan') {
+    const { storeId, month } = req.query;
+    if (!storeId || !month) return res.status(400).json({ error: 'storeId,month必須' });
+    const key = `meo_plan_${storeId}_${month}`;
+    if (req.method === 'GET') return res.json({ plan: (await kvGet(key)) || '' });
+    if (req.method === 'POST') {
+      const plan = String((req.body || {}).plan || '').slice(0, 4000);
+      await kvSet(key, plan);
+      return res.json({ success: true });
+    }
+  }
+
   // ── HP(WordPress)連携：接続情報の保存／接続テスト／記事の投稿 ──
   // アプリケーションパスワードはサーバ側KV(wp_conn_${storeId})に保管。公開は承認制のため既定は下書き(draft)。
   if (action === 'wp-conn') {
