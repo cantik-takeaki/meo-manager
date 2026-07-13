@@ -1164,6 +1164,30 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── AIコンサル結果の保存（グレード推移履歴・使い捨て解消）。同日実行は上書き・最大24件 ──
+  if (action === 'consul-log') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `consul_log_${storeId}`;
+    if (req.method === 'GET') return res.json({ logs: (await kvGet(key)) || [] });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const entry = {
+        date: String(b.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+        score: Number(b.score) || 0,
+        grade: String(b.grade || '').slice(0, 2),
+        tasks: Array.isArray(b.tasks) ? b.tasks.slice(0, 6).map(t => String(t).slice(0, 120)) : [],
+      };
+      let logs = (await kvGet(key)) || [];
+      logs = logs.filter(l => l.date !== entry.date); // 同日再実行は上書き
+      logs.push(entry);
+      logs.sort((a, b2) => String(a.date).localeCompare(String(b2.date)));
+      if (logs.length > 24) logs = logs.slice(-24);
+      await kvSet(key, logs);
+      return res.json({ success: true, logs });
+    }
+  }
+
   // ── 月次レポート：来月の施策計画（月ごと・編集可）。先方に「次に何をするか」を示す ──
   if (action === 'meo-report-plan') {
     const { storeId, month } = req.query;
