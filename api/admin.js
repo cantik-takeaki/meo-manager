@@ -1401,6 +1401,7 @@ export default async function handler(req, res) {
 
     let totalKw = 0, top3 = 0, top10 = 0, outRange = 0, upCount = 0, downCount = 0, filled = 0;
     const kpiSum = { scan: 0, survey: 0, ai: 0, click: 0, line: 0, mail: 0 };
+    const kpiPrevSum = { scan: 0, survey: 0, ai: 0, click: 0, line: 0, mail: 0 };
     const perStore = [];
     const clients = new Set();
 
@@ -1431,9 +1432,11 @@ export default async function handler(req, res) {
       let status = 'KW未登録';
       if (kws.length > 0) status = hist.length === 0 ? 'データなし' : (inputThisMonth ? '入力済み' : '未入力');
       const kpi = await kvGet(`kpi_${st.storeId}_${ym}`) || {};
+      const kpiPrev = await kvGet(`kpi_${st.storeId}_${prevYm}`) || {};
       const leads = await kvGet(`leads_${st.storeId}`) || [];
       const mailCount = leads.filter(l => String(l.at || '').slice(0, 7) === ym).length;
-      return { st, kwCount: kws.length, s3, s10, sOut, avg, mom, inputThisMonth, status, kpi, mailCount, lastInput: last ? last.date : null };
+      const mailPrev = leads.filter(l => String(l.at || '').slice(0, 7) === prevYm).length;
+      return { st, kwCount: kws.length, s3, s10, sOut, avg, mom, inputThisMonth, status, kpi, kpiPrev, mailCount, mailPrev, lastInput: last ? last.date : null };
     }));
     for (const r of _storeResults) {
       clients.add(r.st.company);
@@ -1443,6 +1446,9 @@ export default async function handler(req, res) {
       kpiSum.scan += r.kpi.scan || 0; kpiSum.survey += r.kpi.survey || 0; kpiSum.ai += r.kpi.ai || 0;
       kpiSum.click += r.kpi.click || 0; kpiSum.line += r.kpi.line || 0;
       kpiSum.mail += r.mailCount;
+      kpiPrevSum.scan += r.kpiPrev.scan || 0; kpiPrevSum.survey += r.kpiPrev.survey || 0; kpiPrevSum.ai += r.kpiPrev.ai || 0;
+      kpiPrevSum.click += r.kpiPrev.click || 0; kpiPrevSum.line += r.kpiPrev.line || 0;
+      kpiPrevSum.mail += r.mailPrev;
       perStore.push({
         storeId: r.st.storeId, name: r.st.name, company: r.st.company, status: r.status,
         kwCount: r.kwCount, top3: r.s3, top10: r.s10, out: r.sOut, avgRank: r.avg,
@@ -1460,6 +1466,7 @@ export default async function handler(req, res) {
         top10Pct: totalKw ? Math.round((top10 / totalKw) * 100) : 0,
       },
       kpi: kpiSum,
+      kpiPrev: kpiPrevSum,
       perStore,
     });
   }

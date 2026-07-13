@@ -8661,10 +8661,20 @@ async function loadDashboardSummary() {
     set('sumFilledOf', `/ ${t.stores ?? 0}店舗`);
     set('sumUnfilled', t.unfilled ?? 0);
 
-    // 口コミ獲得KPI 全店舗合計
+    // 口コミ獲得KPI 全店舗合計（前月比つき）
     const k = d.kpi || {};
-    set('aggScan', k.scan ?? 0); set('aggSurvey', k.survey ?? 0); set('aggAi', k.ai ?? 0);
-    set('aggClick', k.click ?? 0); set('aggLine', k.line ?? 0); set('aggMail', k.mail ?? 0);
+    const kp = d.kpiPrev || null;
+    const setKpi = (id, cur, prev) => {
+      const el = document.getElementById(id); if (!el) return;
+      cur = cur ?? 0;
+      if (kp == null || prev == null) { el.textContent = cur; return; }
+      const diff = cur - prev;
+      const chip = diff > 0 ? `<span style="font-size:10px;color:var(--accent-2);font-weight:700"> ▲${diff}</span>` : diff < 0 ? `<span style="font-size:10px;color:var(--red)"> ▼${-diff}</span>` : '';
+      el.innerHTML = `${cur}${chip}`;
+      el.title = `前月 ${prev}`;
+    };
+    setKpi('aggScan', k.scan, kp?.scan); setKpi('aggSurvey', k.survey, kp?.survey); setKpi('aggAi', k.ai, kp?.ai);
+    setKpi('aggClick', k.click, kp?.click); setKpi('aggLine', k.line, kp?.line); setKpi('aggMail', k.mail, kp?.mail);
     const pct = (num, den) => den ? Math.round((num / den) * 100) + '%' : '—';
     set('rateSurvey', pct(k.survey, k.scan)); set('rateSurveySub', `${k.survey || 0} / ${k.scan || 0}`);
     set('rateAi', pct(k.ai, k.survey)); set('rateAiSub', `${k.ai || 0} / ${k.survey || 0}`);
@@ -10456,8 +10466,10 @@ function renderReplySla() {
   const rateCol = rate >= 90 ? 'var(--accent-2)' : rate >= 70 ? '#d97706' : 'var(--red)';
   const cell = (label, val, sub, col) => `<div style="text-align:center;min-width:96px"><div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:${col || 'var(--text)'}">${val}</div><div style="font-size:11px;color:var(--text-sub)">${label}</div>${sub ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:1px">${sub}</div>` : ''}</div>`;
   let alerts = '';
-  if (negUnreplied.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);border-radius:8px;font-size:12px;color:var(--red);font-weight:700">★1〜2の低評価に未返信が ${negUnreplied.length}件 — 最優先で返信を（ネガティブの放置は信頼を大きく損ないます）</div>`;
-  if (over72.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px;font-size:12px;color:#d97706"><b>72時間以上 未返信が ${over72.length}件</b> — 推奨SLA（48〜72h）超過です。「未返信すべてに返信生成」でまとめて対応できます。</div>`;
+  // アラートはクリックで該当の絞り込み（既存フィルタボタン経由）＋一覧へスクロール
+  const _jumpFilter = (idx) => `onclick="(function(){const b=document.querySelectorAll('.filter-bar .filter-btn')[${idx}];if(b)b.click();document.getElementById('reviewsList')?.scrollIntoView({behavior:'smooth'})})()" style="cursor:pointer" title="クリックで該当の口コミを表示"`;
+  if (negUnreplied.length) alerts += `<div ${_jumpFilter(2)} onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1"><div style="margin-top:8px;padding:9px 11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);border-radius:8px;font-size:12px;color:var(--red);font-weight:700">★1〜2の低評価に未返信が ${negUnreplied.length}件 — 最優先で返信を（クリックで該当口コミへ）</div></div>`;
+  if (over72.length) alerts += `<div ${_jumpFilter(1)} onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1"><div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);border-radius:8px;font-size:12px;color:#d97706"><b>72時間以上 未返信が ${over72.length}件</b> — 推奨SLA（48〜72h）超過です（クリックで未返信を表示）。</div></div>`;
   else if (over48.length) alerts += `<div style="margin-top:8px;padding:9px 11px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.2);border-radius:8px;font-size:12px;color:#d97706">48時間以上 未返信が ${over48.length}件 — 72hを超える前に返信しましょう。</div>`;
   if (!alerts && !unreplied.length) alerts = `<div style="font-size:11.5px;color:var(--accent-2);margin-top:6px">${ICO_OK}すべての口コミに返信済みです。返信率は順位・信頼の両面で有利に働きます。</div>`;
   box.innerHTML = `
