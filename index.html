@@ -799,12 +799,13 @@ body.role-viewer [data-edit-action] { display:none !important; }
               <option value="データなし">データなし</option>
               <option value="KW未登録">KW未登録</option>
             </select>
+            <button class="btn btn-outline btn-sm" onclick="exportSummaryCsv()" title="表示中の店舗別サマリーをCSVでダウンロード"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>CSV</button>
           </div>
         </div>
         <div style="overflow-x:auto">
           <table class="summary-table">
-            <thead><tr>
-              <th>店舗名</th><th>ステータス</th><th>KW数</th><th>TOP3</th><th>TOP10</th><th>圏外</th><th>平均順位</th><th>前月比</th><th>最終入力</th>
+            <thead><tr id="summaryHeadRow">
+              <th>店舗名</th><th>ステータス</th><th style="cursor:pointer" onclick="sumSort('kwCount')" title="クリックで並び替え">KW数<span data-sk="kwCount"></span></th><th style="cursor:pointer" onclick="sumSort('top3')" title="クリックで並び替え">TOP3<span data-sk="top3"></span></th><th style="cursor:pointer" onclick="sumSort('top10')" title="クリックで並び替え">TOP10<span data-sk="top10"></span></th><th style="cursor:pointer" onclick="sumSort('out')" title="クリックで並び替え">圏外<span data-sk="out"></span></th><th style="cursor:pointer" onclick="sumSort('avgRank')" title="クリックで並び替え">平均順位<span data-sk="avgRank"></span></th><th style="cursor:pointer" onclick="sumSort('mom')" title="クリックで並び替え">前月比<span data-sk="mom"></span></th><th style="cursor:pointer" onclick="sumSort('lastInput')" title="クリックで並び替え">最終入力<span data-sk="lastInput"></span></th>
             </tr></thead>
             <tbody id="summaryTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">読み込み中...</td></tr></tbody>
           </table>
@@ -1994,6 +1995,9 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div class="page-title">企業ナレッジ</div>
         <div class="page-sub" id="knowledgeSubtitle">店舗を選択してください</div>
       </div>
+
+      <!-- ナレッジ充実度メーター（AI生成の品質はここで決まる。表示専用・フォームには触れない） -->
+      <div id="knScoreWrap" style="display:none;margin-bottom:14px"></div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>URLから自動取得</div></div>
@@ -6893,41 +6897,42 @@ function _meoDiag(k, rk, rv, gbpConnected, loc, gbpReal) {
   const kw = (k.keywords || []).filter(Boolean);
   const rkKw = (rk.keywords || []).filter(w => w && rk.meta?.[w]?.enabled !== false);
   const kwCount = new Set([...kw, ...rkKw]).size;
+  // fix = 未達のときにクリックで飛ぶ改善先パネル（診断→改善を直結）
   const items = [
-    { label: '店名', w: 6, ok: !!k.storeName },
-    { label: '業種カテゴリ', w: 6, ok: !!k.category },
-    { label: '住所', w: 6, ok: !!k.address },
-    { label: '電話番号', w: 6, ok: !!k.phone },
-    { label: '営業時間', w: 6, ok: !!k.businessHours },
-    { label: '店舗説明', w: 6, ok: !!k.description },
-    { label: '強み・特徴', w: 8, ok: !!k.strengths },
-    { label: '提供サービス', w: 8, ok: !!k.services },
-    { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer },
-    { label: 'キーワード設定', w: 8, ok: kwCount >= 3 },
-    { label: 'GBP連携', w: 10, ok: !!gbpConnected },
-    { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0 },
-    { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4 },
-    { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0 },
+    { label: '店名', w: 6, ok: !!k.storeName, fix: 'knowledge' },
+    { label: '業種カテゴリ', w: 6, ok: !!k.category, fix: 'knowledge' },
+    { label: '住所', w: 6, ok: !!k.address, fix: 'knowledge' },
+    { label: '電話番号', w: 6, ok: !!k.phone, fix: 'knowledge' },
+    { label: '営業時間', w: 6, ok: !!k.businessHours, fix: 'knowledge' },
+    { label: '店舗説明', w: 6, ok: !!k.description, fix: 'knowledge' },
+    { label: '強み・特徴', w: 8, ok: !!k.strengths, fix: 'knowledge' },
+    { label: '提供サービス', w: 8, ok: !!k.services, fix: 'knowledge' },
+    { label: 'ターゲット設定', w: 6, ok: !!k.targetCustomer, fix: 'knowledge' },
+    { label: 'キーワード設定', w: 8, ok: kwCount >= 3, fix: 'rankmgr' },
+    { label: 'GBP連携', w: 10, ok: !!gbpConnected, fix: 'stores' },
+    { label: '口コミ獲得', w: 8, ok: (rv.totalCount || 0) > 0, fix: 'reviews' },
+    { label: '平均★4.0以上', w: 8, ok: (rv.averageRating || 0) >= 4, fix: 'reviews' },
+    { label: '口コミ全返信', w: 8, ok: (rv.totalCount || 0) > 0 && (rv.unrepliedCount || 0) === 0, fix: 'reviews' },
   ];
   // GBP実データ項目（連携店舗のみ・GBP最適化チェックと同じ実データ判定）
   if (loc && (loc._type === 'gbp' || loc.gbpConnected || loc.storefrontAddress)) {
     const cats = loc.categories || {};
     items.push(
-      { label: 'GBPメインカテゴリ', w: 6, ok: !!cats.primaryCategory },
-      { label: 'GBPサブカテゴリ', w: 6, ok: !!(cats.additionalCategories && cats.additionalCategories.length) },
-      { label: 'GBPウェブサイト', w: 4, ok: !!loc.websiteUri },
+      { label: 'GBPメインカテゴリ', w: 6, ok: !!cats.primaryCategory, fix: 'stores' },
+      { label: 'GBPサブカテゴリ', w: 6, ok: !!(cats.additionalCategories && cats.additionalCategories.length), fix: 'stores' },
+      { label: 'GBPウェブサイト', w: 4, ok: !!loc.websiteUri, fix: 'stores' },
     );
   }
   // GBP実データ：写真の有無・鮮度（活性シグナル＝MEOで重要。取得できた店舗のみ加点）
   if (gbpReal && typeof gbpReal.photoCount === 'number') {
-    items.push({ label: 'GBP写真あり', w: 6, ok: gbpReal.photoCount > 0 });
-    items.push({ label: '写真が新しい(60日内)', w: 6, ok: gbpReal.photoDays != null && gbpReal.photoDays <= 60 });
+    items.push({ label: 'GBP写真あり', w: 6, ok: gbpReal.photoCount > 0, fix: 'posts' });
+    items.push({ label: '写真が新しい(60日内)', w: 6, ok: gbpReal.photoDays != null && gbpReal.photoDays <= 60, fix: 'posts' });
   }
   // 順位実績（最新計測でTOP10圏内が1つでもあるか）
   const hist = rk.history || [];
   const lastR = hist[hist.length - 1];
   const anyTop10 = !!(lastR && (lastR.rankings || []).some(r => { const n = parseInt(r, 10); return Number.isFinite(n) && n >= 1 && n <= 10; }));
-  items.push({ label: 'TOP10キーワード', w: 8, ok: anyTop10 });
+  items.push({ label: 'TOP10キーワード', w: 8, ok: anyTop10, fix: 'rankmgr' });
   const total = items.reduce((s, i) => s + i.w, 0);
   const earned = items.reduce((s, i) => s + (i.ok ? i.w : 0), 0);
   const score = Math.round((earned / total) * 100);
@@ -6975,9 +6980,11 @@ async function loadDiagnosis() {
   const le = document.getElementById('meoScoreLabel');
   le.innerHTML = `<span style="display:inline-block;min-width:26px;padding:1px 8px;border-radius:7px;background:${gradeInfo.color};color:#fff;font-weight:900;margin-right:6px">${grade}</span>${gradeInfo.label}`;
   le.style.color = gradeInfo.color;
-  document.getElementById('meoChecklist').innerHTML = items.map(i =>
-    `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? ICO_OK : ICO_TODO}${i.label}</div>`
-  ).join('');
+  // 未達項目はクリックで改善先パネルへ直行（診断→改善の直結）
+  document.getElementById('meoChecklist').innerHTML = items.map(i => {
+    if (i.ok || !i.fix) return `<div style="font-size:12px;color:${i.ok ? 'var(--text)' : 'var(--text-sub)'}">${i.ok ? ICO_OK : ICO_TODO}${i.label}</div>`;
+    return `<div onclick="showPanel('${i.fix}')" title="クリックで改善画面へ" style="font-size:12px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:2px">${ICO_TODO}<span style="border-bottom:1px dashed var(--text-muted)">${i.label}</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>`;
+  }).join('');
 
   const adv = document.getElementById('meoAdvice');
   adv.textContent = '診断中...';
@@ -8676,6 +8683,22 @@ function renderSummaryTable() {
     (f === 'all' || r.status === f) &&
     (!q || (r.name || '').toLowerCase().includes(q) || (r.company || '').toLowerCase().includes(q))
   );
+  // 列ソート（未指定時はAPI順のまま＝既定挙動を変えない）。nullは常に末尾へ
+  const ss = window._sumSort;
+  if (ss && ss.key) {
+    const dir = ss.dir === 'asc' ? 1 : -1;
+    filtered = filtered.slice().sort((a, b) => {
+      let av = a[ss.key], bv = b[ss.key];
+      if (ss.key === 'lastInput') { av = av || ''; bv = bv || ''; return av === bv ? 0 : (av < bv ? -1 : 1) * dir; }
+      const an = (av == null), bn = (bv == null);
+      if (an && bn) return 0; if (an) return 1; if (bn) return -1; // null末尾固定
+      return (av - bv) * dir;
+    });
+  }
+  // ヘッダの昇降矢印を更新
+  document.querySelectorAll('#summaryHeadRow [data-sk]').forEach(el => {
+    el.textContent = (ss && ss.key === el.getAttribute('data-sk')) ? (ss.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  });
   if (!filtered.length) {
     body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">該当する店舗がありません</td></tr>';
   } else {
@@ -8703,6 +8726,43 @@ function renderSummaryTable() {
   if (cnt) cnt.textContent = `${filtered.length}件表示（全${rows.length}件）`;
 }
 
+// 店舗別サマリーの列ソート（同じ列を再クリックで昇降トグル→3回目で解除）
+function sumSort(key) {
+  const ss = window._sumSort;
+  if (!ss || ss.key !== key) window._sumSort = { key, dir: 'asc' };
+  else if (ss.dir === 'asc') window._sumSort = { key, dir: 'desc' };
+  else window._sumSort = null; // 解除＝既定のAPI順に戻す
+  renderSummaryTable();
+}
+// 店舗別サマリーをCSVダウンロード（表示中の絞り込み・並び順のまま。BOM付きでExcel文字化け防止）
+function exportSummaryCsv() {
+  const rows = (window._dashSummary?.perStore) || [];
+  if (!rows.length) return showToast('データがありません', 'error');
+  const q = (document.getElementById('summarySearch')?.value || '').trim().toLowerCase();
+  const f = document.getElementById('summaryFilter')?.value || 'all';
+  let list = rows.filter(r => (f === 'all' || r.status === f) && (!q || (r.name || '').toLowerCase().includes(q) || (r.company || '').toLowerCase().includes(q)));
+  const ss = window._sumSort;
+  if (ss && ss.key) {
+    const dir = ss.dir === 'asc' ? 1 : -1;
+    list = list.slice().sort((a, b) => {
+      let av = a[ss.key], bv = b[ss.key];
+      if (ss.key === 'lastInput') { av = av || ''; bv = bv || ''; return av === bv ? 0 : (av < bv ? -1 : 1) * dir; }
+      const an = (av == null), bn = (bv == null);
+      if (an && bn) return 0; if (an) return 1; if (bn) return -1;
+      return (av - bv) * dir;
+    });
+  }
+  const esc = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ['店舗名', '会社名', 'ステータス', 'KW数', 'TOP3', 'TOP10', '圏外', '平均順位', '前月比', '最終入力'];
+  const lines = [head.join(',')].concat(list.map(r => [r.name, r.company || '', r.status, r.kwCount, r.top3, r.top10, r.out || 0, r.avgRank != null ? r.avgRank : '', r.mom != null ? r.mom : '', r.lastInput || ''].map(esc).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `店舗別サマリー_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  showToast(`${list.length}件をCSVで保存しました`, 'success');
+}
 // 店舗別サマリーの店舗名クリック → サイドバーの該当店舗を選択
 function jumpToStore(storeId) {
   const idx = (window._locations || []).findIndex(l => (l.storeId || (l.name || '').replace(/\//g, '_')) === storeId);
@@ -10031,18 +10091,25 @@ async function runAiConsul() {
   box.style.display = '';
   box.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-sub);font-size:13px">「${escapeHtml(loc.title || '')}」を分析中…（10秒ほどかかります）</div>`;
   try {
-    // ① データ収集（ナレッジ・口コミ・順位を並行取得）
+    // ① データ収集（ナレッジ・口コミ・順位・GBP写真を並行取得）
     const gbpConnected = loc._type === 'gbp' || loc.gbpConnected;
-    const [k, rvData, rk] = await Promise.all([
+    const [k, rvData, rk, ph] = await Promise.all([
       fetch(`/api/admin?action=knowledge&locationId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({})),
       (gbpConnected && loc.name)
         ? fetch(`/api/reviews?locationName=${encodeURIComponent(loc.name)}${loc.storeId ? '&storeId=' + loc.storeId : ''}`).then(r => r.json()).catch(() => ({}))
         : Promise.resolve({}),
       fetch(`/api/admin?action=rankings&storeId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({ history: [], keywords: [] })),
+      // GBP写真の実データ（loadDiagnosisと同じ経路＝locationNameのみ・cookieトークン）。失敗時はnull＝従来挙動
+      (gbpConnected && loc.name)
+        ? fetch(`/api/posts?action=gbp-photo&locationName=${encodeURIComponent(loc.name)}`).then(r => r.json()).catch(() => null)
+        : Promise.resolve(null),
     ]);
     const rv = (rvData && rvData.stats) || {};
+    // GBP写真実データを診断に合流（ダッシュボード診断と同じ整形＝グレード不一致を解消）
+    let gbpReal = null;
+    if (ph && !ph.error) { const days = ph.latest ? Math.floor((Date.now() - new Date(ph.latest).getTime()) / 86400000) : null; gbpReal = { photoCount: ph.count || 0, photoDays: days }; }
     // ② MEO診断（loadDiagnosisと共通ロジック・グレードS〜D）
-    const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, loc);
+    const { items, score, grade, gradeInfo } = _meoDiag(k, rk, rv, gbpConnected, loc, gbpReal);
     // ③ 順位分析（最新と前回の差分。history[].rankingsはrk.keywordsにindex対応）
     const hist = rk.history || [];
     const lastR = hist[hist.length - 1];
@@ -12046,7 +12113,46 @@ async function loadKnowledge() {
     document.getElementById('kn-serviceArea').value = d.serviceArea || '';
     document.getElementById('kn-targetCustomer').value = d.targetCustomer || '';
     document.getElementById('kn-description').value = d.description || '';
+    renderKnowledgeScore(d);
   } catch {}
+}
+
+// ── ナレッジ充実度メーター：AI生成(返信/投稿/診断)が実際に参照する項目を重み付き採点し、未入力の影響を可視化 ──
+function renderKnowledgeScore(d) {
+  const box = document.getElementById('knScoreWrap'); if (!box) return;
+  d = d || {};
+  const FIELDS = [
+    { key: 'storeName', id: 'kn-storeName', label: '店名', w: 8, why: '全生成の基本情報' },
+    { key: 'category', id: 'kn-category', label: '業種カテゴリ', w: 10, why: '関連性の土台。無いと一般文になります' },
+    { key: 'strengths', id: 'kn-strengths', label: '強み・特徴', w: 20, why: '空だとAI返信・投稿が「どこにでもある文章」になります' },
+    { key: 'services', id: 'kn-services', label: '提供サービス', w: 15, why: '投稿・説明文の具体性が決まります' },
+    { key: 'address', id: 'kn-address', label: '住所', w: 8, why: '地域名の織り込み(近接性)に使用' },
+    { key: 'nearbyLandmarks', id: 'kn-nearbyLandmarks', label: '最寄り・目印', w: 7, why: '「駅から◯分」等の実在感に使用' },
+    { key: 'expertise', id: 'kn-expertise', label: '専門性・資格', w: 10, why: 'E-E-A-T(信頼性)の材料' },
+    { key: 'serviceArea', id: 'kn-serviceArea', label: '対応エリア', w: 7, why: 'エリアKWの織り込みに使用' },
+    { key: 'targetCustomer', id: 'kn-targetCustomer', label: 'ターゲット', w: 7, why: '文体・訴求の調整に使用' },
+    { key: 'keywords', id: null, label: '対策キーワード', w: 8, why: '全生成でKWを織り込む核', ok: !!(d.keywords || []).filter(Boolean).length },
+  ];
+  let earned = 0; const missing = [];
+  FIELDS.forEach(f => {
+    const ok = (f.ok !== undefined) ? f.ok : !!(d[f.key] && String(d[f.key]).trim());
+    if (ok) earned += f.w; else missing.push(f);
+  });
+  const total = FIELDS.reduce((s, f) => s + f.w, 0);
+  const score = Math.round(earned / total * 100);
+  const col = score >= 80 ? 'var(--accent-2)' : score >= 50 ? 'var(--gold)' : 'var(--red)';
+  const msg = score >= 80 ? 'AI生成の材料は十分です。定期的に最新化しましょう' : score >= 50 ? 'あと少し。特に重み大の未入力から埋めるとAIの質が上がります' : 'ナレッジが薄いとAI返信・投稿が一般文になります。まず「強み」「サービス」から';
+  const jump = (id) => id ? `onclick="document.getElementById('${id}')?.scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('${id}')?.focus()" style="cursor:pointer;text-decoration:underline dashed;text-underline-offset:3px"` : '';
+  box.style.display = 'block';
+  box.innerHTML = `<div class="card" style="border-color:${score >= 80 ? 'rgba(16,185,129,.3)' : 'rgba(245,158,11,.3)'}">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:800"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>ナレッジ充実度</div>
+      <div style="flex:1;min-width:160px;height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden"><div style="height:100%;width:${score}%;background:${col};transition:width .4s"></div></div>
+      <div style="font-size:19px;font-weight:900;color:${col};font-variant-numeric:tabular-nums">${score}<span style="font-size:11px;color:var(--text-sub);font-weight:600">/100</span></div>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-sub);margin-top:6px">${msg}。<b>このページの入力がそのままAI返信・投稿・診断の質になります。</b></p>
+    ${missing.length ? `<div style="display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:6px">${missing.sort((a, b) => b.w - a.w).slice(0, 5).map(f => `<span ${jump(f.id)} title="${escapeHtml(f.why)}" style="font-size:11.5px;color:var(--gold)">未入力: ${escapeHtml(f.label)}${f.w >= 15 ? '（重要）' : ''}</span>`).join('')}</div>` : ''}
+  </div>`;
 }
 
 // ─── キーワード（可変リスト） ───

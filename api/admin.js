@@ -28,14 +28,21 @@ const _normG = (s) => String(s || '').replace(/[\s　・\-―ー（）()]/g, '')
 const _normP = (s) => String(s || '').replace(/[^0-9]/g, '');
 const _normU = (s) => String(s || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
 const _loose = (a, b) => { a = _normG(a); b = _normG(b); return !a || !b || a === b || a.includes(b) || b.includes(a); };
+// 営業時間の時刻トークン抽出（store-settings.jsと同一の緩判定）
+const _hoursTok = (s) => {
+  const z = String(s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/：/g, ':');
+  return [...z.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => `${parseInt(m[1], 10)}:${m[2]}`);
+};
+const _fmtGbpT = (t) => typeof t === 'string' ? (t.length === 4 ? `${parseInt(t.slice(0, 2), 10)}:${t.slice(2)}` : t) : (t && t.hours != null ? `${t.hours}:${String(t.minutes || 0).padStart(2, '0')}` : '');
 async function fetchCurrentGbpInfo(locationName, token) {
   const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
   if (!locPart) return { error: 'no_location' };
-  const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,phoneNumbers,storefrontAddress,categories,websiteUri`, { headers: { Authorization: `Bearer ${token}` } });
+  const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,phoneNumbers,storefrontAddress,categories,websiteUri,regularHours`, { headers: { Authorization: `Bearer ${token}` } });
   const d = await r.json();
   if (d.error) return { error: d.error.status || d.error.message || 'api_error' };
   const addr = d.storefrontAddress ? [...(d.storefrontAddress.addressLines || []), d.storefrontAddress.locality, d.storefrontAddress.administrativeArea, d.storefrontAddress.postalCode].filter(Boolean).join(' ') : '';
-  return { current: { title: d.title || '', phone: d.phoneNumbers?.primaryPhone || '', address: addr, category: d.categories?.primaryCategory?.displayName || '', url: d.websiteUri || '' } };
+  const hoursStr = (d.regularHours?.periods || []).map(p => `${p.openDay || ''} ${_fmtGbpT(p.openTime)}-${_fmtGbpT(p.closeTime)}`).join(' ');
+  return { current: { title: d.title || '', phone: d.phoneNumbers?.primaryPhone || '', address: addr, category: d.categories?.primaryCategory?.displayName || '', url: d.websiteUri || '', hours: hoursStr } };
 }
 function diffGbpBaseline(saved, current) {
   const diffs = [];
@@ -45,6 +52,13 @@ function diffGbpBaseline(saved, current) {
   chk('address', '住所', _loose);
   chk('category', 'カテゴリ', _loose);
   chk('url', '公式URL', (a, b) => _normU(a) === _normU(b));
+  // 営業時間（緩判定）：保存値の時刻(H:MM)がGBP側に全て含まれるかだけを見る
+  if (saved.hours && current.hours) {
+    const st = _hoursTok(saved.hours);
+    if (st.length && st.some(t => !_hoursTok(current.hours).includes(t))) {
+      diffs.push({ field: '営業時間', saved: saved.hours, current: current.hours, note: '表記ゆれの可能性あり（時刻ベースの緩判定）' });
+    }
+  }
   return diffs;
 }
 
