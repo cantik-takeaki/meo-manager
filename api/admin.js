@@ -1376,7 +1376,20 @@ export default async function handler(req, res) {
         results.push({ area, rank, point: geo ? { lat: geo.lat, lng: geo.lng } : null, byCoord: !!geo });
       } catch (e) { results.push({ area, rank: null, error: e.message }); }
     }
-    return res.json({ keyword, results, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
+    // 履歴に保存＋同一KWの前回結果を返す（エリア別の前回比表示用）。storeId無しは保存スキップ
+    let prev = null;
+    if (storeId) {
+      try {
+        const histKey = `geo_history_${storeId}`;
+        let gh = (await kvGet(histKey)) || [];
+        const sameKw = gh.filter(h => h.keyword === keyword);
+        prev = sameKw.length ? sameKw[sameKw.length - 1] : null;
+        gh.push({ date: new Date().toISOString().slice(0, 10), keyword, results: results.map(r => ({ area: r.area, rank: r.rank })) });
+        if (gh.length > 12) gh = gh.slice(-12);
+        await kvSet(histKey, gh);
+      } catch (e) { /* 履歴保存失敗は結果返却を妨げない */ }
+    }
+    return res.json({ keyword, results, prev, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) });
   }
 
   // ── ダッシュボード全社集計（順位ロールアップ＋口コミ獲得KPI合計＋店舗別サマリー） ──
