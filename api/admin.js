@@ -786,9 +786,12 @@ export default async function handler(req, res) {
       if (!st.name) continue;
       const rk = await kvGet(`rankings_${st.storeId}`) || {};
       const meta = rk.meta || {};
+      // 手動「AIで順位取得」と計測地点を統一：計測地点(rank_point)があれば ll を付与（無ければ従来のarea文字列）
+      const rp = await kvGet(`rank_point_${st.storeId}`);
+      const ll = (rp && Number.isFinite(+rp.lat) && Number.isFinite(+rp.lng)) ? `${rp.lat},${rp.lng},14z` : '';
       (rk.keywords || []).forEach(kw => {
         const m = meta[kw] || {};
-        if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '' });
+        if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '', ll });
       });
     }
     let ok = 0, fail = 0;
@@ -1363,14 +1366,14 @@ export default async function handler(req, res) {
     const perStore = [];
     const clients = new Set();
 
-    for (const st of stores) {
-      clients.add(st.company);
+    // 店舗ごとのKV読み(rankings/kpi/leads)を並列化（直列N+1→並列でダッシュボード高速化）。集約は結果順で行い出力shapeは不変
+    const prevYm = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7);
+    const _storeResults = await Promise.all(stores.map(async (st) => {
       const rk = await kvGet(`rankings_${st.storeId}`) || { history: [], keywords: [] };
       const kws = (rk.keywords || []).filter(Boolean);
       const hist = rk.history || [];
       const last = hist[hist.length - 1] || null;
       const ranksArr = last ? (last.rankings || []) : [];
-      // この店のTOP3/TOP10/圏外/平均
       let s3 = 0, s10 = 0, sOut = 0, sum = 0, cnt = 0;
       kws.forEach((_, i) => {
         const r = parseInt(ranksArr[i], 10);
@@ -1379,40 +1382,33 @@ export default async function handler(req, res) {
           if (r <= 10) s10++;
           if (r > 20) sOut++;
           sum += r; cnt++;
-        } else if (last) {
-          sOut++; // 計測済みだが順位なし＝圏外
-        }
+        } else if (last) { sOut++; }
       });
       const avg = cnt ? Math.round((sum / cnt) * 10) / 10 : null;
-      totalKw += kws.length; top3 += s3; top10 += s10; outRange += sOut;
-
-      // 前月比（当月最新平均 vs 前月最新平均）
       const monthLast = (m) => { const hs = hist.filter(h => (h.date || '').slice(0, 7) === m); return hs[hs.length - 1] || null; };
       const avgOf = (entry) => { if (!entry) return null; const rs = (entry.rankings || []).map(x => parseInt(x, 10)).filter(x => Number.isFinite(x) && x >= 1); return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null; };
-      const prevYm = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7);
       const curAvg = avgOf(monthLast(ym)), prevAvg = avgOf(monthLast(prevYm));
-      let mom = null;
-      if (curAvg != null && prevAvg != null) { mom = Math.round((prevAvg - curAvg) * 10) / 10; if (mom > 0) upCount++; else if (mom < 0) downCount++; }
-
-      // 当月に入力があるか
+      const mom = (curAvg != null && prevAvg != null) ? Math.round((prevAvg - curAvg) * 10) / 10 : null;
       const inputThisMonth = hist.some(h => (h.date || '').slice(0, 7) === ym);
-      if (inputThisMonth) filled++;
-
-      // ステータス
       let status = 'KW未登録';
       if (kws.length > 0) status = hist.length === 0 ? 'データなし' : (inputThisMonth ? '入力済み' : '未入力');
-
-      // 口コミ獲得KPI（当月）
       const kpi = await kvGet(`kpi_${st.storeId}_${ym}`) || {};
-      kpiSum.scan += kpi.scan || 0; kpiSum.survey += kpi.survey || 0; kpiSum.ai += kpi.ai || 0;
-      kpiSum.click += kpi.click || 0; kpiSum.line += kpi.line || 0;
       const leads = await kvGet(`leads_${st.storeId}`) || [];
-      kpiSum.mail += leads.filter(l => String(l.at || '').slice(0, 7) === ym).length;
-
+      const mailCount = leads.filter(l => String(l.at || '').slice(0, 7) === ym).length;
+      return { st, kwCount: kws.length, s3, s10, sOut, avg, mom, inputThisMonth, status, kpi, mailCount, lastInput: last ? last.date : null };
+    }));
+    for (const r of _storeResults) {
+      clients.add(r.st.company);
+      totalKw += r.kwCount; top3 += r.s3; top10 += r.s10; outRange += r.sOut;
+      if (r.mom != null) { if (r.mom > 0) upCount++; else if (r.mom < 0) downCount++; }
+      if (r.inputThisMonth) filled++;
+      kpiSum.scan += r.kpi.scan || 0; kpiSum.survey += r.kpi.survey || 0; kpiSum.ai += r.kpi.ai || 0;
+      kpiSum.click += r.kpi.click || 0; kpiSum.line += r.kpi.line || 0;
+      kpiSum.mail += r.mailCount;
       perStore.push({
-        storeId: st.storeId, name: st.name, company: st.company, status,
-        kwCount: kws.length, top3: s3, top10: s10, out: sOut, avgRank: avg,
-        mom, lastInput: last ? last.date : null,
+        storeId: r.st.storeId, name: r.st.name, company: r.st.company, status: r.status,
+        kwCount: r.kwCount, top3: r.s3, top10: r.s10, out: r.sOut, avgRank: r.avg,
+        mom: r.mom, lastInput: r.lastInput,
       });
     }
 

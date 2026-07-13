@@ -105,7 +105,10 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const { info } = req.body;
-      await kvSet(key, { info, savedAt: new Date().toISOString(), alerts: [] });
+      // 正規情報を更新しても過去の検知アラート履歴は消さない（監査証跡の保全）
+      const existing = await kvGet(key) || {};
+      const alerts = Array.isArray(existing.alerts) ? existing.alerts : [];
+      await kvSet(key, { info, savedAt: new Date().toISOString(), alerts });
       return res.json({ success: true });
     }
   }

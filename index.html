@@ -10707,7 +10707,7 @@ async function diagnoseReview(i) {
         ${j.comment ? `<div style="font-size:12px;color:var(--text-sub);margin-top:6px">${escapeHtml(j.comment)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="generateReply(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI返信作成</button>
-          ${canReport ? `<button class="btn btn-outline btn-sm" onclick="generateReport(${i}, ${JSON.stringify(j.reasons || []).replace(/"/g, '&quot;')})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Google報告文を作成</button>` : ''}
+          ${canReport ? `<button class="btn btn-outline btn-sm" onclick="generateReviewReport(${i}, ${JSON.stringify(j.reasons || []).replace(/"/g, '&quot;')})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>Google報告文を作成</button>` : ''}
         </div>
         <div id="report-${i}" style="display:none;margin-top:10px"></div>
         <p style="font-size:11px;color:var(--text-sub);line-height:1.6;margin-top:10px">※これはGoogleポリシーに照らした<b>可能性</b>の分析です。削除を保証するものではなく、Googleの審査結果を保証するものでもありません。実際の削除可否はGoogleが判断します。</p>
@@ -10717,7 +10717,7 @@ async function diagnoseReview(i) {
   }
 }
 
-async function generateReport(i, reasons) {
+async function generateReviewReport(i, reasons) {
   const review = getFilteredReviews()[i];
   const box = document.getElementById(`report-${i}`);
   if (!box) return;
