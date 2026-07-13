@@ -1089,7 +1089,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div style="overflow-x:auto">
           <table class="summary-table">
             <thead><tr>
-              <th style="text-align:left;padding-left:14px">キーワード</th><th>優先度</th><th>現在順位</th><th>前回比</th><th>状態</th><th>操作</th>
+              <th style="text-align:left;padding-left:14px">キーワード</th><th>優先度</th><th>現在順位</th><th>前回比</th><th>推移</th><th>状態</th><th>操作</th>
             </tr></thead>
             <tbody id="kwMgrBody"></tbody>
           </table>
@@ -5359,7 +5359,7 @@ function renderKwMgr() {
   const D = window._kwData, body = document.getElementById('kwMgrBody'); if (!body || !D) return;
   const entries = D.keywords.map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim());
   const cb = document.getElementById('kwCountBadge'); if (cb) cb.textContent = entries.length ? `${entries.length}件 / 無制限` : '';
-  if (!entries.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:22px">まだ対策キーワードがありません。<br>「AIでキーワード候補」または「キーワード追加」で登録してください。</td></tr>'; return; }
+  if (!entries.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:22px">まだ対策キーワードがありません。<br>「AIでキーワード候補」または「キーワード追加」で登録してください。</td></tr>'; return; }
   const last = D.history.at(-1)?.rankings || [], prev = D.history.at(-2)?.rankings || [];
   body.innerHTML = entries.map(en => {
     const m = D.meta[en.k] || {};
@@ -5378,6 +5378,7 @@ function renderKwMgr() {
       <td>${pri}</td>
       <td>${curTxt}</td>
       <td>${delta}</td>
+      <td>${rankSparkline((D.history || []).map(h => (h.rankings || [])[en.i] ?? null))}</td>
       <td>${enabled ? '<span style="color:var(--accent-2);font-size:12px">有効</span>' : '<span style="color:var(--text-muted);font-size:12px">停止</span>'}</td>
       <td><div style="display:inline-flex;gap:5px">
         <button class="kw-act" title="順位入力" onclick="openRankInput(${en.i})"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
@@ -5551,9 +5552,18 @@ async function addSuggestedKws() {
 async function aiFetchRanks(ev) {
   if (!currentLocationId) return showToast('店舗を選択してください', 'error');
   if (window._aiFetching) return showToast('順位取得を実行中です', 'error'); // 多重実行ガード（SerpApi枠の二重消費・KV競合を防ぐ）
-  const D = window._kwData, entries = (D?.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim() && (D.meta[e.k]?.enabled !== false));
-  if (!entries.length) return showToast('有効なキーワードがありません', 'error');
-  if (!confirm(`${entries.length}件のキーワードの順位をGoogleマップから取得します。よろしいですか？\n（月間の自動取得回数には上限があります）`)) return;
+  const D = window._kwData, allEntries = (D?.keywords || []).map((k, i) => ({ k: String(k || ''), i })).filter(e => e.k.trim() && (D.meta[e.k]?.enabled !== false));
+  if (!allEntries.length) return showToast('有効なキーワードがありません', 'error');
+  const today = new Date().toISOString().slice(0, 10);
+  // 本日すでに計測済みのKWはスキップして枠を節約（誤操作・再クリックの二重消費を防止）
+  const _todayEntry = (D.history || []).find(h => h.date === today);
+  const _measuredToday = (kw) => { if (!_todayEntry) return false; const idx = (D.keywords || []).indexOf(kw); const v = parseInt((_todayEntry.rankings || [])[idx], 10); return Number.isFinite(v) && v >= 1; };
+  let entries = allEntries.filter(e => !_measuredToday(e.k));
+  const _skipped = allEntries.length - entries.length;
+  if (!entries.length) {
+    if (!confirm(`${allEntries.length}件すべて本日計測済みです。もう一度取得（再計測）しますか？\n（月間の自動取得回数を消費します）`)) return;
+    entries = allEntries;
+  } else if (!confirm(`${entries.length}件のキーワードの順位をGoogleマップから取得します${_skipped ? `（本日計測済みの${_skipped}件はスキップ）` : ''}。よろしいですか？\n（月間の自動取得回数には上限があります）`)) return;
   window._aiFetching = true;
   const btn = ev?.currentTarget; const btnHtml = btn?.innerHTML; if (btn) { btn.disabled = true; btn.textContent = '取得中…'; }
   // 検索地点は店舗の実所在地から精密化（精度改善）。都道府県＋市区(locality)を使い、KW個別のareaがあれば優先。
@@ -5565,7 +5575,6 @@ async function aiFetchRanks(ev) {
   const _rll = _rankLlParam();
   const llParam = _rll ? `&ll=${_rll}` : '';
   const store = currentLocation?.title || '';
-  const today = new Date().toISOString().slice(0, 10);
   let ok = 0, fail = 0, firstErr = '';
   showToast('順位を取得中…しばらくお待ちください', 'success');
   try {
@@ -10742,6 +10751,11 @@ async function generateReviewReport(i, reasons) {
 async function submitReply(i, reviewName) {
   const comment = document.getElementById(`replyText-${i}`)?.value?.trim();
   if (!comment) return showToast('返信文を入力してください', 'error');
+  // 景表法・薬機法チェック：公開前にリスク語(必ず/完治/No.1等)を検知して確認を挟む（既存kbCheckText流用・検出ゼロなら従来どおり）
+  try {
+    const _ng = (typeof kbCheckText === 'function') ? kbCheckText(comment).filter(f => f.level === 'high') : [];
+    if (_ng.length && !confirm(`この返信に景表法・薬機法のリスク語が含まれます：\n「${_ng.map(f => f.word).join('」「')}」\n\nそのままGoogleに公開しますか？（キャンセルで修正できます）`)) return;
+  } catch (e) {}
 
   try {
     const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`, {
