@@ -5070,6 +5070,15 @@ function renderPop() {
   box.style.width = (paper.w * pxPerMm).toFixed(0) + 'px';
   box.style.height = (paper.h * pxPerMm).toFixed(0) + 'px';
   box.style.boxShadow = '0 6px 24px rgba(0,0,0,.14)';
+  // POP文言の景表法・薬機法チェック（印刷物は掲示され続けるためリスク大。既存kbCheckText流用・プレビュー下に警告）
+  try {
+    if (typeof kbCheckText === 'function') {
+      const ng = kbCheckText([st.catch, st.title, st.desc, st.message].filter(Boolean).join('　')).filter(f => f.level === 'high');
+      let warn = document.getElementById('popKbWarn');
+      if (!warn && box.parentElement) { warn = document.createElement('div'); warn.id = 'popKbWarn'; box.parentElement.appendChild(warn); }
+      if (warn) warn.innerHTML = ng.length ? `<div style="margin-top:8px;font-size:11.5px;color:var(--red);max-width:340px">⚠ 景表法・薬機法のリスク語「${ng.map(f => escapeHtml(f.word)).join('」「')}」を含みます。印刷前に言い換えをご検討ください。</div>` : '';
+    }
+  } catch (e) {}
   box.style.borderRadius = '6px';
   box.style.overflow = 'hidden';
   box.innerHTML = popInnerHtml(L, F);
@@ -5957,21 +5966,31 @@ function hpSeoRecheck() {
   const firstPara = (body.split('\n').find(l => l.trim() && !/^#/.test(l))) || '';
   const nkw = norm(kw);
   const inTitle = kw ? norm(title).includes(nkw) : null;
+  // KW出現回数（正規化した本文で数える）と、H2行にKWが入っているか
+  const kwCount = nkw ? (norm(body).split(nkw).length - 1) : 0;
+  const h2Lines = (body.match(/^##\s.*$/gm) || []);
+  const kwInH2 = nkw ? h2Lines.some(l => norm(l).includes(nkw)) : null;
   const checks = [
     { ok: title.length > 0 && title.length <= 34, label: `タイトル ${title.length}字` },
     { ok: inTitle, label: 'タイトルに対策KW' },
     { ok: meta.length >= 80 && meta.length <= 130, label: `メタ説明 ${meta.length}字` },
+    { ok: kw ? norm(meta).includes(nkw) : null, label: 'メタ説明に対策KW' },
     { ok: kw ? norm(firstPara).includes(nkw) : null, label: '導入文に対策KW' },
     { ok: kw ? norm(body).includes(nkw) : null, label: '本文に対策KW' },
+    { ok: kwInH2, label: 'H2見出しに対策KW' },
+    { ok: kw ? (kwCount >= 2 && kwCount <= 8) : null, label: `KW出現 ${kwCount}回（2〜8回目安）` },
     { ok: h2 >= 2, label: `見出しH2 ${h2}個` },
     { ok: bodyLen >= 700, label: `本文 約${bodyLen}字` },
     { ok: /Q:/.test(document.getElementById('hpFaq').value), label: 'FAQあり' },
   ];
+  // KW詰め込み警告（9回以上は過剰＝ペナルティリスク）
+  const stuffing = nkw && kwCount > 8;
   const ico = ok => ok === null ? '<span style="color:var(--text-muted)">—</span>' : ok ? '<span style="color:var(--accent-2)">✓</span>' : '<span style="color:#d97706">△</span>';
   const pass = checks.filter(c => c.ok === true).length, total = checks.filter(c => c.ok !== null).length;
   box.innerHTML = `<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px">
     <div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>オンページSEOチェック ${pass}/${total}${kw ? '' : '（対策キーワード未入力＝KW項目は—）'}</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px;font-size:11.5px">${checks.map(c => `<div>${ico(c.ok)} ${c.label}</div>`).join('')}</div></div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px;font-size:11.5px">${checks.map(c => `<div>${ico(c.ok)} ${c.label}</div>`).join('')}</div>
+    ${stuffing ? `<div style="margin-top:6px;font-size:11.5px;color:var(--red)">⚠ 対策KWが${kwCount}回と多すぎます（詰め込みはペナルティのリスク）。自然な言い換え・関連語に置き換えましょう。</div>` : ''}</div>`;
 }
 // 前の店舗の記事下書きが残って別店舗に投稿される事故を防ぐため、記事編集欄を初期化
 let _hpLoadedStore = null;
