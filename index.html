@@ -12905,6 +12905,12 @@ async function loadDrafts() {
     if (alertEl) alertEl.innerHTML = (cnt.overdue || cnt.today)
       ? `<div style="background:${cnt.overdue ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)'};border:1px solid ${cnt.overdue ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'};border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12.5px">${cnt.overdue ? `期日を過ぎた未投稿が <b>${cnt.overdue}件</b> あります。` : ''}${cnt.today ? ` 本日公開予定が <b>${cnt.today}件</b> あります。` : ''}内容を確認して「今すぐ投稿」で公開してください。</div>`
       : '';
+    // 見逃し防止：本日/期日超過があればページを開いた時に1回通知して該当カードへ誘導（自動投稿はしない設計のため）
+    if ((cnt.overdue || cnt.today) && window._draftNotifiedSid !== currentLocationId) {
+      window._draftNotifiedSid = currentLocationId;
+      showToast(`${cnt.overdue ? `期日超過の予約投稿が${cnt.overdue}件` : ''}${cnt.overdue && cnt.today ? '・' : ''}${cnt.today ? `本日公開予定が${cnt.today}件` : ''}あります。「予約投稿の管理」で内容確認→「今すぐ投稿」で公開してください`, cnt.overdue ? 'error' : 'success');
+      document.getElementById('draftsCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     if (!drafts.length) { listEl.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">予約投稿はまだありません。新規投稿で「予約する」、または「月間投稿プラン」で作成してください。</p>'; return; }
     _draftImages = {}; _draftAspect = {}; _draftHashtags = {}; // 削除済み下書きの古いキーを残さない
     drafts.forEach(d => { _draftImages[d.id] = d.images || []; _draftAspect[d.id] = d.aspect || 'portrait'; _draftHashtags[d.id] = d.hashtags || ''; });
