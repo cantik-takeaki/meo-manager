@@ -741,11 +741,12 @@ export default async function handler(req, res) {
   // ── システムステータス（設定ページ・外部連携と枠の健全性を一目で） ──
   if (req.method === 'GET' && action === 'status') {
     const ym = new Date().toISOString().slice(0, 7);
-    let kvOk = true, used = 0, cronLast = null, managedCount = 0;
+    let kvOk = true, used = 0, cronLast = null, managedCount = 0, tamperLast = null;
     try {
       used = await kvGet(`serpapi_usage_${ym}`) || 0;
       cronLast = await kvGet('cron_rank_last') || null;
       managedCount = ((await kvGet('managed_locations')) || []).length;
+      tamperLast = await kvGet('cron_tamper_last') || null;
     } catch (e) { kvOk = false; }
     let gbp = { connected: false };
     try { gbp = await getMasterInfo(); } catch (e) {}
@@ -761,6 +762,7 @@ export default async function handler(req, res) {
       },
       serpapi: { month: ym, used, limit: SERPAPI_LIMIT, remaining: Math.max(0, SERPAPI_LIMIT - used) },
       cronLast: cronLast ? { at: cronLast.at, date: cronLast.date, ok: cronLast.ok, fail: cronLast.fail, targets: cronLast.targets } : null,
+      tamperLast: tamperLast ? { at: tamperLast.at, date: tamperLast.date, checked: tamperLast.checked, changed: tamperLast.changed, pending: tamperLast.pending } : null,
       managedStores: managedCount,
     });
   }
@@ -915,7 +917,7 @@ export default async function handler(req, res) {
     await kvSet('cron_tamper_last', summary);
     // 変化を検知したらメール通知（RESEND設定時・通知ONのみ）
     try {
-      if (changed > 0 && (await kvGet('notify_weekly')) !== false) {
+      if (changed > 0 && (await kvGet('notify_tamper')) !== false) {
         const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
         if (to) {
           const rows = changes.map(c => `<div style="margin-bottom:8px"><b>${c.store}</b><ul style="margin:2px 0">${c.diffs.map(d => `<li>${d.field}: 「${d.saved}」→「${d.current}」</li>`).join('')}</ul></div>`).join('');
@@ -1061,14 +1063,16 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── 週次サマリーメールのON/OFF（設定ページ） ──
+  // ── 通知メールのON/OFF（設定ページ）type=weekly(週次サマリー・既定)/tamper(改ざん検知) ──
   if (action === 'notify-pref') {
+    const nType = (req.method === 'GET' ? req.query.type : (req.body || {}).type) || 'weekly';
+    const nKey = nType === 'tamper' ? 'notify_tamper' : 'notify_weekly';
     if (req.method === 'GET') {
-      const v = await kvGet('notify_weekly');
+      const v = await kvGet(nKey);
       return res.json({ enabled: v !== false, available: !!process.env.RESEND_API_KEY });
     }
     if (req.method === 'POST') {
-      await kvSet('notify_weekly', !!(req.body || {}).enabled);
+      await kvSet(nKey, !!(req.body || {}).enabled);
       return res.json({ success: true });
     }
   }
@@ -1333,6 +1337,42 @@ export default async function handler(req, res) {
     const { storeId } = req.query;
     if (!storeId) return res.status(400).json({ error: 'storeId必須' });
     return res.json({ history: (await kvGet(`wp_history_${storeId}`)) || [] });
+  }
+
+  // ── サイテーション掲載URLのNAP突合チェック（無料・素のfetchで電話/店名の実掲載を判定） ──
+  // クライアントが5件ずつ分割して呼ぶ前提（Vercel 10s制限対策）。1リクエストあたり最大6件を並列fetch(各3秒timeout)。
+  if (req.method === 'POST' && action === 'citation-verify') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const cit = (await kvGet(`citation_${storeId}`)) || {};
+    const nap = cit.nap || {};
+    const phoneDigits = String(nap.phone || '').replace(/\D/g, '');
+    const nameNorm = String(nap.name || '').replace(/\s+/g, '');
+    if (!phoneDigits && !nameNorm) return res.status(400).json({ error: 'NAP情報（店舗名・電話番号）を先に保存してください' });
+    const wanted = Array.isArray((req.body || {}).siteIds) ? req.body.siteIds : null;
+    const targets = (cit.sites || [])
+      .filter(s => s.listingUrl && /^https?:\/\//i.test(String(s.listingUrl)))
+      .filter(s => !wanted || wanted.includes(s.id))
+      .slice(0, 6);
+    // 電話は「数字の間に区切り記号を許す」正規表現で照合（03-1234-5678 / 0312345678 / (03)1234 5678 すべて拾う）
+    const phoneRe = phoneDigits ? new RegExp(phoneDigits.split('').join('[-‐－ー()（）\\s.]{0,2}')) : null;
+    const results = await Promise.all(targets.map(async (s) => {
+      try {
+        const ctl = new AbortController();
+        const tm = setTimeout(() => ctl.abort(), 3000);
+        const r = await fetch(s.listingUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; rakuraku-meo/1.0)' }, signal: ctl.signal, redirect: 'follow' });
+        clearTimeout(tm);
+        if (!r.ok) return { siteId: s.id, status: 'unreachable' };
+        const html = String(await r.text()).slice(0, 900000);
+        const phoneOk = !phoneRe || phoneRe.test(html);
+        const nameOk = !nameNorm || html.replace(/\s+/g, '').includes(nameNorm);
+        if (phoneOk && nameOk) return { siteId: s.id, status: 'ok' };
+        // 両方とも見つからない＝JS描画/bot遮断の可能性が高い→不一致と断定せず手動確認へ
+        if (!phoneOk && !nameOk) return { siteId: s.id, status: 'unreachable' };
+        return { siteId: s.id, status: phoneOk ? 'name_missing' : 'phone_mismatch' };
+      } catch (e) { return { siteId: s.id, status: 'unreachable' }; }
+    }));
+    return res.json({ results });
   }
 
   // WPのカテゴリ一覧（アイキャッチ/カテゴリ指定用）

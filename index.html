@@ -2630,6 +2630,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
           クライアントの正しい店舗情報を登録してください。<br>
           正規情報を保存すると<b>毎日自動でGoogleビジネスプロフィールを巡回・照合</b>し、店名・電話・住所・カテゴリ・URLの変更（改ざん・乗っ取り）を検出してアラート履歴に記録します（変化を検知するとメール通知）。今すぐ確認したいときは「変更チェック」を押してください。
         </p>
+        <div id="tamperCronStatus" style="display:none;font-size:12px;color:var(--text-muted);background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
           <div>
             <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px">正式店舗名 *</label>
@@ -2718,7 +2719,11 @@ body.role-viewer [data-edit-action] { display:none !important; }
         </div>
         <p style="font-size:12px;color:var(--text-sub);margin-bottom:16px">登録済みの媒体にチェックを入れてください。登録数が多いほどMEO評価が上がります。</p>
         <div id="citationSites"></div>
-        <button class="btn btn-primary" style="margin-top:14px" onclick="saveCitation()">登録状況を保存</button>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveCitation()">登録状況を保存</button>
+          <button class="btn btn-outline" onclick="verifyCitations()" title="掲載ページURLを実際に取得し、保存済みのNAP（店舗名・電話番号）が本当に載っているかを照合します（無料）"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>掲載URLをNAP一括チェック</button>
+          <span id="citVerifyStatus" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
       </div>
 
       <div class="card" style="border-color:rgba(79,125,243,0.3)">
@@ -3360,6 +3365,13 @@ body.role-viewer [data-edit-action] { display:none !important; }
           </div>
           <label class="tgl"><input type="checkbox" id="setNotify" onchange="toggleNotify(this)"><span class="tgl-track"></span></label>
         </div>
+        <div class="set-row">
+          <div class="set-row-main">
+            <div class="set-row-title">改ざん検知メール</div>
+            <div class="set-row-sub" id="setNotifyTamperHint">毎日の自動巡回でGBPビジネス情報の変更（改ざん・乗っ取りの疑い）を検知したときにメールで知らせます。</div>
+          </div>
+          <label class="tgl"><input type="checkbox" id="setNotifyTamper" onchange="toggleNotifyTamper(this)"><span class="tgl-track"></span></label>
+        </div>
       </div>
 
       <!-- 店舗 -->
@@ -3769,6 +3781,11 @@ async function loadSettings() {
     const nh = document.getElementById('setNotifyHint');
     if (nt) { nt.checked = !!np.enabled && !!np.available; nt.disabled = !np.available; }
     if (nh && !np.available) nh.textContent = 'メール送信（RESEND_API_KEY）が未設定のため現在は利用できません。設定すると週次レポートが届くようになります。';
+    const tp = await fetch('/api/admin?action=notify-pref&type=tamper').then(r => r.json());
+    const tt = document.getElementById('setNotifyTamper');
+    const th = document.getElementById('setNotifyTamperHint');
+    if (tt) { tt.checked = !!tp.enabled && !!tp.available; tt.disabled = !tp.available; }
+    if (th && !tp.available) th.textContent = 'メール送信（RESEND_API_KEY）が未設定のため現在は利用できません。設定すると検知メールが届くようになります。';
   } catch (e) {}
   // 店舗数
   const stInfo = document.getElementById('setStoreInfo');
@@ -3942,6 +3959,19 @@ async function toggleNotify(el) {
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.success) showToast(enabled ? '週次レポートメールを有効にしました' : '週次レポートメールを無効にしました', 'success');
+    else { el.checked = !enabled; showToast(d.error || '変更できませんでした', 'error'); }
+  } catch (e) { el.checked = !enabled; showToast('通信エラー: ' + e.message, 'error'); }
+}
+
+async function toggleNotifyTamper(el) {
+  const enabled = el.checked;
+  try {
+    const r = await fetch('/api/admin?action=notify-pref', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, type: 'tamper' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) showToast(enabled ? '改ざん検知メールを有効にしました' : '改ざん検知メールを無効にしました', 'success');
     else { el.checked = !enabled; showToast(d.error || '変更できませんでした', 'error'); }
   } catch (e) { el.checked = !enabled; showToast('通信エラー: ' + e.message, 'error'); }
 }
@@ -10760,16 +10790,18 @@ function renderReviews() {
   el.innerHTML = reviews.map((r, i) => {
     const stars = '★'.repeat(starRatingToNum(r.starRating)) + '☆'.repeat(5-starRatingToNum(r.starRating));
     const date = new Date(r.createTime).toLocaleDateString('ja-JP');
+    const lang = _revLangBadge(r.comment);
     return `
       <div class="review-card" id="rc-${i}">
         <div class="review-header">
           <div>
-            <div class="reviewer-name">${r.reviewer?.displayName || '匿名'}</div>
+            <div class="reviewer-name">${r.reviewer?.displayName || '匿名'}${lang ? ` <span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(46,143,240,0.12);border-radius:5px;padding:2px 7px;vertical-align:1px"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>${lang}</span>` : ''}</div>
             <div class="review-date">${date}</div>
           </div>
           <div class="stars">${stars}</div>
         </div>
         <div class="review-text">${r.comment || '（コメントなし）'}</div>
+        <div id="rtr-${i}" style="display:none;margin-top:8px"></div>
         ${r.reviewReply ? `<div class="review-reply"><div class="review-reply-label">オーナーの返信${r.reviewReply.updateTime ? `<span style="font-weight:400;color:var(--text-muted)">・返信日 ${new Date(r.reviewReply.updateTime).toLocaleDateString('ja-JP')}</span>` : ''}</div>${r.reviewReply.comment}</div>` : ''}
         <div class="review-actions">
           <button class="btn btn-outline btn-sm" onclick="toggleReplyEditor(${i})">
@@ -10777,6 +10809,7 @@ function renderReviews() {
           </button>
           <button class="btn btn-outline btn-sm" onclick="generateReply(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI返信生成</button>
           <button class="btn btn-outline btn-sm" onclick="diagnoseReview(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>️ AIリスク診断</button>
+          ${lang ? `<button class="btn btn-outline btn-sm" onclick="translateReview(${i})"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>日本語訳を表示</button>` : ''}
         </div>
         <div id="risk-${i}" style="display:none;margin-top:10px"></div>
         <div class="reply-editor" id="re-${i}">
@@ -10797,6 +10830,42 @@ function renderReviews() {
 
 function toggleReplyEditor(i) {
   document.getElementById(`re-${i}`).classList.toggle('open');
+}
+
+// 口コミ本文の言語バッジ判定（サーバー側 _detectLang と同じ基準。かな有り=日本語=バッジなし）
+function _revLangBadge(t) {
+  const s = String(t || '');
+  if (!s.trim() || /[぀-ヿ]/.test(s)) return null;
+  if (/[가-힣]/.test(s)) return 'KO';
+  if (/[一-鿿㐀-䶿]/.test(s)) return 'ZH';
+  if (/[฀-๿]/.test(s)) return 'TH';
+  if (/[Ѐ-ӿ]/.test(s)) return 'RU';
+  if (/[A-Za-zÀ-ÿ]{3,}/.test(s)) return 'EN';
+  return null;
+}
+
+// 外国語口コミの日本語訳を表示（AI翻訳・ボタン押下時のみ実行。2回目以降は開閉トグル）
+async function translateReview(i) {
+  const r = getFilteredReviews()[i];
+  if (!r) return;
+  const box = document.getElementById(`rtr-${i}`);
+  if (!box) return;
+  if (box.dataset.done) { box.style.display = box.style.display === 'none' ? 'block' : 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">翻訳中…</span>';
+  try {
+    const resp = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'review_translate', reviewText: r.comment || '' }),
+    });
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok || !d.content) throw new Error(d.error || '翻訳に失敗しました');
+    box.dataset.done = '1';
+    const safe = String(d.content).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+    box.innerHTML = `<div style="background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.7"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">日本語訳（AI・参考）</div>${safe}</div>`;
+  } catch (e) {
+    box.innerHTML = `<span style="font-size:12px;color:var(--red)">${e.message}</span>`;
+  }
 }
 
 // フィルタ＋並べ替えの単一情報源。renderReviewsとgenerateReply等のインデックスはここで必ず一致させる
@@ -12227,10 +12296,11 @@ function renderCitationSites(registered, nap) {
             <div style="flex:1">
               <div style="font-size:13px;font-weight:500">${site.name}</div>
               <div style="font-size:11px;color:var(--text-muted)">${site.note || ''}</div>
-              <div id="curl-${site.id}" style="display:${isReg?'flex':'none'};gap:6px;margin-top:4px">
+              <div id="curl-${site.id}" style="display:${isReg?'flex':'none'};gap:6px;margin-top:4px;align-items:center">
                 <input type="text" id="cit-url-${site.id}" value="${regData.listingUrl||''}" placeholder="掲載ページURL（任意）"
                   style="flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px">
                 ${regData.listingUrl?`<a href="${regData.listingUrl}" target="_blank" style="font-size:11px;color:var(--accent);line-height:2.4">確認</a>`:''}
+                <span id="cvb-${site.id}" style="white-space:nowrap">${_citBadgeHtml((window._citVerify||{})[site.id])}</span>
               </div>
             </div>
             <span style="font-size:11px;color:${priorityColor[site.priority]};font-weight:600;white-space:nowrap">${priorityLabel[site.priority]}</span>
@@ -12242,6 +12312,53 @@ function renderCitationSites(registered, nap) {
 
 function toggleCitUrl(id, checked) {
   document.getElementById(`curl-${id}`).style.display = checked ? 'flex' : 'none';
+}
+
+// NAP突合バッジ（ok=一致 / phone_mismatch=電話未確認 / name_missing=店名未確認 / unreachable=取得不可→手動確認）
+function _citBadgeHtml(status) {
+  if (!status) return '';
+  const map = {
+    ok: ['✓ NAP一致', 'var(--green, #10b981)', 'rgba(16,185,129,0.12)'],
+    phone_mismatch: ['△ 電話未確認', 'var(--gold)', 'rgba(245,158,11,0.12)'],
+    name_missing: ['△ 店名未確認', 'var(--gold)', 'rgba(245,158,11,0.12)'],
+    unreachable: ['— 手動確認', 'var(--text-muted)', 'var(--bg-3)'],
+  };
+  const [label, color, bg] = map[status] || map.unreachable;
+  return `<span style="font-size:10px;font-weight:700;color:${color};background:${bg};border-radius:5px;padding:2px 7px">${label}</span>`;
+}
+
+// 掲載URLのNAP突合一括チェック（保存済みデータをサーバーが実fetchで照合。5件ずつ分割でVercel 10s制限を回避）
+async function verifyCitations() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const sid = currentLocationId;
+  const st = document.getElementById('citVerifyStatus');
+  try {
+    await saveCitation(); // 入力中のURLも含めて保存してから照合
+    const d = await fetch(`/api/store-settings?action=citation&locationId=${encodeURIComponent(sid)}`).then(r => r.json());
+    const targets = (d.sites || []).filter(s => s.listingUrl && /^https?:\/\//i.test(String(s.listingUrl)));
+    if (!targets.length) { if (st) st.textContent = ''; return showToast('掲載ページURLが入力された媒体がありません。各媒体のURL欄に掲載ページを入力してください', 'error'); }
+    if (!((d.nap || {}).phone) && !((d.nap || {}).name)) { if (st) st.textContent = ''; return showToast('NAP情報（店舗名・電話番号）を先に保存してください', 'error'); }
+    window._citVerify = window._citVerify || {};
+    let done = 0;
+    for (let i = 0; i < targets.length; i += 5) {
+      if (currentLocationId !== sid) return; // 店舗切替時は中断
+      const chunk = targets.slice(i, i + 5).map(s => s.id);
+      if (st) st.textContent = `照合中… ${done}/${targets.length}媒体`;
+      const r = await fetch(`/api/admin?action=citation-verify&storeId=${encodeURIComponent(sid)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteIds: chunk }),
+      }).then(r => r.json());
+      if (r.error) throw new Error(r.error);
+      (r.results || []).forEach(x => {
+        window._citVerify[x.siteId] = x.status;
+        const el = document.getElementById(`cvb-${x.siteId}`);
+        if (el) el.innerHTML = _citBadgeHtml(x.status);
+        done++;
+      });
+    }
+    if (st) st.textContent = `照合完了 ${done}/${targets.length}媒体（「—手動確認」はJS描画やbot対策で自動確認できないサイトです）`;
+    showToast('NAP突合チェックが完了しました', 'success');
+  } catch (e) { if (st) st.textContent = ''; showToast(e.message || '照合に失敗しました', 'error'); }
 }
 
 // NAP情報を企業ナレッジから取り込む（サイテーション登録の手間を削減）
@@ -13207,6 +13324,21 @@ async function loadProtection() {
             ${a.diffs.map(df => `<div style="font-size:13px"><strong>${df.field}</strong>: 「${df.saved}」→「${df.current}」</div>`).join('')}
           </div>`).join('')
       : '<div class="empty-state"><p><svg viewBox="0 0 24 24" width="15" height="15" fill="none" style="vertical-align:-3px;margin-right:5px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>アラートなし（正常です）</p></div>';
+  } catch {}
+  // 毎日自動巡回のステータス（本当に動いているかを可視化）
+  try {
+    const st = await fetch('/api/admin?action=status').then(r => r.json());
+    const box = document.getElementById('tamperCronStatus');
+    if (box) {
+      if (st.tamperLast) {
+        const t = st.tamperLast;
+        box.style.display = 'block';
+        box.innerHTML = `<b style="color:var(--text)">毎日自動巡回:</b> 最終実行 ${t.date || ''}　照合 ${t.checked ?? 0}店舗　変化検知 <span style="color:${(t.changed || 0) > 0 ? 'var(--red)' : 'var(--green, #10b981)'};font-weight:700">${t.changed ?? 0}件</span>${t.pending ? `　保留 ${t.pending}` : ''}`;
+      } else {
+        box.style.display = 'block';
+        box.textContent = '毎日自動巡回: まだ実行されていません（毎日3時に自動実行されます）';
+      }
+    }
   } catch {}
 }
 
