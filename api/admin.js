@@ -1188,6 +1188,23 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── AIO診断スコアの履歴（URL別・前回比表示用）。診断の使い捨てを解消 ──
+  if (action === 'aio-log') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `aio_log_${storeId}`;
+    if (req.method === 'GET') return res.json({ logs: (await kvGet(key)) || [] });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const entry = { date: new Date().toISOString().slice(0, 10), url: String(b.url || '').slice(0, 300), score: Math.max(0, Math.min(100, parseInt(b.score, 10) || 0)) };
+      let logs = (await kvGet(key)) || [];
+      logs.push(entry);
+      if (logs.length > 24) logs = logs.slice(-24);
+      await kvSet(key, logs);
+      return res.json({ success: true });
+    }
+  }
+
   // ── 月次レポート：来月の施策計画（月ごと・編集可）。先方に「次に何をするか」を示す ──
   if (action === 'meo-report-plan') {
     const { storeId, month } = req.query;

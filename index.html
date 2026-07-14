@@ -1283,7 +1283,11 @@ body.role-viewer [data-edit-action] { display:none !important; }
 
         <!-- 低評価フィードバック一覧（折りたたみ） -->
         <div id="feedbackBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-          <div style="font-weight:700;font-size:14px;margin-bottom:8px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>低評価フィードバック（店内限定・Google非公開）</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <div style="font-weight:700;font-size:14px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>低評価フィードバック（店内限定・Google非公開）</div>
+            <button class="btn btn-outline btn-sm" onclick="analyzeFeedback()" title="Googleに出る前の不満の声をAIが分析し、繰り返されている課題と改善案を出します"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AIで傾向分析</button>
+          </div>
+          <div id="feedbackAnalysis" style="display:none;font-size:13px;line-height:1.8;white-space:pre-wrap;background:var(--bg-3);border-radius:10px;padding:12px;margin-bottom:10px"></div>
           <div id="feedbackList"></div>
         </div>
       </div>
@@ -6248,6 +6252,7 @@ async function renderFeedback() {
   try {
     const d = await fetch(`/api/admin?action=feedback&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
     const items = d.feedback || [];
+    window._feedbackItems = items; // AI傾向分析で使用
     if (!items.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-sub)">まだフィードバックはありません。</p>'; return; }
     list.innerHTML = items.map(f => `
       <div style="padding:10px;border-bottom:1px solid var(--border)">
@@ -6256,6 +6261,22 @@ async function renderFeedback() {
         <button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="deleteFeedback('${f.id}')">対応済みにする（削除）</button>
       </div>`).join('');
   } catch (e) { list.innerHTML = `<span style="font-size:12px;color:var(--red)">取得失敗</span>`; }
+}
+
+// 低評価フィードバック（Google非公開の声）のAI傾向分析：繰り返される課題と改善案を抽出（既存type=review_analysis流用）
+async function analyzeFeedback() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const items = (window._feedbackItems || []).map(f => ({ star: f.rating || 0, comment: f.text || '' })).filter(f => f.comment);
+  if (!items.length) return showToast('分析できるフィードバックがありません', 'error');
+  const box = document.getElementById('feedbackAnalysis');
+  box.style.display = 'block'; box.textContent = 'フィードバックを分析中…';
+  try {
+    const d = await fetch('/api/generate-content', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, type: 'review_analysis', reviews: items.slice(0, 40) }),
+    }).then(r => r.json());
+    box.textContent = d.content || d.error || '分析に失敗しました';
+  } catch (e) { box.textContent = '分析に失敗しました'; }
 }
 
 async function deleteFeedback(id) {
@@ -11934,23 +11955,35 @@ async function aioAnalyze(ev) {
   status.textContent = 'ページを読み込み、AIがAIO/LLMO/GEO観点で診断中…（15〜25秒）';
   res.innerHTML = '';
   try {
+    // 前回スコア（同一URLの最後の診断）を先に取得 → 前回比を表示
+    let prevScore = null;
+    try { const gl = await fetch(`/api/admin?action=aio-log&storeId=${encodeURIComponent(currentLocationId)}`).then(r => r.json()); const same = (gl.logs || []).filter(l => l.url === url); if (same.length) prevScore = same[same.length - 1].score; } catch (e) {}
     const d = await fetch('/api/generate-content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locationId: currentLocationId, type: 'aio_analyze', url }) }).then(r => r.json());
     if (d.error) { status.textContent = d.error; return; }
     status.textContent = '';
-    res.innerHTML = renderAioAnalysis(d);
+    res.innerHTML = renderAioAnalysis(d, prevScore);
+    // 今回スコアを履歴に保存（失敗しても表示は続行）
+    try { const sc = parseInt(d.result?.score, 10); if (Number.isFinite(sc)) await fetch(`/api/admin?action=aio-log&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, score: sc }) }); } catch (e) {}
   } catch (e) { status.textContent = '診断に失敗しました: ' + e.message; }
   if (btn) { btn.disabled = false; btn.innerHTML = bh; }
 }
 function _aioColor(sc) { return sc >= 75 ? 'var(--accent-2)' : sc >= 45 ? '#d97706' : 'var(--red)'; }
 function _aioStatusChip(st) { const m = { good: ['良好', 'var(--accent-2)'], weak: ['要改善', '#d97706'], missing: ['未対応', 'var(--red)'] }; const [t, c] = m[st] || ['—', 'var(--text-muted)']; return `<span style="font-size:10.5px;font-weight:700;color:#fff;background:${c};padding:1px 8px;border-radius:999px">${t}</span>`; }
-function renderAioAnalysis(d) {
+function renderAioAnalysis(d, prevScore) {
   const r = d.result || {}, dims = r.dimensions || [], imps = r.improvements || [];
   const score = Math.max(0, Math.min(100, parseInt(r.score, 10) || 0)), sc = _aioColor(score);
   const schema = d.schema || [];
+  // 前回比（同一URLの前回診断があれば表示）
+  let prevChip = '';
+  if (prevScore != null) {
+    const pd = score - prevScore;
+    prevChip = `<div style="font-size:11px;margin-top:2px">${pd > 0 ? `<span style="color:var(--accent-2);font-weight:700">前回比 ▲${pd}</span>` : pd < 0 ? `<span style="color:var(--red)">前回比 ▼${-pd}</span>` : '<span style="color:var(--text-muted)">前回と同じ</span>'}<span style="color:var(--text-muted)">（前回 ${prevScore}）</span></div>`;
+  }
   let html = `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:var(--bg-3);border-radius:10px;padding:14px;margin-top:6px">
     <div style="text-align:center;min-width:120px">
       <div style="font-size:11px;color:var(--text-sub)">AIO/LLMO/GEO 総合</div>
       <div style="font-size:46px;font-weight:900;line-height:1.1;color:${sc}">${score}<span style="font-size:18px;color:var(--text-sub)">/100</span></div>
+      ${prevChip}
     </div>
     <div style="flex:1;min-width:220px;font-size:13px;line-height:1.7">${escapeHtml(r.summary || '')}
       <div style="margin-top:6px;font-size:11px;color:var(--text-sub)">検出された構造化データ: ${schema.length ? schema.map(escapeHtml).join('、') : 'なし'}</div>
