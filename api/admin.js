@@ -1205,6 +1205,32 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── AIコンサル週次タスクの完了チェック（端末をまたいで共有。週キーで自動リセット） ──
+  if (action === 'consul-done') {
+    const { storeId, week } = req.query;
+    if (!storeId || !week) return res.status(400).json({ error: 'storeId,week必須' });
+    const key = `consul_done_${storeId}_${String(week).slice(0, 10)}`;
+    if (req.method === 'GET') return res.json({ done: (await kvGet(key)) || [] });
+    if (req.method === 'POST') {
+      const arr = Array.isArray((req.body || {}).done) ? req.body.done.slice(0, 10).map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
+      await kvSet(key, arr);
+      return res.json({ success: true });
+    }
+  }
+
+  // ── 口コミ分析(AI)の結果保存（使い捨て解消：次回表示時に前回の分析を出す） ──
+  if (action === 'review-analysis') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `review_analysis_${storeId}`;
+    if (req.method === 'GET') return res.json({ saved: (await kvGet(key)) || null });
+    if (req.method === 'POST') {
+      const text = String((req.body || {}).text || '').slice(0, 6000);
+      await kvSet(key, { date: new Date().toISOString(), text });
+      return res.json({ success: true });
+    }
+  }
+
   // ── 月次レポート：来月の施策計画（月ごと・編集可）。先方に「次に何をするか」を示す ──
   if (action === 'meo-report-plan') {
     const { storeId, month } = req.query;

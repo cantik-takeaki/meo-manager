@@ -6576,7 +6576,25 @@ async function analyzeReviews() {
       body: JSON.stringify({ locationId: currentLocationId, type: 'review_analysis', reviews: items.slice(0, 40) }),
     }).then(r => r.json());
     box.textContent = d.content || d.error || '分析に失敗しました';
+    // 分析結果をKVに保存（使い捨て解消：次回パネルを開いた時に前回の分析を表示）
+    if (d.content) {
+      window._revAnalysisSid = currentLocationId;
+      fetch(`/api/admin?action=review-analysis&storeId=${encodeURIComponent(currentLocationId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: d.content }) }).catch(() => {});
+    }
   } catch (e) { box.textContent = '分析に失敗しました'; }
+}
+// 前回の口コミ分析(AI)結果を復元表示（保存済みがあれば日付ラベルつき。店舗切替で入れ替え）
+async function loadSavedReviewAnalysis() {
+  const box = document.getElementById('reviewAnalysis'); if (!box || !currentLocationId) return;
+  if (window._revAnalysisSid === currentLocationId && box.textContent.trim()) return; // 同店舗で表示済み
+  const sid = currentLocationId;
+  window._revAnalysisSid = sid;
+  box.textContent = '';
+  try {
+    const d = await fetch(`/api/admin?action=review-analysis&storeId=${encodeURIComponent(sid)}`).then(r => r.json());
+    if (currentLocationId !== sid) return; // 店舗切替レース防御
+    if (d.saved && d.saved.text) box.innerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">前回の分析（${escapeHtml((d.saved.date || '').slice(0, 10))}）—「分析する」で最新に更新できます</div>${escapeHtml(d.saved.text).replace(/\n/g, '<br>')}`;
+  } catch (e) {}
 }
 
 // AI相談アシスタント（店舗データを踏まえて回答）
@@ -10148,13 +10166,21 @@ function _isoWeek() {
   return t.getUTCFullYear() + '-W' + String(Math.ceil(((t - y0) / 864e5 + 1) / 7)).padStart(2, '0');
 }
 function _consulDone(locId) {
-  try { return JSON.parse(localStorage.getItem(`consul_done_${locId}_${_isoWeek()}`) || '[]'); } catch (e) { return []; }
+  // localStorage(即時)とKV(端末間共有・runAiConsulで取得済み)をマージ
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem(`consul_done_${locId}_${_isoWeek()}`) || '[]'); } catch (e) {}
+  const kv = window._consulDoneKv;
+  if (kv && kv.locId === locId && kv.week === _isoWeek() && Array.isArray(kv.done)) arr = [...new Set([...arr, ...kv.done])];
+  return arr;
 }
 function toggleConsulTask(locId, i, el) {
   const key = `consul_done_${locId}_${_isoWeek()}`;
   let arr = _consulDone(locId);
   if (el.checked) { if (!arr.includes(i)) arr.push(i); } else arr = arr.filter(x => x !== i);
   try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {}
+  // KVにも保存（端末をまたいで共有・失敗しても localStorage で動作継続）
+  if (window._consulDoneKv && window._consulDoneKv.locId === locId) window._consulDoneKv.done = arr;
+  fetch(`/api/admin?action=consul-done&storeId=${encodeURIComponent(locId)}&week=${encodeURIComponent(_isoWeek())}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: arr }) }).catch(() => {});
   const row = el.closest('tr');
   if (row) row.style.opacity = el.checked ? 0.55 : 1;
 }
@@ -10173,7 +10199,7 @@ async function runAiConsul() {
   try {
     // ① データ収集（ナレッジ・口コミ・順位・GBP写真を並行取得）
     const gbpConnected = loc._type === 'gbp' || loc.gbpConnected;
-    const [k, rvData, rk, ph, alog, clog] = await Promise.all([
+    const [k, rvData, rk, ph, alog, clog, cdone] = await Promise.all([
       fetch(`/api/admin?action=knowledge&locationId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({})),
       (gbpConnected && loc.name)
         ? fetch(`/api/reviews?locationName=${encodeURIComponent(loc.name)}${loc.storeId ? '&storeId=' + loc.storeId : ''}`).then(r => r.json()).catch(() => ({}))
@@ -10186,6 +10212,8 @@ async function runAiConsul() {
       // 施策ログ＋過去のコンサル履歴（重複提案の防止・グレード推移の表示に使用）
       fetch(`/api/posts?action=actionlog&storeId=${encodeURIComponent(loc.storeId || locId)}`).then(r => r.json()).catch(() => ({ logs: [] })),
       fetch(`/api/admin?action=consul-log&storeId=${encodeURIComponent(locId)}`).then(r => r.json()).catch(() => ({ logs: [] })),
+      // 週次タスクの完了チェック（KV＝端末間共有）
+      fetch(`/api/admin?action=consul-done&storeId=${encodeURIComponent(locId)}&week=${encodeURIComponent(_isoWeek())}`).then(r => r.json()).catch(() => ({ done: [] })),
     ]);
     const rv = (rvData && rvData.stats) || {};
     // GBP写真実データを診断に合流（ダッシュボード診断と同じ整形＝グレード不一致を解消）
@@ -10229,6 +10257,8 @@ async function runAiConsul() {
       if (s !== -1 && e !== -1) ai = JSON.parse(t.slice(s, e + 1));
     } catch (e) {}
     const tasks = (ai?.tasks || []).slice(0, 5);
+    // 週次タスクの完了チェック（KV分をマージ用に保持。_consulDoneがlocalStorageと統合）
+    window._consulDoneKv = { locId, week: _isoWeek(), done: (cdone && cdone.done) || [] };
     // 今回の結果を履歴に保存（グレード推移・次回の重複防止に使用。失敗しても分析表示は続行）
     try {
       await fetch(`/api/admin?action=consul-log&storeId=${encodeURIComponent(locId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ score, grade, tasks: tasks.map(t => t.name || '') }) });
@@ -10330,6 +10360,7 @@ async function loadReviews() {
   }
 
   document.getElementById('reviewsList').innerHTML = '<div class="loading"><div class="spinner"></div>口コミを読み込み中...</div>';
+  loadSavedReviewAnalysis(); // 前回のAI分析結果を復元（非同期・失敗しても本処理に影響なし）
 
   try {
     const res = await fetch(`/api/reviews?locationName=${encodeURIComponent(currentLocation.name)}${currentLocation.storeId ? '&storeId=' + currentLocation.storeId : ''}`);
