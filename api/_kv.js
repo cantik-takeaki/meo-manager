@@ -34,3 +34,15 @@ export async function kvDel(key) {
     body: JSON.stringify(['DEL', key]),
   });
 }
+
+// アトミック加算（SerpApi使用量カウンタ等の並行実行アンダーカウント対策）。新しい合計値を返す
+export async function kvIncrBy(key, n) {
+  const { url, token } = getKV();
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(['INCRBY', key, String(parseInt(n, 10) || 0)]),
+  });
+  const data = await res.json();
+  return Number(data.result);
+}

@@ -8437,7 +8437,9 @@ async function loadInsightsPage(opts) {
   if (grid) grid.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--text-sub);padding:10px">読み込み中…</div>';
   if (chart) chart.innerHTML = '';
   const sid = currentLocation.storeId ? '&storeId=' + currentLocation.storeId : '';
-  const q = custom ? `&start=${opts.start}&end=${opts.end}` : `&months=${months}`;
+  // 3/6ヶ月プリセットは前年比も取得（12ヶ月はAPIの履歴上限18ヶ月を超えるため対象外）
+  const wantYoy = !custom && months <= 6;
+  const q = (custom ? `&start=${opts.start}&end=${opts.end}` : `&months=${months}`) + (wantYoy ? '&yoy=1' : '');
   try {
     const d = await fetch(`/api/locations?action=insights&locationName=${encodeURIComponent(currentLocation.name)}${sid}${q}`).then(r => r.json());
     if (d.error || d.pending) { if (grid) grid.innerHTML = ''; if (chart) chart.innerHTML = `<p style="font-size:12px;color:var(--text-sub);padding:10px">インサイトを取得できませんでした（${escapeHtml(d.error || 'API承認待ち')}）。</p>`; return; }
@@ -8445,8 +8447,16 @@ async function loadInsightsPage(opts) {
     const r = d.range || {}, fmtd = o => o ? `${o.year}/${o.month}/${o.day}` : '';
     const rEl = document.getElementById('insPageRange'); if (rEl) rEl.textContent = (r.start && r.end) ? `期間：${fmtd(r.start)} 〜 ${fmtd(r.end)}` : '';
     const s = d.summary || {};
-    const card = (label, val, hot) => `<div style="background:var(--bg-2,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:var(--text-sub)">${label}</div><div style="font-size:24px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;color:${hot ? 'var(--accent)' : 'var(--text)'}">${(val || 0).toLocaleString()}</div></div>`;
-    if (grid) grid.innerHTML = card('表示回数(合計)', s.impressions, true) + card('Maps表示', s.mapsImpressions) + card('検索表示', s.searchImpressions) + card('電話', s.calls) + card('ルート案内', s.directionRequests) + card('ウェブクリック', s.websiteClicks);
+    const py = (wantYoy && d.yoySummary) ? d.yoySummary : null;
+    const yoyChip = (key) => {
+      if (!py) return '';
+      const prev = py[key] || 0, cur = s[key] || 0;
+      if (!prev) return '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">前年比 —</div>';
+      const pct = Math.round(((cur - prev) / prev) * 100), up = pct >= 0;
+      return `<div style="font-size:11px;font-weight:700;margin-top:2px;color:${up ? '#10b981' : 'var(--red)'}">前年比 ${up ? '+' : ''}${pct}%</div>`;
+    };
+    const card = (label, val, key, hot) => `<div style="background:var(--bg-2,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:12px;color:var(--text-sub)">${label}</div><div style="font-size:24px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;color:${hot ? 'var(--accent)' : 'var(--text)'}">${(val || 0).toLocaleString()}</div>${yoyChip(key)}</div>`;
+    if (grid) grid.innerHTML = card('表示回数(合計)', s.impressions, 'impressions', true) + card('Maps表示', s.mapsImpressions, 'mapsImpressions') + card('検索表示', s.searchImpressions, 'searchImpressions') + card('電話', s.calls, 'calls') + card('ルート案内', s.directionRequests, 'directionRequests') + card('ウェブクリック', s.websiteClicks, 'websiteClicks');
     renderInsChart();
     renderInsOverlay();
   } catch (e) { if (chart) chart.innerHTML = `<p style="font-size:12px;color:var(--red);padding:10px">取得に失敗しました: ${escapeHtml(e.message)}</p>`; }

@@ -1,5 +1,5 @@
 // api/admin.js — 店舗登録・順位入力（統合）
-import { kvGet, kvSet, kvDel } from './_kv.js';
+import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
 
 function parseCookies(req) {
@@ -814,7 +814,7 @@ export default async function handler(req, res) {
       if (ok + fail >= MAX_CALLS) break;
       try {
         const { list, error, calls } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
-        if (_cronUseSerp && calls) { used += calls; await kvSet(usedKey, used); } // 実リクエスト数で加算（再試行含む）
+        if (_cronUseSerp && calls) { used = await kvIncrBy(usedKey, calls); } // アトミック加算（並行実行のアンダーカウント防止・戻り値=真の合計）
         if (error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error }); continue; }
         const target = _normName(job.st.name);
         let rank = null;
@@ -1097,7 +1097,7 @@ export default async function handler(req, res) {
     if (useSerp && used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
     try {
       const { list, error, calls } = await fetchLocalResults(keyword, { location, ll });
-      if (useSerp && calls) await kvSet(usedKey, used + calls); // 使用回数を記録（実リクエスト数＝再試行含む）
+      if (useSerp && calls) await kvIncrBy(usedKey, calls); // アトミック加算（並行実行のアンダーカウント防止）
       if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
       const target = _normName(store);
       let rank = null, matched = null;
@@ -1408,7 +1408,7 @@ export default async function handler(req, res) {
         const geo = await geocodeQuery(area);
         const opts = geo ? { ll: `${geo.lat},${geo.lng},14z` } : { location: area };
         const { list, error, calls } = await fetchLocalResults(keyword, opts);
-        if (useSerp && calls) { used += calls; await kvSet(usedKey, used); } // 実リクエスト数で加算（エラー時も消費済み）
+        if (useSerp && calls) { used = await kvIncrBy(usedKey, calls); } // アトミック加算（エラー時も消費分を計上・戻り値=真の合計で枠ガードが正確に）
         if (error) { results.push({ area, rank: null, error, point: geo ? { lat: geo.lat, lng: geo.lng } : null }); continue; }
         let rank = null;
         (list || []).forEach((item, i) => {
