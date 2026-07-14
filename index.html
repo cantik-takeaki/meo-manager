@@ -2797,6 +2797,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:var(--bg-3);border-radius:var(--radius-sm)">
           <input id="aioDetectUrl" type="url" placeholder="公式サイトのURL（構造化データ/FAQ等を自動判定）" style="flex:1;min-width:220px;background:var(--bg-2,#fff);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:inherit">
           <button class="btn btn-primary btn-sm" onclick="aioDetect()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg>HPを読んで自動判定</button>
+          <button class="btn btn-outline btn-sm" onclick="aioAutoFromData()" title="ツール内の実データ(サイテーション登録数/GBP充足/口コミ返信状況)から自動でチェック"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px;flex-shrink:0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>実データで自動判定</button>
         </div>
         <div id="aioDetectStatus" style="font-size:12px;color:var(--text-sub);margin-bottom:8px"></div>
 
@@ -11861,8 +11862,43 @@ function renderGeoResults(results, storeLatLng, prev) {
       <span>${dot('#d97706')}プロフィール負け＝近いのに下位（カテゴリ・口コミ・投稿で関連性を強化）</span>
       <span>${dot('#6366f1')}距離負け＝遠くて下位（その地域名を対策KW/投稿に入れる・エリアページ/拠点で対応）</span>
     </div>` : '';
+  // 地図表示用に最新結果を保持（Leafletは押した時にだけ遅延ロード＝無料・軽量）
+  window._geoLast = { results, storeLatLng };
+  const hasPoints = results.some(r => r.point && Number.isFinite(+r.point.lat) && Number.isFinite(+r.point.lng));
+  const mapBtn = hasPoints ? `<div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="renderGeoMap()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16M16 6v16"/></svg>地図で見る（どこで強い/弱いか）</button></div><div id="geoMapBox" style="display:none;height:300px;border-radius:10px;margin-top:10px;overflow:hidden;border:1px solid var(--border)"></div>` : '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px">${results.map((r, i) => cell(r, _factors[i])).join('')}</div>
-    <p style="font-size:11.5px;color:var(--text-sub);margin-top:10px;line-height:1.6">${note}</p>${legend}`;
+    <p style="font-size:11.5px;color:var(--text-sub);margin-top:10px;line-height:1.6">${note}</p>${legend}${mapBtn}`;
+}
+// ジオグリッド結果をLeaflet地図にプロット（緑=TOP3/黄=TOP10/赤=それ以下/灰=圏外、青ピン=店舗）
+async function renderGeoMap() {
+  const box = document.getElementById('geoMapBox'); const g = window._geoLast;
+  if (!box || !g) return;
+  box.style.display = 'block';
+  try { await _loadLeaflet(); } catch (e) { box.innerHTML = '<p style="font-size:12px;color:var(--red);padding:10px">地図の読み込みに失敗しました（通信環境をご確認ください）</p>'; return; }
+  const pts = g.results.filter(r => r.point && Number.isFinite(+r.point.lat) && Number.isFinite(+r.point.lng));
+  if (!pts.length) return;
+  if (window._geoMap) { window._geoMap.remove(); window._geoMap = null; }
+  const map = L.map(box).setView([+pts[0].point.lat, +pts[0].point.lng], 12);
+  window._geoMap = map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+  const bounds = [];
+  pts.forEach(r => {
+    const rk = r.rank;
+    const col = rk == null ? '#94a3b8' : rk <= 3 ? '#10b981' : rk <= 10 ? '#d97706' : '#ef4444';
+    const ll = [+r.point.lat, +r.point.lng];
+    bounds.push(ll);
+    L.circleMarker(ll, { radius: 14, color: '#fff', weight: 2, fillColor: col, fillOpacity: 0.9 }).addTo(map)
+      .bindTooltip(`${String(r.area || '').replace(/,\s*Japan$/i, '')}：${rk == null ? '圏外' : rk + '位'}`, { direction: 'top' });
+    // 順位数字をマーカー上に表示
+    L.marker(ll, { icon: L.divIcon({ className: '', html: `<div style="width:28px;height:28px;line-height:28px;text-align:center;color:#fff;font-weight:800;font-size:11px;margin-left:-14px;margin-top:-14px">${rk == null ? '−' : rk}</div>`, iconSize: [0, 0] }), interactive: false }).addTo(map);
+  });
+  if (g.storeLatLng && Number.isFinite(+g.storeLatLng.lat)) {
+    const sll = [+g.storeLatLng.lat, +g.storeLatLng.lng];
+    bounds.push(sll);
+    L.marker(sll).addTo(map).bindTooltip('店舗所在地', { direction: 'top' });
+  }
+  if (bounds.length > 1) map.fitBounds(bounds, { padding: [28, 28] });
+  setTimeout(() => map.invalidateSize(), 200);
 }
 
 // 1キーワードの順位をSerpApiで自動取得
@@ -12026,6 +12062,38 @@ async function aioDetect() {
     status.textContent = `${detected.length}項目を検出（${checked}件を新たにチェック）。内容を確認して「チェック状況を保存」してください。`;
     showToast('自動判定しました', 'success');
   } catch (e) { status.textContent = '判定に失敗しました: ' + e.message; }
+}
+
+// ツール内の実データからAIOチェックを自動判定（サイテーション登録数/GBP充足/口コミ全返信。チェックを付けるだけで外さない）
+async function aioAutoFromData() {
+  if (!currentLocationId) return showToast('店舗を選択してください', 'error');
+  const status = document.getElementById('aioDetectStatus');
+  if (status) status.textContent = 'ツール内の実データを確認中…';
+  const found = [];
+  try {
+    // ① サイテーション10媒体以上
+    try {
+      const c = await fetch(`/api/store-settings?action=citation&locationId=${encodeURIComponent(currentLocationId)}`).then(r => r.json());
+      if ((c.sites || []).length >= 10) found.push('citation_10');
+    } catch (e) {}
+    // ② GBP主要項目の充足（店名/住所/電話/営業時間/サイト/主要カテゴリ）
+    const loc = currentLocation || {};
+    if (loc.title && loc.storefrontAddress && loc.phoneNumbers?.primaryPhone && (loc.regularHours?.periods || []).length && loc.websiteUri && loc.categories?.primaryCategory) found.push('gbp_complete');
+    // ③ 口コミ全返信（定期返信の実データ根拠）
+    if (loc.name && (loc._type === 'gbp' || loc.gbpConnected)) {
+      try {
+        const rv = await fetch(`/api/reviews?locationName=${encodeURIComponent(loc.name)}${loc.storeId ? '&storeId=' + loc.storeId : ''}`).then(r => r.json());
+        const st = rv.stats || {};
+        if ((st.totalCount || 0) > 0 && (st.unrepliedCount || 0) === 0) found.push('eeat_review');
+      } catch (e) {}
+    }
+    let checked = 0;
+    found.forEach(id => { const cb = document.getElementById('aio-' + id); if (cb && !cb.checked) { cb.checked = true; checked++; } });
+    if (status) status.textContent = found.length
+      ? `実データから${found.length}項目を確認（${checked}件を新たにチェック）。「チェック状況を保存」で確定してください。`
+      : '実データで自動確認できる項目（サイテーション10媒体/GBP充足/口コミ全返信）は現在未達です。';
+    showToast(found.length ? '実データで自動判定しました' : '自動判定できる達成項目はまだありません', found.length ? 'success' : 'error');
+  } catch (e) { if (status) status.textContent = '判定に失敗しました'; }
 }
 
 // URLのページをAIが読み、AIO/LLMO/GEO観点で"質"を採点＋改善提案
