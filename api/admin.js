@@ -1314,10 +1314,25 @@ export default async function handler(req, res) {
       const t = await r.text();
       let d = {}; try { d = JSON.parse(t); } catch {}
       if (!r.ok) return res.status(r.status).json({ error: d.message || `投稿失敗(${r.status})` });
+      // 投稿履歴を保存（言いっぱなし解消：HP SEOページに一覧表示。最大30件）
+      try {
+        const hk = `wp_history_${req.query.storeId}`;
+        let hist = (await kvGet(hk)) || [];
+        hist.unshift({ date: new Date().toISOString(), id: d.id, title: title.slice(0, 80), link: d.link || '', status: d.status });
+        if (hist.length > 30) hist = hist.slice(0, 30);
+        await kvSet(hk, hist);
+      } catch (e) { /* 履歴保存失敗は投稿成功に影響させない */ }
       return res.json({ success: true, id: d.id, link: d.link, status: d.status, editLink: `${c.siteUrl}/wp-admin/post.php?post=${d.id}&action=edit` });
     } catch (e) {
       return res.status(502).json({ error: 'HP投稿に失敗しました: ' + e.message });
     }
+  }
+
+  // HP投稿履歴の取得（wp-publishが保存した一覧）
+  if (action === 'wp-history' && req.method === 'GET') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    return res.json({ history: (await kvGet(`wp_history_${storeId}`)) || [] });
   }
 
   // WPのカテゴリ一覧（アイキャッチ/カテゴリ指定用）
