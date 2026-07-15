@@ -11212,10 +11212,19 @@ async function loadPosts() {
     const posts = data.localPosts || [];
     document.getElementById('statPosts').textContent = posts.length;
 
+    // Googleに拒否された投稿があれば先頭に警告（原因の多くは電話番号・酒類等の規制商品プロモ）
+    const rejected = posts.filter(p => p.state === 'REJECTED');
+    const rejBanner = rejected.length
+      ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;line-height:1.7">
+          <b style="color:var(--red)">Googleに拒否された投稿が ${rejected.length}件 あります（検索に表示されていません）</b><br>
+          主な原因: 本文中の電話番号（明確に禁止）／酒類・タバコ等の規制商品の宣伝（「飲み放題」や酒名＋価格）。
+          該当投稿の内容を修正し、新しい投稿として出し直してください（電話番号は削除、酒類はInstagramのみへ）。
+        </div>` : '';
     document.getElementById('postsList').innerHTML = posts.length
-      ? posts.map(p => `
-          <div class="post-card">
+      ? rejBanner + posts.map(p => `
+          <div class="post-card"${p.state === 'REJECTED' ? ' style="border:1px solid rgba(239,68,68,0.45)"' : ''}>
             <div class="post-type-badge">${p.topicType || 'STANDARD'}</div>
+            ${p.state === 'REJECTED' ? '<div style="display:inline-block;font-size:10px;font-weight:700;color:#fff;background:var(--red);border-radius:5px;padding:2px 8px;margin:4px 0 2px">Googleに拒否されました（ポリシー違反判定・非表示中）</div>' : ''}
             <div class="post-text">${p.summary || ''}</div>
             <div class="post-footer">
               <span class="post-date">${new Date(p.createTime).toLocaleDateString('ja-JP')}</span>
