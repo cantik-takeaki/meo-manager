@@ -5733,6 +5733,76 @@ function kbRunManualCheck() {
   document.getElementById('kbCheckResult').innerHTML = kbFindingsHtml(kbCheckText(t));
 }
 
+// ─── Google投稿ポリシーチェック（投稿の非公開化・投稿機能停止を防ぐ） ───
+// 根拠: GBP投稿コンテンツポリシー＝①電話番号の掲載禁止 ②規制対象商品(酒類/タバコ/ギャンブル/医薬品/武器)の
+// プロモーション(価格・割引・クーポン・特典)禁止。日本の飲食店は「飲み放題＋価格」が最多の非公開化トリガー。
+const GBP_PROMO_RE = /[¥￥]|[0-9０-９][0-9０-９,，.]*\s*円|半額|割引|値引|無料|クーポン|特価|OFF|ＯＦＦ|オフ|セール|キャンペーン|お得|税込|税抜|ポイント還元|プレゼント|サービス中|飲み放題|放題/;
+// ※lookbehindは旧Safariでスクリプト全体がパースエラーになるため使わない（前後文脈はコード側で判定）
+const GBP_POLICY_RULES = [
+  { re: /(0\d{1,4}[-‐－ー()（）\s]\d{1,4}[-‐－ー()（）\s]\d{3,4}|0\d{9,10})(?!\d)/g, level: 'high', cat: 'phone',
+    reason: 'Google投稿は電話番号の掲載が明確に禁止（自動で非公開化されます）', suggest: '電話番号は削除し「プロフィールの電話ボタンから」等に置き換える' },
+  { re: /飲み放題|呑み放題|飲放題/g, level: 'high', cat: 'alcohol',
+    reason: '酒類のプロモーションと自動判定される最多トリガー（規制対象商品の販促は禁止）', suggest: '「食べ放題」中心に書き換えるか、この投稿はInstagramのみにする' },
+  { re: /ビール|カクテル|ワイン|サワー|酎ハイ|チューハイ|ハイボール|日本酒|地酒|銘酒|焼酎|梅酒|果実酒|リキュール|ウイスキー|ウィスキー|シャンパン|スパークリング|泡盛|マッコリ|紹興酒|アルコール|お酒|酒類|利き酒|飲み比べ|晩酌/g, level: 'alcohol_ctx', cat: 'alcohol',
+    reason: '', suggest: '' },
+  { re: /タバコ|たばこ|煙草|シーシャ|水タバコ|電子タバコ|加熱式タバコ|VAPE|ベイプ/gi, level: 'regulated_ctx', cat: 'tobacco',
+    reason: '', suggest: '' },
+  { re: /カジノ|オンラインカジノ|パチンコ|パチスロ|賭け|ベッティング|ブックメーカー/g, level: 'regulated_ctx', cat: 'gambling',
+    reason: '', suggest: '' },
+  { re: /医薬品|処方薬|処方箋なし|バイアグラ|ED治療薬|痩せ薬|ダイエット薬|睡眠薬/g, level: 'regulated_ctx', cat: 'pharma',
+    reason: '', suggest: '' },
+  { re: /銃|エアガン|実弾|刀剣販売|スタンガン/g, level: 'regulated_ctx', cat: 'weapon',
+    reason: '', suggest: '' },
+];
+const GBP_CAT_LABEL = { alcohol: '酒類', tobacco: 'タバコ', gambling: 'ギャンブル', pharma: '医薬品', weapon: '武器' };
+function gbpPolicyCheck(text) {
+  const t = String(text || '');
+  const findings = [];
+  const hasPromo = GBP_PROMO_RE.test(t);
+  GBP_POLICY_RULES.forEach(rule => {
+    const seen = new Set();
+    const re = new RegExp(rule.re.source, rule.re.flags);
+    let m;
+    while ((m = re.exec(t)) !== null) {
+      const w = m[0];
+      const before = t.slice(Math.max(0, m.index - 8), m.index);
+      const after = t.slice(m.index + w.length, m.index + w.length + 4);
+      // 除外: 電話番号は直前が数字なら長い数値の一部 / 酒類ワードは「ノンアル◯◯」表記 / 「アルコール消毒」は衛生の話
+      const skip =
+        (rule.cat === 'phone' && /\d$/.test(before)) ||
+        (rule.cat === 'alcohol' && /(ノンアルコール|ノンアル|ノン)$/.test(before)) ||
+        (w === 'アルコール' && /^(消毒|除菌)/.test(after));
+      if (!skip && !seen.has(w)) {
+        seen.add(w);
+        if (rule.level === 'high') {
+          findings.push({ word: w, level: 'high', reason: rule.reason, suggest: rule.suggest });
+        } else {
+          // 規制対象商品ワード: 販促表現(価格/割引/無料/放題等)と同居→high、単独→mid
+          const label = GBP_CAT_LABEL[rule.cat] || '規制対象商品';
+          findings.push(hasPromo
+            ? { word: w, level: 'high', reason: `${label}＋販促表現（価格・割引・無料・放題など）の組み合わせは規制対象商品のプロモーションとして禁止`, suggest: `${label}の話題と価格・特典を切り離すか、Instagramのみに投稿する` }
+            : { word: w, level: 'mid', reason: `${label}は規制対象商品。販促と取られる文脈だと非公開化されることがあります`, suggest: '料理・技術・雰囲気を主役にし、この語は控えめに（不安ならInstagramのみへ）' });
+        }
+      }
+      if (re.lastIndex === m.index) re.lastIndex++;
+    }
+  });
+  return findings;
+}
+
+// GBP公開前ゲート: 違反の可能性があれば内容を見せて確認。true=続行
+function gbpPolicyGate(summary) {
+  let fs = [];
+  try { fs = gbpPolicyCheck(summary); } catch (e) { return true; }
+  if (!fs.length) return true;
+  const high = fs.filter(f => f.level === 'high');
+  const lines = fs.slice(0, 8).map(f => `・「${f.word}」 ${f.reason}`).join('\n');
+  const msg = high.length
+    ? `【Google投稿ポリシー違反の可能性: ${fs.length}件】\n${lines}\n\nこのままGoogleに投稿すると「コンテンツポリシー違反」で非公開化・投稿機能停止のリスクがあります。\n対処: 該当表現を削除するか、投稿先をInstagramのみに切り替えてください（Instagramは酒類等もOK）。\n\nそれでもGoogleに投稿しますか？`
+    : `【Google投稿ポリシー注意: ${fs.length}件】\n${lines}\n\n価格・割引・無料などの販促表現と組み合わせると非公開化されやすい内容です。このままGoogleに投稿しますか？`;
+  return confirm(msg);
+}
+
 // ── AIでMEOコンテンツを作成（対策キーワード反映）──
 function scOnType() {
   const t = document.getElementById('scType').value, inp = document.getElementById('scInput');
@@ -11264,6 +11334,12 @@ async function generateNewPost() {
     });
     const d = await res.json();
     ta.value = d.content || d.error || '生成に失敗しました';
+    // 生成文にGoogle投稿ポリシーのリスク語（電話番号・酒類販促等）があれば早めに知らせる（投稿時にもゲートで確認）
+    try {
+      if (d.content && gbpPolicyCheck(d.content).some(f => f.level === 'high')) {
+        showToast('注意: 生成文にGoogle投稿ポリシーに触れる可能性のある表現があります。Googleに投稿する場合は文言を調整してください', 'error');
+      }
+    } catch (e) {}
   } catch (e) { ta.value = '生成に失敗しました'; }
   updatePostCount();
 }
@@ -11277,6 +11353,9 @@ async function createPost() {
   const toInstagram = document.getElementById('targetInstagram').checked;
   if (!toGoogle && !toInstagram) return showToast('投稿先を1つ以上選んでください', 'error');
   if (toInstagram && !_postImages.length) return showToast('Instagramに投稿するには画像を1枚以上選択してください', 'error');
+
+  // Googleに出す場合のみ投稿ポリシーチェック（電話番号・酒類等の規制商品プロモ→非公開化を防ぐ。Instagramのみなら対象外）
+  if (toGoogle && !gbpPolicyGate(summary)) return;
 
   const targets = [toGoogle && 'Google', toInstagram && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
@@ -11320,6 +11399,12 @@ async function scheduleNewPost() {
       }),
     });
     showToast('予約投稿に追加しました（下の「予約投稿の管理」で管理できます）', 'success');
+    // Google向け予約に投稿ポリシーのリスク語があれば早めに知らせる（公開時にもう一度ゲートで確認）
+    try {
+      if (document.getElementById('targetGoogle').checked && gbpPolicyCheck(summary).some(f => f.level === 'high')) {
+        showToast('注意: Google投稿ポリシーに触れる可能性のある表現（電話番号・酒類の販促など）が含まれています。公開前に文言の見直しをおすすめします', 'error');
+      }
+    } catch (e) {}
     document.getElementById('postText').value = ''; updatePostCount();
     const ph = document.getElementById('postHashtags'); if (ph) { ph.value = ''; updateHashCount('postHashtags', 'postHashCount'); }
     document.getElementById('postSchedDate').value = ''; document.getElementById('postSchedTime').value = '';
@@ -13252,6 +13337,7 @@ async function publishDraftNow(id) {
   if (!toG && !toI) return showToast('投稿先を1つ以上選んでください', 'error');
   const imgs = _draftImages[id] || [];
   if (toI && !imgs.length) return showToast('Instagramには画像が必要です。画像を選択してください', 'error');
+  if (toG && !gbpPolicyGate(summary)) return;
   const targets = [toG && 'Google', toI && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
   await saveDraft(id, true);
