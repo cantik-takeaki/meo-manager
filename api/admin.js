@@ -259,7 +259,31 @@ export default async function handler(req, res) {
     const { storeId } = req.query;
     if (!storeId) return res.status(400).json({ error: 'storeId必須' });
     const s = await kvGet(`survey_${storeId}`);
-    return res.json({ ...DEFAULT_SURVEY, ...(s || {}) });
+    const merged = { ...DEFAULT_SURVEY, ...(s || {}) };
+    // Google口コミURLが未設定なら、GBP連携済みの管理店に限りGoogle API(metadata.newReviewUri)から自動解決して永続化。
+    // 未設定のまま「Googleの口コミ投稿を開く」を押すと writereview?placeid= 空でGoogleのエラーページに飛ぶ実害があった(2026-07-16)。
+    if (!merged.googleUrl) {
+      try {
+        const managed = (await kvGet('managed_locations')) || [];
+        const hit = managed.find(m => String(m.locId || '').replace(/\//g, '_') === storeId);
+        if (hit) {
+          const token = await getMasterToken();
+          if (token) {
+            const locPath = String(hit.locId || '').split('/').slice(-2).join('/'); // "locations/NNN"
+            const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPath}?readMask=metadata`,
+              { headers: { Authorization: `Bearer ${token}` } });
+            const d = await r.json().catch(() => ({}));
+            const auto = d?.metadata?.newReviewUri
+              || (d?.metadata?.placeId ? `https://search.google.com/local/writereview?placeid=${d.metadata.placeId}` : '');
+            if (auto) {
+              merged.googleUrl = auto;
+              await kvSet(`survey_${storeId}`, { ...(s || {}), googleUrl: auto }); // 次回からAPIを叩かずKVで即返す
+            }
+          }
+        }
+      } catch (e) { /* 自動解決の失敗は無視（従来挙動のまま返す） */ }
+    }
+    return res.json(merged);
   }
 
   // ── リード取得（公開・アンケート完了画面のメール/LINE登録を受け取る） ──

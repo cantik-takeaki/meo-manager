@@ -437,8 +437,13 @@ document.getElementById('copyBtn').onclick = async () => {
   renderLeadBox();
 };
 document.getElementById('openGoogle').onclick = () => {
+  const url = (SURVEY && SURVEY.googleUrl) ? SURVEY.googleUrl : (params.get('g') || '');
+  // URL未設定のまま placeid空のGoogleへ飛ばすとエラーページになるため、開かずに案内する
+  if (!url) {
+    alert('この店舗のGoogle口コミ投稿ページがまだ設定されていません。\nお手数ですが、Googleマップでお店を検索して「クチコミを書く」からご投稿ください。');
+    return;
+  }
   kpiTrack('click');
-  const url = (SURVEY && SURVEY.googleUrl) ? SURVEY.googleUrl : (params.get('g') || 'https://search.google.com/local/writereview?placeid=');
   window.open(url, '_blank');
 };
 
