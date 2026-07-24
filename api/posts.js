@@ -345,6 +345,19 @@ export default async function handler(req, res) {
         return res.json(data);
       }
 
+      // 【一時診断】トークン権限とDM/コメントの生レスポンスをそのまま返す（審査再申請の原因切り分け用・後で削除）
+      if (req.method === 'GET' && sub === 'diag') {
+        const out = { ig_user: IG_USER, token_tail: String(IG_TOKEN || '').slice(-6) };
+        const fetchJson = async (u) => { try { const r = await fetch(u); return await r.json(); } catch (e) { return { _fetchError: e.message }; } };
+        out.me = await fetchJson(`${BASE}/me?fields=user_id,username&access_token=${IG_TOKEN}`);
+        out.conversations = await fetchJson(`${BASE}/${IG_USER}/conversations?platform=instagram&fields=id,updated_time,participants,messages.limit(5){from,message,created_time}&access_token=${IG_TOKEN}`);
+        out.conversations_me = await fetchJson(`${BASE}/me/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
+        if (req.query.mediaId) {
+          out.comments = await fetchJson(`${BASE}/${req.query.mediaId}/comments?fields=id,text,username,timestamp&access_token=${IG_TOKEN}`);
+        }
+        return res.json(out);
+      }
+
       // 最近の投稿一覧
       if (req.method === 'GET' && sub === 'media') {
         const r = await fetch(`${BASE}/${IG_USER}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,comments_count,like_count&limit=25&access_token=${IG_TOKEN}`);
