@@ -345,23 +345,6 @@ export default async function handler(req, res) {
         return res.json(data);
       }
 
-      // 【一時診断】トークン権限とDM/コメントの生レスポンスをそのまま返す（審査再申請の原因切り分け用・後で削除）
-      if (req.method === 'GET' && sub === 'diag') {
-        const out = { ig_user: IG_USER, token_tail: String(IG_TOKEN || '').slice(-6) };
-        const fetchJson = async (u) => { try { const r = await fetch(u); return await r.json(); } catch (e) { return { _fetchError: e.message }; } };
-        out.me = await fetchJson(`${BASE}/me?fields=user_id,username&access_token=${IG_TOKEN}`);
-        out.conversations = await fetchJson(`${BASE}/${IG_USER}/conversations?platform=instagram&fields=id,updated_time,participants,messages.limit(5){from,message,created_time}&access_token=${IG_TOKEN}`);
-        out.conversations_me = await fetchJson(`${BASE}/me/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
-        if (req.query.mediaId) {
-          out.comments = await fetchJson(`${BASE}/${req.query.mediaId}/comments?fields=id,text,username,timestamp&access_token=${IG_TOKEN}`);
-          out.kv_comments = await kvGet(`ig_cm_${req.query.mediaId}`);
-        }
-        // Webhookが実際に発火してKVに保存されているか（発火していれば下記にイベントが入る）
-        out.kv_dm_all = await kvGet('ig_dm_all');
-        out.kv_dm_me = await kvGet(`ig_dm_${IG_USER}`);
-        out.subscribed_apps = await fetchJson(`${BASE}/me/subscribed_apps?access_token=${IG_TOKEN}`);
-        return res.json(out);
-      }
 
       // 最近の投稿一覧
       if (req.method === 'GET' && sub === 'media') {
@@ -549,7 +532,7 @@ export default async function handler(req, res) {
         // myId未解決時に全体プール(ig_dm_all)へフォールバックしない。
         // 全体プールには他店舗宛のDMも混在するため、本番で他店の会話が見えるプライバシー事故になる（監査指摘）。
         if (!myId) return res.json({ data: [], source: 'no-id', error: 'IGユーザーIDを解決できませんでした。Instagram連携を確認してください' });
-        const events = await kvGet(`ig_dm_${myId}`) || [];
+        const events = (await kvGet(`ig_dm_${myId}`) || []).filter(e => String(e.senderId) !== '999888' && String(e.recipientId) !== '999888' && !String(e.mid || '').startsWith('mtest'));
         const convs = {};
         for (const e of events) {
           const other = String(e.senderId) === myId ? e.recipientId : e.senderId;
@@ -576,7 +559,7 @@ export default async function handler(req, res) {
         const myId = await resolveMyId();
         // 同上: 全体プールへのフォールバックはプライバシーリスクのため行わない
         if (!myId) return res.json({ messages: { data: [] }, myId: '', error: 'IGユーザーIDを解決できませんでした' });
-        const events = await kvGet(`ig_dm_${myId}`) || [];
+        const events = (await kvGet(`ig_dm_${myId}`) || []).filter(e => String(e.senderId) !== '999888' && String(e.recipientId) !== '999888' && !String(e.mid || '').startsWith('mtest'));
         const thread = events
           .filter(e => String(e.senderId) === String(conversationId) || String(e.recipientId) === String(conversationId))
           .sort((a, b) => (a.ts || 0) - (b.ts || 0))
