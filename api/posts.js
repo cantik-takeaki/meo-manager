@@ -354,7 +354,12 @@ export default async function handler(req, res) {
         out.conversations_me = await fetchJson(`${BASE}/me/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${IG_TOKEN}`);
         if (req.query.mediaId) {
           out.comments = await fetchJson(`${BASE}/${req.query.mediaId}/comments?fields=id,text,username,timestamp&access_token=${IG_TOKEN}`);
+          out.kv_comments = await kvGet(`ig_cm_${req.query.mediaId}`);
         }
+        // Webhookが実際に発火してKVに保存されているか（発火していれば下記にイベントが入る）
+        out.kv_dm_all = await kvGet('ig_dm_all');
+        out.kv_dm_me = await kvGet(`ig_dm_${IG_USER}`);
+        out.subscribed_apps = await fetchJson(`${BASE}/me/subscribed_apps?access_token=${IG_TOKEN}`);
         return res.json(out);
       }
 
