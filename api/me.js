@@ -3,7 +3,7 @@
 // GBP(Google)は裏で常時接続(_tokens.jsのmaster)。ログイン画面にGoogleは出さない。
 // メール送信が未設定(RESEND_API_KEY無)の場合は2段階を自動スキップ(パスワードのみ)＝ロックアウト防止。
 import { getValidCookieToken, getMasterInfo } from './_tokens.js';
-import { kvGet, kvSet } from './_kv.js';
+import { kvGet, kvSet, kvScanKeys } from './_kv.js';
 import crypto from 'crypto';
 
 const ADMIN_KEY = 'admin_credential'; // { user(email), salt, hash, name, createdAt }
@@ -250,6 +250,42 @@ export default async function handler(req, res) {
     const dn = await getDisplayName(cred);
     setSession(res, cred, dn);
     return res.json({ success: true, name: dn, twofaSkipped: true });
+  }
+
+  // ── GET: データ書き出し（オーナー=super_admin限定・機密は除外/伏字） ──
+  if ((req.query || {}).action === 'export-data') {
+    const meUser = await resolveSessionUser(req, c);
+    if (!meUser || meUser.role !== 'super_admin') return res.status(403).json({ error: '管理者（オーナー）権限が必要です' });
+    let keys = [];
+    try { keys = await kvScanKeys('*'); } catch (e) { return res.status(500).json({ error: 'データ読み取りに失敗しました' }); }
+    // 機密キーは丸ごと除外
+    const EXCLUDE = (k) => /^gbp_tokens_/.test(k) || k === 'admin_credential' || /^login_code_/.test(k);
+    // 値の中の機密フィールドは伏字
+    const SECRET = /token|password|passcode|secret|access_?token|refresh_?token|api_?key|client_secret|\bpw\b|\bhash\b|\bsalt\b|bearer|credential/i;
+    const redact = (v) => Array.isArray(v)
+      ? v.map(redact)
+      : (v && typeof v === 'object'
+        ? Object.fromEntries(Object.entries(v).map(([k, val]) => [k, SECRET.test(k) ? '***REDACTED***' : redact(val)]))
+        : v);
+    const data = {};
+    const excluded = [];
+    for (const k of keys) {
+      if (EXCLUDE(k)) { excluded.push(k); continue; }
+      try { data[k] = redact(await kvGet(k)); } catch (e) { data[k] = null; }
+    }
+    const nowIso = new Date().toISOString();
+    const body = JSON.stringify({
+      exportedAt: nowIso,
+      source: 'ラクラクMEO (meo-manager) KV',
+      note: '機密（GBPトークン gbp_tokens_* / admin_credential / 認証コード）は除外。token/password/hash/salt 等のフィールドは***REDACTED***。',
+      totalKeys: keys.length,
+      exportedKeys: keys.length - excluded.length,
+      excludedSecretKeys: excluded,
+      data,
+    }, null, 2);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="rakuraku-meo_export_${nowIso.slice(0, 10)}.json"`);
+    return res.status(200).send(body);
   }
 
   // ── GET: ログイン状態 ──

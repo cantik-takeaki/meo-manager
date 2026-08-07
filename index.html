@@ -3436,6 +3436,15 @@ body.role-viewer [data-edit-action] { display:none !important; }
         </div>
       </div>
 
+      <!-- データ書き出し（super_adminのみ） -->
+      <div class="card" style="max-width:720px" data-min-role="super_admin">
+        <div class="card-header">
+          <div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>データの書き出し</div>
+        </div>
+        <p style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">店舗・投稿・口コミ・学習メモ・キーワードなどの<b>業務データをJSONで書き出し</b>ます（バックアップ・引き継ぎ用）。GBPトークンやパスワード等の<b>機密は除外・伏字</b>にして出力します。従業員に運用そのものを任せる場合は、書き出しファイルではなく「チーム・権限」でアカウントを発行してください（同じ最新データを画面で共有できます）。</p>
+        <a class="btn btn-primary btn-sm" href="/api/me?action=export-data" download><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>データを書き出す（JSON）</a>
+      </div>
+
       <!-- AIプロンプト調整 -->
       <div class="card" style="max-width:720px" data-min-role="admin">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>AIプロンプト調整（上級者向け）</div></div>

@@ -46,3 +46,23 @@ export async function kvIncrBy(key, n) {
   const data = await res.json();
   return Number(data.result);
 }
+
+// 全キー走査（SCANをカーソルで反復）。データ書き出し用。
+export async function kvScanKeys(match = '*') {
+  const { url, token } = getKV();
+  let cursor = '0';
+  const keys = [];
+  let guard = 0;
+  do {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(['SCAN', cursor, 'MATCH', match, 'COUNT', 500]),
+    });
+    const data = await res.json();
+    if (!data.result) break;
+    cursor = String(data.result[0]);
+    for (const k of (data.result[1] || [])) keys.push(k);
+  } while (cursor !== '0' && ++guard < 200);
+  return [...new Set(keys)];
+}
