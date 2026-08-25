@@ -1924,5 +1924,56 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
+  // ── GBP属性: カテゴリで利用可能な属性を一覧（id/表示名/型） ──
+  if (req.method === 'GET' && action === 'gbp-attributes-list') {
+    const token = await getMasterToken();
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    let categoryName = req.query.categoryName || '';
+    if (!categoryName && req.query.storeId) {
+      const l = ((await kvGet('managed_locations')) || []).find(x => String(x.locId || '').replace(/\//g, '_') === req.query.storeId);
+      // カテゴリは _locations 側にあるためstoreIdからは取得できない場合がある。categoryName直指定を推奨。
+    }
+    if (!categoryName) return res.status(400).json({ error: 'categoryName必須（例: categories/gcid:cafe）' });
+    try {
+      const p = new URLSearchParams({ categoryName, regionCode: 'JP', languageCode: 'ja', showAll: 'false' });
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/attributes?${p.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message, code: d.error.code });
+      const list = (d.attributeMetadata || []).filter(a => !a.deprecated).map(a => ({ id: a.parent, name: a.displayName, type: a.valueType, group: a.groupDisplayName || '' }));
+      return res.json({ attributes: list });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // ── GBP属性の設定（BOOL属性を中心に。body.attributes=[{id:"attributes/xxx", bool:true}] or {id, enums:[...]}） ──
+  if (req.method === 'POST' && action === 'gbp-attributes-set') {
+    const storeId = req.query.storeId || req.body.storeId;
+    const b = req.body || {};
+    let locationName = b.locationName || '';
+    let token = await getMasterToken();
+    if (!locationName && storeId) {
+      const m = ((await kvGet('managed_locations')) || []).find(x => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+      if (m) { locationName = m.locId || m.locationName || ''; if (m.storeId) token = (await getAccessToken(m.storeId)) || token; }
+    }
+    const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
+    if (!locPart) return res.status(400).json({ error: 'locationName不明' });
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    const attrs = (b.attributes || []).map(a => {
+      const o = { name: a.id };
+      if (Array.isArray(a.enums)) o.repeatedEnumValue = { setValues: a.enums };
+      else o.values = [a.bool !== false];
+      return o;
+    });
+    if (!attrs.length) return res.status(400).json({ error: 'attributes必須' });
+    if (b.dryRun) return res.json({ dryRun: true, locPart, body: { name: `${locPart}/attributes`, attributes: attrs } });
+    try {
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}/attributes?updateMask=${encodeURIComponent(attrs.map(a => a.name).join(','))}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `${locPart}/attributes`, attributes: attrs }),
+      });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message, code: d.error.code });
+      return res.json({ success: true, count: (d.attributes || []).length });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   return res.status(405).end();
 }
