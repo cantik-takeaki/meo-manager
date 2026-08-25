@@ -1182,7 +1182,6 @@ export default async function handler(req, res) {
       const { list, error, calls, _dbg } = await fetchLocalResults(keyword, { location, ll: _ll });
       if (useSerp && calls) await kvIncrBy(usedKey, calls); // アトミック加算（並行実行のアンダーカウント防止）
       else if (!useSerp && calls) await kvIncrBy(`dfs_usage_${ym}`, calls); // DataForSEO従量の使用数を計上
-      if (req.query.debug === '1') return res.json({ debug: true, resolvedLl: _ll || null, _dbg: _dbg || null, listCount: (list || []).length, error: error || null });
       if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
       const target = _normName(store);
       let rank = null, matched = null;
