@@ -1966,8 +1966,9 @@ export default async function handler(req, res) {
     if (!attrs.length) return res.status(400).json({ error: 'attributes必須' });
     if (b.dryRun) return res.json({ dryRun: true, locPart, body: { name: `${locPart}/attributes`, attributes: attrs } });
     try {
-      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}/attributes`, {
-        method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ attributes: attrs }),
+      const mask = attrs.map(a => a.name).join(',');
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}/attributes?attributeMask=${encodeURIComponent(mask)}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `${locPart}/attributes`, attributes: attrs }),
       });
       const d = await r.json();
       if (d.error) return res.status(502).json({ error: d.error.message, code: d.error.code });
