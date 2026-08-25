@@ -1844,6 +1844,31 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
+  // ── GBP現在の店舗情報を取得（カテゴリID付き。更新前の確認用） ──
+  if (req.method === 'GET' && action === 'gbp-get') {
+    const storeId = req.query.storeId;
+    let locationName = req.query.locationName || '';
+    let token = await getMasterToken();
+    if (!locationName && storeId) {
+      const managed = await kvGet('managed_locations') || [];
+      const m = managed.find(x => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+      if (m) { locationName = m.locId || m.locationName || ''; if (m.storeId) token = (await getAccessToken(m.storeId)) || token; }
+    }
+    const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
+    if (!locPart) return res.status(400).json({ error: 'locationName不明' });
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    try {
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,categories,phoneNumbers,websiteUri,profile`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message || 'GBP取得失敗', code: d.error.code });
+      const pc = d.categories?.primaryCategory;
+      const ac = d.categories?.additionalCategories || [];
+      return res.json({ title: d.title, websiteUri: d.websiteUri || '', phone: d.phoneNumbers?.primaryPhone || '', hasDescription: !!(d.profile && d.profile.description),
+        primary: pc ? { id: pc.name, displayName: pc.displayName } : null,
+        additional: ac.map(c => ({ id: c.name, displayName: c.displayName })) });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   // ── GBP店舗情報の更新（カテゴリ/説明/電話/URL）。社長承認の上で実行する対外アクション ──
   // body: { storeId?, locationName?, primaryCategoryId?, additionalCategoryIds?[], description?, phone?, websiteUri?, dryRun? }
   if (req.method === 'POST' && action === 'gbp-update') {
@@ -1868,6 +1893,25 @@ export default async function handler(req, res) {
     if (typeof b.description === 'string') { bodyObj.profile = { description: b.description.slice(0, 750) }; masks.push('profile.description'); }
     if (typeof b.websiteUri === 'string') { bodyObj.websiteUri = b.websiteUri; masks.push('websiteUri'); }
     if (typeof b.phone === 'string') { bodyObj.phoneNumbers = { primaryPhone: b.phone }; masks.push('phoneNumbers.primaryPhone'); }
+    // サービス（自由記述サービス項目）: services=["メニュー名",...] ＋ カテゴリ(primaryCategoryId か serviceCategoryId)
+    if (Array.isArray(b.services) && b.services.length) {
+      const cat = b.primaryCategoryId || b.serviceCategoryId;
+      if (!cat) return res.status(400).json({ error: 'services にはカテゴリ(primaryCategoryId か serviceCategoryId)が必要です' });
+      bodyObj.serviceItems = b.services.slice(0, 100).map(s => ({ freeFormServiceItem: { category: cat, label: { displayName: String(s).slice(0, 120), languageCode: 'ja' } } }));
+      masks.push('serviceItems');
+    }
+    // 営業時間: hours=[{day:'MON'..'SUN'|英名, open:'11:00', close:'22:00'},...]（同日内・複数可＝昼夜別に2件）
+    if (Array.isArray(b.hours) && b.hours.length) {
+      const DAY = { MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY', SAT: 'SATURDAY', SUN: 'SUNDAY' };
+      const T = (s) => { const m = String(s).match(/(\d{1,2}):(\d{2})/); return m ? { hours: +m[1], minutes: +m[2] } : null; };
+      const periods = [];
+      for (const h of (b.hours || [])) {
+        const d = DAY[String(h.day || '').slice(0, 3).toUpperCase()] || String(h.day || '').toUpperCase();
+        const o = T(h.open), c = T(h.close);
+        if (Object.values(DAY).includes(d) && o && c) periods.push({ openDay: d, openTime: o, closeDay: d, closeTime: c });
+      }
+      if (periods.length) { bodyObj.regularHours = { periods }; masks.push('regularHours'); }
+    }
     if (!masks.length) return res.status(400).json({ error: '更新項目がありません' });
     if (b.dryRun) return res.json({ dryRun: true, locPart, updateMask: masks.join(','), body: bodyObj });
     try {
