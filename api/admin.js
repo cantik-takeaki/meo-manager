@@ -845,9 +845,15 @@ export default async function handler(req, res) {
       if (!st.name) continue;
       const rk = await kvGet(`rankings_${st.storeId}`) || {};
       const meta = rk.meta || {};
-      // 手動「AIで順位取得」と計測地点を統一：計測地点(rank_point)があれば ll を付与（無ければ従来のarea文字列）
+      // 計測地点(rank_point)があれば ll を付与。無ければ店舗住所からgeocodeして座標を得る
+      // （DataForSEOのGoogleマップは座標が実質必須。国レベルだと0件になるため）。
       const rp = await kvGet(`rank_point_${st.storeId}`);
-      const ll = (rp && Number.isFinite(+rp.lat) && Number.isFinite(+rp.lng)) ? `${rp.lat},${rp.lng},14z` : '';
+      let ll = (rp && Number.isFinite(+rp.lat) && Number.isFinite(+rp.lng)) ? `${rp.lat},${rp.lng},14z` : '';
+      if (!ll) {
+        const _kn = await kvGet(`knowledge_${st.storeId}`) || {};
+        const _geoQ = _kn.address || st.name;
+        if (_geoQ) { const _g = await geocodeQuery(_geoQ); if (_g) ll = `${_g.lat},${_g.lng},14z`; }
+      }
       (rk.keywords || []).forEach(kw => {
         const m = meta[kw] || {};
         if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '', ll });
@@ -1155,8 +1161,16 @@ export default async function handler(req, res) {
     const used = await kvGet(usedKey) || 0;
     if (useSerp && used >= SERPAPI_LIMIT) return res.status(429).json({ error: `今月の順位取得上限（${SERPAPI_LIMIT}回）に達しました。来月リセットされます`, overLimit: true, used, limit: SERPAPI_LIMIT });
     try {
-      const { list, error, calls } = await fetchLocalResults(keyword, { location, ll });
+      // DataForSEOのGoogleマップは座標が実質必須。ll未指定なら店舗住所からgeocodeして補う（国レベルだと0件になる）。
+      let _ll = ll;
+      if (!_ll && !useSerp && storeId) {
+        const _kn = await kvGet(`knowledge_${storeId}`) || {};
+        const _geoQ = _kn.address || store;
+        if (_geoQ) { const _g = await geocodeQuery(_geoQ); if (_g) _ll = `${_g.lat},${_g.lng},14z`; }
+      }
+      const { list, error, calls } = await fetchLocalResults(keyword, { location, ll: _ll });
       if (useSerp && calls) await kvIncrBy(usedKey, calls); // アトミック加算（並行実行のアンダーカウント防止）
+      else if (!useSerp && calls) await kvIncrBy(`dfs_usage_${ym}`, calls); // DataForSEO従量の使用数を計上
       if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
       const target = _normName(store);
       let rank = null, matched = null;
