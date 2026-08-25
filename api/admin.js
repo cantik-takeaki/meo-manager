@@ -85,7 +85,14 @@ async function fetchLocalResults(keyword, { location, ll } = {}) {
         title: x.title, position: x.rank_absolute || (i + 1), rating: x.rating?.value || null, reviews: x.rating?.votes_count || null, place_id: x.place_id || '',
       }));
       const _dbg = { http: r.status, sc: d?.status_code, sm: d?.status_message, tsc: t0?.status_code, tsm: t0?.status_message, cost: d?.cost, resCount: (t0?.result || []).length, itemsCount: items.length, itemTypes: [...new Set(items.map(x => x.type))].slice(0, 6), sent: ll ? ('coord:' + ll.replace(/@|z$/g, '')) : ('name:' + (location || 'Japan')) };
-      if (!list.length && t0?.status_message && t0.status_code >= 40000) return { error: t0.status_message, calls: 1, _dbg };
+      // 認証(401/40100)やタスクエラーを"成功0件"と誤認しない。無課金(cost0)のエラーは calls:0（使用数を増やさない）。
+      if (!list.length) {
+        const httpBad = r.status >= 400, topBad = (d?.status_code || 0) >= 40000, taskBad = (t0?.status_code || 0) >= 40000;
+        if (httpBad || topBad || taskBad) {
+          const msg = t0?.status_message || d?.status_message || ('HTTP ' + r.status);
+          return { error: msg, calls: (d?.cost || 0) > 0 ? 1 : 0, _dbg };
+        }
+      }
       return { list, calls: 1, _dbg };
     } catch (e) { return { error: e.message, calls: 1, _dbg: { ex: e.message } }; }
   }
