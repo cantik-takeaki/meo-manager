@@ -67,10 +67,12 @@ function diffGbpBaseline(saved, current) {
 // ll = 店舗の実座標（"lat,lng"）。SerpApiのgoogle_localは地点文字列(location)、DataForSEOは座標で計測でき精度が高い。
 async function fetchLocalResults(keyword, { location, ll } = {}) {
   const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
-  if (provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
+  if (provider === 'dataforseo' && (process.env.DATAFORSEO_B64 || (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD))) {
     // DataForSEO（有料・座標指定で高精度）。envに認証情報がある時のみ通る＝未設定なら絶対に走らない。
+    // 認証は DATAFORSEO_B64（login:password のBase64・取り違え防止）優先。無ければ LOGIN/PASSWORD から生成。前後空白は除去。
     try {
-      const auth = Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
+      const auth = (process.env.DATAFORSEO_B64 || '').trim()
+        || Buffer.from(`${(process.env.DATAFORSEO_LOGIN || '').trim()}:${(process.env.DATAFORSEO_PASSWORD || '').trim()}`).toString('base64');
       const task = { language_code: 'ja', keyword, device: 'mobile', os: 'android' };
       if (ll) task.location_coordinate = ll.replace(/@|z$/g, ''); // "lat,lng,zoom"可 → DataForSEOは "lat,lng,zoom"
       else task.location_name = location || 'Japan';
@@ -815,7 +817,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'unauthorized' });
     }
     const _cronProvider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
-    const _cronUseSerp = !(_cronProvider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    const _cronUseSerp = !(_cronProvider === 'dataforseo' && (process.env.DATAFORSEO_B64 || process.env.DATAFORSEO_LOGIN));
     if (_cronUseSerp && !process.env.SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
     // 同日の再実行はスキップ（誤操作・外部からの連打で枠を浪費しない。force=1で強制再実行）
@@ -1163,7 +1165,7 @@ export default async function handler(req, res) {
     const { keyword, location, ll, store, storeId } = req.query;
     if (!keyword || !store) return res.status(400).json({ error: 'keyword・store必須' });
     const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
-    const useSerp = !(provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    const useSerp = !(provider === 'dataforseo' && (process.env.DATAFORSEO_B64 || process.env.DATAFORSEO_LOGIN));
     // SerpApi時のみ月間上限ガード（DataForSEOは従量なので別管理）。上限到達で自動停止し課金枠突入を防ぐ。
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
@@ -1525,7 +1527,7 @@ export default async function handler(req, res) {
     const areas = String(req.query.areas || '').split('|').map(s => s.trim()).filter(Boolean).slice(0, 9);
     if (!keyword || !store || !areas.length) return res.status(400).json({ error: 'keyword・store・areas必須' });
     const provider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
-    const useSerp = !(provider === 'dataforseo' && process.env.DATAFORSEO_LOGIN);
+    const useSerp = !(provider === 'dataforseo' && (process.env.DATAFORSEO_B64 || process.env.DATAFORSEO_LOGIN));
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
     let used = await kvGet(usedKey) || 0;
