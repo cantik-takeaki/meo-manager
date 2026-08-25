@@ -79,13 +79,15 @@ async function fetchLocalResults(keyword, { location, ll } = {}) {
         body: JSON.stringify([task]),
       });
       const d = await r.json();
-      const items = d?.tasks?.[0]?.result?.[0]?.items || [];
+      const t0 = d?.tasks?.[0];
+      const items = t0?.result?.[0]?.items || [];
       const list = items.filter(x => x.type === 'maps_search').map((x, i) => ({
         title: x.title, position: x.rank_absolute || (i + 1), rating: x.rating?.value || null, reviews: x.rating?.votes_count || null, place_id: x.place_id || '',
       }));
-      if (!list.length && d?.tasks?.[0]?.status_message && d.tasks[0].status_code >= 40000) return { error: d.tasks[0].status_message, calls: 1 };
-      return { list, calls: 1 };
-    } catch (e) { return { error: e.message, calls: 1 }; }
+      const _dbg = { http: r.status, sc: d?.status_code, sm: d?.status_message, tsc: t0?.status_code, tsm: t0?.status_message, cost: d?.cost, resCount: (t0?.result || []).length, itemsCount: items.length, itemTypes: [...new Set(items.map(x => x.type))].slice(0, 6), sent: ll ? ('coord:' + ll.replace(/@|z$/g, '')) : ('name:' + (location || 'Japan')) };
+      if (!list.length && t0?.status_message && t0.status_code >= 40000) return { error: t0.status_message, calls: 1, _dbg };
+      return { list, calls: 1, _dbg };
+    } catch (e) { return { error: e.message, calls: 1, _dbg: { ex: e.message } }; }
   }
   // 既定: SerpApi（無料枠）。
   //  ・ll(座標)あり → google_maps エンジンで"その正確な地点"から計測（店舗の実所在地・新宿駅など任意地点に対応）
@@ -1168,9 +1170,10 @@ export default async function handler(req, res) {
         const _geoQ = _kn.address || store;
         if (_geoQ) { const _g = await geocodeQuery(_geoQ); if (_g) _ll = `${_g.lat},${_g.lng},14z`; }
       }
-      const { list, error, calls } = await fetchLocalResults(keyword, { location, ll: _ll });
+      const { list, error, calls, _dbg } = await fetchLocalResults(keyword, { location, ll: _ll });
       if (useSerp && calls) await kvIncrBy(usedKey, calls); // アトミック加算（並行実行のアンダーカウント防止）
       else if (!useSerp && calls) await kvIncrBy(`dfs_usage_${ym}`, calls); // DataForSEO従量の使用数を計上
+      if (req.query.debug === '1') return res.json({ debug: true, resolvedLl: _ll || null, _dbg: _dbg || null, listCount: (list || []).length, error: error || null });
       if (error) return res.status(502).json({ error: error + '（検索地点は「市区,都道府県,Japan」の英語表記が確実。空欄でもキーワードに地域があれば取得できます）' });
       const target = _normName(store);
       let rank = null, matched = null;
