@@ -833,7 +833,7 @@ export default async function handler(req, res) {
     const _dfsUsedKey = `dfs_usage_${ym}`;
     let _dfsUsed = _cronUseSerp ? 0 : (await kvGet(_dfsUsedKey) || 0);
     const _dfsMonthlyLimit = Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 1500); // 従量課金の月間コール上限(安全弁・GCP課金事故の再発防止)
-    const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 10);     // 1回の実行件数(60秒の関数上限に収める)
+    const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 8);      // 1回の実行件数(60秒の関数上限に収める。DataForSEO Liveは1件数秒)
     let budget, MAX_CALLS;
     if (_cronUseSerp) {
       const reserve = Math.ceil(SERPAPI_LIMIT * 0.2); // 手動取得用に2割温存
@@ -874,6 +874,8 @@ export default async function handler(req, res) {
     let _cursor = await kvGet('cron_rank_cursor');
     if (!Number.isFinite(_cursor) || _cursor >= jobs.length) _cursor = 0;
     const orderedJobs = jobs.length ? jobs.slice(_cursor).concat(jobs.slice(0, _cursor)) : [];
+    // カーソルは「先行更新」：関数が60秒制限で途中終了しても次回は続きから測れる（同じ先頭10件を測り続ける事故を防ぐ）。
+    if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + Math.min(MAX_CALLS, jobs.length)) % jobs.length);
     let ok = 0, fail = 0, _processedCount = 0;
     const processed = [];
     for (const job of orderedJobs) {
@@ -910,8 +912,7 @@ export default async function handler(req, res) {
         processed.push({ store: job.st.name, kw: job.kw, rank });
       } catch (e) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: e.message }); }
     }
-    // 次回開始位置を進める（今回処理した件数ぶん。全KWを数日で一巡）
-    if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
+    // カーソルはループ前に先行更新済み（途中終了対策）。ここでは更新しない。
     const summary = {
       at: new Date().toISOString(), date: today,
       provider: _cronUseSerp ? 'serpapi' : 'dataforseo',
