@@ -345,9 +345,16 @@ export default async function handler(req, res) {
   }
 
   // 管理者ログイン確認：Google連携(access_token) または メール＋パスワード(pw_session) のどちらか。
+  // ★重要: Vercel Cron は管理者Cookieを持たず CRON_SECRET のBearerのみで来る。
+  //   cron系アクションは、この共通ゲートより前で「CRON_SECRET一致なら通す」＝ゲートを免除する。
+  //   （従来はゲートで401になり cron-rank/cron-tamper 本体に到達できず、cronが一度も発火していなかった）
   const _c = parseCookies(req);
   const access_token = _c.access_token;
-  if (!access_token && !_c.pw_session) return res.status(401).json({ error: '管理者ログインが必要です' });
+  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper');
+  const _cronAuthOk = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
+  if (!(_isCronAction && _cronAuthOk) && !access_token && !_c.pw_session) {
+    return res.status(401).json({ error: '管理者ログインが必要です' });
+  }
 
   // ── 管理対象ロケーション（オーナー登録済みGBPから管理者が選抜して登録） ──
   // GETで現在の管理対象一覧、POST{location,on}で追加/除外。これで「全自動表示」をやめ管理者が判断する。
@@ -795,7 +802,7 @@ export default async function handler(req, res) {
   // 安全設計: 優先度「A」の有効KWのみ自動計測。無料枠の20%を手動用に温存し、残枠が尽きたら自動停止。
   // 1回の実行はMAX_CALLS件まで（関数実行時間の上限内に収める）。CRON_SECRET設定時はBearer認証必須。
   if (req.method === 'GET' && action === 'cron-rank') {
-    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}` && !access_token && !_c.pw_session) {
       return res.status(401).json({ error: 'unauthorized' });
     }
     const _cronProvider = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
@@ -901,7 +908,7 @@ export default async function handler(req, res) {
   // ── 改ざん検知の定期自動巡回（Vercel Cron: 毎日3時JST = 0 18 * * * UTC）──
   // 正規情報(baseline)を保存済みの管理店を毎日GBPと自動照合→変化があればアラート記録＋メール通知。
   if (req.method === 'GET' && action === 'cron-tamper') {
-    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}` && !access_token && !_c.pw_session) {
       return res.status(401).json({ error: 'unauthorized' });
     }
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
