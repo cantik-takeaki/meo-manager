@@ -1829,5 +1829,56 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
+  // ── GBPカテゴリ検索（categoryId= "categories/gcid:xxx" を取得） ──
+  if (req.method === 'GET' && action === 'gbp-categories') {
+    const q = String(req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'q必須（例: 中華料理）' });
+    const token = await getMasterToken();
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    try {
+      const params = new URLSearchParams({ regionCode: 'JP', languageCode: 'ja', view: 'BASIC', filter: `displayName=${q}`, pageSize: '20' });
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/categories?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message || 'カテゴリ検索失敗', code: d.error.code });
+      return res.json({ categories: (d.categories || []).map(c => ({ id: c.name, displayName: c.displayName })) });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // ── GBP店舗情報の更新（カテゴリ/説明/電話/URL）。社長承認の上で実行する対外アクション ──
+  // body: { storeId?, locationName?, primaryCategoryId?, additionalCategoryIds?[], description?, phone?, websiteUri?, dryRun? }
+  if (req.method === 'POST' && action === 'gbp-update') {
+    const storeId = req.query.storeId || req.body.storeId;
+    const b = req.body || {};
+    let locationName = b.locationName || '';
+    let token = await getMasterToken();
+    if (!locationName && storeId) {
+      const managed = await kvGet('managed_locations') || [];
+      const m = managed.find(x => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+      if (m) { locationName = m.locId || m.locationName || ''; if (m.storeId) token = (await getAccessToken(m.storeId)) || token; }
+    }
+    const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
+    if (!locPart) return res.status(400).json({ error: 'locationName不明（storeId か locationName を指定）' });
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    const bodyObj = {}; const masks = [];
+    if (b.primaryCategoryId) {
+      bodyObj.categories = { primaryCategory: { name: b.primaryCategoryId } };
+      if (Array.isArray(b.additionalCategoryIds) && b.additionalCategoryIds.length) bodyObj.categories.additionalCategories = b.additionalCategoryIds.map(id => ({ name: id }));
+      masks.push('categories');
+    }
+    if (typeof b.description === 'string') { bodyObj.profile = { description: b.description.slice(0, 750) }; masks.push('profile.description'); }
+    if (typeof b.websiteUri === 'string') { bodyObj.websiteUri = b.websiteUri; masks.push('websiteUri'); }
+    if (typeof b.phone === 'string') { bodyObj.phoneNumbers = { primaryPhone: b.phone }; masks.push('phoneNumbers.primaryPhone'); }
+    if (!masks.length) return res.status(400).json({ error: '更新項目がありません' });
+    if (b.dryRun) return res.json({ dryRun: true, locPart, updateMask: masks.join(','), body: bodyObj });
+    try {
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?updateMask=${encodeURIComponent(masks.join(','))}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj),
+      });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message || 'GBP更新失敗', code: d.error.code, details: d.error.details });
+      return res.json({ success: true, updated: masks, title: d.title, primaryCategory: d.categories?.primaryCategory?.displayName, description: d.profile?.description });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   return res.status(405).end();
 }
