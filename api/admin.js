@@ -817,9 +817,21 @@ export default async function handler(req, res) {
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
     let used = await kvGet(usedKey) || 0;
-    const reserve = Math.ceil(SERPAPI_LIMIT * 0.2); // 手動取得用に2割温存
-    const budget = Math.max(0, SERPAPI_LIMIT - reserve - used);
-    const MAX_CALLS = Math.min(budget, 20);
+    // ── プロバイダ別のガード ──
+    // SerpApi(無料枠): 月100・20%温存・1回20件。DataForSEO(従量): 月間コール上限＋関数60秒に収まる1回件数。
+    const _dfsUsedKey = `dfs_usage_${ym}`;
+    let _dfsUsed = _cronUseSerp ? 0 : (await kvGet(_dfsUsedKey) || 0);
+    const _dfsMonthlyLimit = Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 1500); // 従量課金の月間コール上限(安全弁・GCP課金事故の再発防止)
+    const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 10);     // 1回の実行件数(60秒の関数上限に収める)
+    let budget, MAX_CALLS;
+    if (_cronUseSerp) {
+      const reserve = Math.ceil(SERPAPI_LIMIT * 0.2); // 手動取得用に2割温存
+      budget = Math.max(0, SERPAPI_LIMIT - reserve - used);
+      MAX_CALLS = Math.min(budget, 20);
+    } else {
+      budget = Math.max(0, _dfsMonthlyLimit - _dfsUsed);
+      MAX_CALLS = Math.min(budget, _dfsPerRun);
+    }
     // 対象店舗（GBP管理店＋手動登録）
     const managed = await kvGet('managed_locations') || [];
     const manual = await kvGet('admin_stores') || [];
@@ -841,13 +853,19 @@ export default async function handler(req, res) {
         if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '', ll });
       });
     }
-    let ok = 0, fail = 0;
+    // ── 回転カーソル：毎回続きから測って全KWを一巡させる（先頭N件に偏らない） ──
+    let _cursor = await kvGet('cron_rank_cursor');
+    if (!Number.isFinite(_cursor) || _cursor >= jobs.length) _cursor = 0;
+    const orderedJobs = jobs.length ? jobs.slice(_cursor).concat(jobs.slice(0, _cursor)) : [];
+    let ok = 0, fail = 0, _processedCount = 0;
     const processed = [];
-    for (const job of jobs) {
+    for (const job of orderedJobs) {
       if (ok + fail >= MAX_CALLS) break;
+      _processedCount++;
       try {
         const { list, error, calls } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
         if (_cronUseSerp && calls) { used = await kvIncrBy(usedKey, calls); } // アトミック加算（並行実行のアンダーカウント防止・戻り値=真の合計）
+        else if (!_cronUseSerp && calls) { _dfsUsed = await kvIncrBy(_dfsUsedKey, calls); } // DataForSEO従量の使用数を計上
         if (error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error }); continue; }
         const target = _normName(job.st.name);
         let rank = null;
@@ -875,12 +893,18 @@ export default async function handler(req, res) {
         processed.push({ store: job.st.name, kw: job.kw, rank });
       } catch (e) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: e.message }); }
     }
+    // 次回開始位置を進める（今回処理した件数ぶん。全KWを数日で一巡）
+    if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
     const summary = {
       at: new Date().toISOString(), date: today,
+      provider: _cronUseSerp ? 'serpapi' : 'dataforseo',
       targets: jobs.length, ok, fail,
-      capped: jobs.length > MAX_CALLS ? `対象${jobs.length}件のうち${MAX_CALLS}件で停止（実行時間と残枠の保護）` : null,
-      budgetStopped: budget <= 0 ? '残枠が手動温存分(20%)に達したため自動計測を停止しました' : null,
-      used, limit: SERPAPI_LIMIT, processed,
+      measuredThisRun: _processedCount, cursorNext: jobs.length ? (_cursor + _processedCount) % jobs.length : 0,
+      capped: jobs.length > MAX_CALLS ? `全${jobs.length}件のうち今回${MAX_CALLS}件を計測（続きは次回・回転カーソルで一巡）` : null,
+      budgetStopped: budget <= 0 ? (_cronUseSerp ? '残枠が手動温存分(20%)に達したため停止' : `DataForSEO月間上限(${_dfsMonthlyLimit}コール)に達したため停止`) : null,
+      used, limit: SERPAPI_LIMIT,
+      dfsUsed: _cronUseSerp ? undefined : _dfsUsed, dfsLimit: _cronUseSerp ? undefined : _dfsMonthlyLimit,
+      processed,
     };
     await kvSet('cron_rank_last', summary);
 
