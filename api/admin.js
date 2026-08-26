@@ -881,13 +881,25 @@ export default async function handler(req, res) {
         const _geoQ = _kn.address || st.name;
         if (_geoQ) { const _g = await geocodeQuery(_geoQ); if (_g) ll = `${_g.lat},${_g.lng},14z`; }
       }
+      // 当日すでに計測済みのKWは対象から外す（同じKWを二重計測して課金を無駄にし、
+      // かつ未計測のKWが残ったまま「完了」に見えてしまう問題を防ぐ。remeasure=1で測り直し）
+      const _todayEntry = (rk.history || []).find(h => h.date === today);
+      const _doneKws = new Set();
+      if (_todayEntry && req.query.remeasure !== '1') {
+        (rk.keywords || []).forEach((kw, i) => {
+          const v = (_todayEntry.rankings || [])[i];
+          if (v !== undefined) _doneKws.add(kw);
+        });
+      }
       (rk.keywords || []).forEach(kw => {
         const m = meta[kw] || {};
-        if (kw && m.enabled !== false && m.priority === 'A') jobs.push({ st, kw, area: m.area || '', ll });
+        if (kw && m.enabled !== false && m.priority === 'A' && !_doneKws.has(kw)) jobs.push({ st, kw, area: m.area || '', ll });
       });
     }
     // ── 回転カーソル：毎回続きから測って全KWを一巡させる（先頭N件に偏らない） ──
-    let _cursor = await kvGet('cron_rank_cursor');
+    // jobsは「当日まだ測っていないKW」だけなので、通常は先頭から順に処理すれば穴なく一巡する。
+    // カーソルはremeasure=1（全KWを測り直す）時のみ使う。
+    let _cursor = req.query.remeasure === '1' ? (await kvGet('cron_rank_cursor')) : 0;
     if (!Number.isFinite(_cursor) || _cursor >= jobs.length) _cursor = 0;
     const orderedJobs = jobs.length ? jobs.slice(_cursor).concat(jobs.slice(0, _cursor)) : [];
     // カーソルは「実測した件数だけ」進める（取得ループ直後に更新）。
@@ -978,7 +990,8 @@ export default async function handler(req, res) {
     // インスタンスが凍結されリクエストが破棄されるため機能しない（実測で確認）。よって並列＋時間予算で
     // 1回の実行件数を最大化し、残りは回転カーソルで次回に引き継ぐ方式にする。
     // 当日中に残りも測りたい場合は chain=1 を付けて再度呼ぶ（同日ガードを免除）。
-    summary.remainingToday = Math.max(0, jobs.length - _doneToday);
+    // 残件＝今回の対象（当日未計測のKW）から今回測った分を引いた数。カウンタではなく実データ基準。
+    summary.remainingToday = Math.max(0, jobs.length - _processedCount);
     if (_isChain) await kvSet(_chainKey, _chainCount + 1);
     await kvSet('cron_rank_last', summary);
 
