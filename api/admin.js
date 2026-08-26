@@ -870,6 +870,7 @@ export default async function handler(req, res) {
     const jobs = [];
     for (const st of stores) {
       if (!st.name) continue;
+      if (/^【デモ】|^\[デモ\]/.test(st.name)) continue; // デモ店舗は実在しないため計測しない（従量課金の無駄）
       const rk = await kvGet(`rankings_${st.storeId}`) || {};
       const meta = rk.meta || {};
       // 計測地点(rank_point)があれば ll を付与。無ければ店舗住所からgeocodeして座標を得る
