@@ -1933,7 +1933,9 @@ export default async function handler(req, res) {
       if (d.error) return res.status(502).json({ error: d.error.message || 'GBP取得失敗', code: d.error.code });
       const pc = d.categories?.primaryCategory;
       const ac = d.categories?.additionalCategories || [];
+      // descriptionは本文も返す（登録済みの説明文を監査＝事実誤りや景表法NGの点検に必要。hasDescriptionだけでは中身を照合できない）
       return res.json({ title: d.title, websiteUri: d.websiteUri || '', phone: d.phoneNumbers?.primaryPhone || '', hasDescription: !!(d.profile && d.profile.description),
+        description: (d.profile && d.profile.description) || '',
         primary: pc ? { id: pc.name, displayName: pc.displayName } : null,
         additional: ac.map(c => ({ id: c.name, displayName: c.displayName })) });
     } catch (e) { return res.status(500).json({ error: e.message }); }
