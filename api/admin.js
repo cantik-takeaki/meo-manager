@@ -1965,6 +1965,11 @@ export default async function handler(req, res) {
     if (typeof b.description === 'string') { bodyObj.profile = { description: b.description.slice(0, 750) }; masks.push('profile.description'); }
     if (typeof b.websiteUri === 'string') { bodyObj.websiteUri = b.websiteUri; masks.push('websiteUri'); }
     if (typeof b.phone === 'string') { bodyObj.phoneNumbers = { primaryPhone: b.phone }; masks.push('phoneNumbers.primaryPhone'); }
+    // 主番号を差し替える際、それまでの番号を失わないよう副番号として残せるようにする（NAP統一時に店の携帯を消さないため）
+    if (Array.isArray(b.additionalPhones)) {
+      bodyObj.phoneNumbers = Object.assign({}, bodyObj.phoneNumbers, { additionalPhones: b.additionalPhones.slice(0, 2).map(String) });
+      masks.push('phoneNumbers.additionalPhones');
+    }
     // サービス（自由記述サービス項目）: services=["メニュー名",...] ＋ カテゴリ(primaryCategoryId か serviceCategoryId)
     if (Array.isArray(b.services) && b.services.length) {
       const cat = b.primaryCategoryId || b.serviceCategoryId;
