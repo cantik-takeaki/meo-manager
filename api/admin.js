@@ -2147,6 +2147,9 @@ export default async function handler(req, res) {
     const attrs = (b.attributes || []).map(a => {
       const o = { name: a.id };
       if (Array.isArray(a.enums)) o.repeatedEnumValue = { setValues: a.enums };
+      // URL型の属性（url_appointment / url_reservations / url_instagram など）。
+      // プロフィール本体に予約ボタンやSNSリンクを出すのに使う（投稿のCTAとは別物）。
+      else if (typeof a.url === 'string' && a.url) o.uriValues = [{ uri: a.url }];
       else o.values = [a.bool !== false];
       return o;
     });
