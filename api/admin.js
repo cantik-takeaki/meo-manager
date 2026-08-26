@@ -899,11 +899,13 @@ export default async function handler(req, res) {
     // 逐次だと1件約5秒＝60秒の関数上限で8件しか測れず、150件の一巡に19日かかっていた。
     // ネットワーク待ちを並列化し、時間予算内で測れるだけ測る。KVは競合を避けるため「取得=並列／保存=逐次」。
     const CONC = Math.max(1, parseInt(process.env.RANK_CONCURRENCY, 10) || 8);
-    const DEADLINE = Date.now() + (Math.max(10, parseInt(process.env.RANK_TIME_BUDGET_SEC, 10) || 45) * 1000);
+    // 時間予算は関数上限(60秒)から保存処理の余裕を引いた値。予算切れ後は次回のcronが回転カーソルで続きを測る。
+    const DEADLINE = Date.now() + (Math.max(10, parseInt(process.env.RANK_TIME_BUDGET_SEC, 10) || 35) * 1000);
     const targetsThisRun = orderedJobs.slice(0, MAX_CALLS);
-    const fetched = [];
+    // 「1バッチ取得 → そのバッチを即保存」を繰り返す。
+    // 全件取得後に一括保存すると60秒超過で強制終了した際に測った分（＝課金済み）が全て失われるため。
     for (let i = 0; i < targetsThisRun.length; i += CONC) {
-      if (Date.now() > DEADLINE) break; // 予算切れ＝次回のcronが回転カーソルで続きを測る
+      if (Date.now() > DEADLINE) break;
       const batch = targetsThisRun.slice(i, i + CONC);
       const rs = await Promise.all(batch.map(async job => {
         try {
@@ -911,52 +913,51 @@ export default async function handler(req, res) {
           return { job, ...r };
         } catch (e) { return { job, error: e.message, calls: 1 }; }
       }));
-      fetched.push(...rs);
       _processedCount += batch.length;
-    }
-    // 実測した分だけカーソルを進める（次回は必ず続きから＝全KWを確実に一巡）
-    if (jobs.length && _processedCount) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
-    // 使用コール数を集計して一括加算（アトミック・並列でも取りこぼさない）
-    const _callsTotal = fetched.reduce((s, r) => s + (r.calls || 0), 0);
-    if (_callsTotal) {
-      if (_cronUseSerp) used = await kvIncrBy(usedKey, _callsTotal);
-      else _dfsUsed = await kvIncrBy(_dfsUsedKey, _callsTotal);
-    }
-    // 店舗ごとにまとめて保存（同一店の複数KWを1回の読み書きで反映＝競合と書き潰しを防ぐ）
-    const byStore = new Map();
-    for (const r of fetched) {
-      const sid = r.job.st.storeId;
-      if (!byStore.has(sid)) byStore.set(sid, []);
-      byStore.get(sid).push(r);
-    }
-    for (const [sid, rs] of byStore) {
-      const ex = await kvGet(`rankings_${sid}`) || { history: [], keywords: [] };
-      ex.keywords = ex.keywords || [];
-      let entry = ex.history.find(h => h.date === today);
-      if (!entry) { entry = { date: today, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
-      entry.rankings = entry.rankings || [];
-      for (const r of rs) {
-        if (r.error) { fail++; processed.push({ store: r.job.st.name, kw: r.job.kw, error: r.error }); continue; }
-        const target = _normName(r.job.st.name);
-        let rank = null;
-        (r.list || []).forEach((item, i) => {
-          if (rank) return;
-          const t = _normName(item.title);
-          if (t && (t.includes(target) || target.includes(t))) rank = item.position || (i + 1);
-        });
-        let ki = ex.keywords.indexOf(r.job.kw);
-        if (ki < 0) { ex.keywords.push(r.job.kw); ki = ex.keywords.length - 1; }
-        entry.rankings[ki] = (Number.isFinite(rank) && rank >= 1) ? rank : null;
-        ok++;
-        processed.push({ store: r.job.st.name, kw: r.job.kw, rank });
-        await recordCompRanks(sid, r.job.kw, rank, r.list || []); // 競合順位も同時記録（追加APIコストなし）
+      // 使用コール数を加算（アトミック・並列でも取りこぼさない）
+      const _cAdd = rs.reduce((s, r) => s + (r.calls || 0), 0);
+      if (_cAdd) {
+        if (_cronUseSerp) used = await kvIncrBy(usedKey, _cAdd);
+        else _dfsUsed = await kvIncrBy(_dfsUsedKey, _cAdd);
       }
-      entry.recordedAt = new Date().toISOString();
-      ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-      if (ex.history.length > 60) ex.history = ex.history.slice(-60);
-      await kvSet(`rankings_${sid}`, ex);
+      // 店舗単位でまとめて保存（同一店の複数KWを1回の読み書きで反映＝書き潰しを防ぐ）
+      const byStore = new Map();
+      for (const r of rs) {
+        const sid = r.job.st.storeId;
+        if (!byStore.has(sid)) byStore.set(sid, []);
+        byStore.get(sid).push(r);
+      }
+      for (const [sid, list] of byStore) {
+        const ex = await kvGet(`rankings_${sid}`) || { history: [], keywords: [] };
+        ex.keywords = ex.keywords || [];
+        let entry = ex.history.find(h => h.date === today);
+        if (!entry) { entry = { date: today, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
+        entry.rankings = entry.rankings || [];
+        for (const r of list) {
+          if (r.error) { fail++; processed.push({ store: r.job.st.name, kw: r.job.kw, error: r.error }); continue; }
+          const target = _normName(r.job.st.name);
+          let rank = null;
+          (r.list || []).forEach((item, idx) => {
+            if (rank) return;
+            const t = _normName(item.title);
+            if (t && (t.includes(target) || target.includes(t))) rank = item.position || (idx + 1);
+          });
+          let ki = ex.keywords.indexOf(r.job.kw);
+          if (ki < 0) { ex.keywords.push(r.job.kw); ki = ex.keywords.length - 1; }
+          entry.rankings[ki] = (Number.isFinite(rank) && rank >= 1) ? rank : null;
+          ok++;
+          processed.push({ store: r.job.st.name, kw: r.job.kw, rank });
+        }
+        entry.recordedAt = new Date().toISOString();
+        ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        if (ex.history.length > 60) ex.history = ex.history.slice(-60);
+        await kvSet(`rankings_${sid}`, ex);
+      }
+      // カーソルはバッチ毎に前進（途中終了しても次回は続きから＝欠測を作らない）
+      if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
     }
-    // カーソルはループ前に先行更新済み（途中終了対策）。ここでは更新しない。
+    // 競合順位(recordCompRanks)はKV往復が多く60秒を圧迫するため、自動計測ループでは呼ばない。
+    // 競合順位は手動計測(fetch-rank)時に記録される。
     const summary = {
       at: new Date().toISOString(), date: today,
       provider: _cronUseSerp ? 'serpapi' : 'dataforseo',
