@@ -820,10 +820,22 @@ export default async function handler(req, res) {
     const _cronUseSerp = !(_cronProvider === 'dataforseo' && (process.env.DATAFORSEO_B64 || process.env.DATAFORSEO_LOGIN));
     if (_cronUseSerp && !process.env.SERPAPI_KEY) return res.status(500).json({ error: 'SERPAPI_KEY未設定' });
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // JST日付
-    // 同日の再実行はスキップ（誤操作・外部からの連打で枠を浪費しない。force=1で強制再実行）
+    // ── 自己継続(チェーン) ──
+    // Vercelの関数上限60秒では1回8件しか測れず、150件の全KW一巡に19日かかっていた。
+    // chain=1 で「同日スキップ」を免除し、残件がある限り自分を非同期で呼び続けて当日中に全件を完走させる。
+    // 暴走防止: 当日のチェーン回数をKVで数え CHAIN_MAX で打ち切る＋月間コール上限(_dfsMonthlyLimit)は従来どおり有効。
+    const _isChain = req.query.chain === '1';
+    const _chainKey = `cron_rank_chain_${today}`;
+    const CHAIN_MAX = Math.max(1, parseInt(process.env.CRON_RANK_CHAIN_MAX, 10) || 40);
+    // 同日の再実行はスキップ（誤操作・外部からの連打で枠を浪費しない。force=1で強制／chain=1は継続なので免除）
     const last = await kvGet('cron_rank_last');
-    if (last && last.date === today && req.query.force !== '1') {
+    if (last && last.date === today && req.query.force !== '1' && !_isChain) {
       return res.json({ skipped: '本日はすでに実行済みです', last });
+    }
+    let _chainCount = 0;
+    if (_isChain) {
+      _chainCount = (await kvGet(_chainKey)) || 0;
+      if (_chainCount >= CHAIN_MAX) return res.json({ chainStopped: `チェーン上限${CHAIN_MAX}回に到達`, date: today });
     }
     const ym = new Date().toISOString().slice(0, 7);
     const usedKey = `serpapi_usage_${ym}`;
@@ -832,7 +844,9 @@ export default async function handler(req, res) {
     // SerpApi(無料枠): 月100・20%温存・1回20件。DataForSEO(従量): 月間コール上限＋関数60秒に収まる1回件数。
     const _dfsUsedKey = `dfs_usage_${ym}`;
     let _dfsUsed = _cronUseSerp ? 0 : (await kvGet(_dfsUsedKey) || 0);
-    const _dfsMonthlyLimit = Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 1500); // 従量課金の月間コール上限(安全弁・GCP課金事故の再発防止)
+    // 従量課金の月間コール上限(安全弁・GCP課金事故の再発防止)。
+    // 毎日フル計測=約150件/日×30日=4500コール(≒$9/月)を想定して5000。減らすならenvで上書き。
+    const _dfsMonthlyLimit = Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 5000);
     const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 8);      // 1回の実行件数(60秒の関数上限に収める。DataForSEO Liveは1件数秒)
     let budget, MAX_CALLS;
     if (_cronUseSerp) {
@@ -924,12 +938,28 @@ export default async function handler(req, res) {
       dfsUsed: _cronUseSerp ? undefined : _dfsUsed, dfsLimit: _cronUseSerp ? undefined : _dfsMonthlyLimit,
       processed,
     };
+    // ── 当日の累計計測数を記録し、残件があれば自分を非同期で呼んで継続（当日中に全KWを完走させる） ──
+    const _doneKey = `cron_rank_done_${today}`;
+    const _doneToday = await kvIncrBy(_doneKey, ok + fail);
+    summary.doneToday = _doneToday;
+    summary.chainCount = _chainCount;
+    let _chained = false;
+    if ((ok + fail) > 0 && _doneToday < jobs.length && budget > 0 && _chainCount + 1 < CHAIN_MAX) {
+      await kvSet(_chainKey, _chainCount + 1);
+      const _base = process.env.SELF_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://meo.cantik.co.jp');
+      const _auth = process.env.CRON_SECRET ? { Authorization: `Bearer ${process.env.CRON_SECRET}` } : {};
+      // fire-and-forget（レスポンスを待たない＝この関数は60秒以内に終える）
+      fetch(`${_base}/api/admin?action=cron-rank&chain=1`, { headers: _auth }).catch(() => {});
+      _chained = true;
+    }
+    summary.chained = _chained;
+    summary.remainingToday = Math.max(0, jobs.length - _doneToday);
     await kvSet('cron_rank_last', summary);
 
     // 週次サマリーメール（RESEND設定時のみ・設定ページでOFF可）
     try {
       const notifyPref = await kvGet('notify_weekly');
-      if (notifyPref !== false && (ok + fail) > 0) {
+      if (notifyPref !== false && (ok + fail) > 0 && !_chained) { // チェーン継続中は送らない（完走時の1通だけ）
         const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
         if (to) {
           const rows = processed.map(p => `<tr><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.store}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.kw}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.error ? '取得失敗' : (p.rank ? p.rank + '位' : '圏外')}</td></tr>`).join('');
