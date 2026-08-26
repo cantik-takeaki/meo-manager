@@ -1270,6 +1270,72 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 店舗への確認事項（店舗ごと）──
+  // Web上の掲載が媒体間で矛盾していたり、そもそも情報が無い項目は、店に聞かないと確定できない。
+  // それを人の記憶やチャットに置かず、店舗ごとにこのシステムで管理する（未確認のまま投稿・GBPに書かないためのゲート）。
+  // ※ meo_memo（学習メモ）はコンテンツ生成が毎回読み込むため、そこに「要確認」を書くと投稿文に混入する。だから別キーにする。
+  //   GET  → { items:[{id,q,why,field,status,answer,at,doneAt}] }
+  //   POST → body{ items:[{q,why,field}] } で追加（既存は保持）／ body{ id, status:'done'|'open', answer } で更新
+  //   DELETE → ?id= で削除
+  if (action === 'confirm-items') {
+    const { storeId } = req.query;
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const key = `confirm_items_${storeId}`;
+    let list = (await kvGet(key)) || [];
+    if (req.method === 'GET') {
+      return res.json({ items: list, open: list.filter(x => x.status !== 'done').length });
+    }
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      if (b.id) {
+        // 1件の更新（回答を記録して確認済みにする）
+        const it = list.find(x => x.id === b.id);
+        if (!it) return res.status(404).json({ error: '該当なし' });
+        if (b.status === 'done' || b.status === 'open') { it.status = b.status; it.doneAt = b.status === 'done' ? new Date().toISOString() : null; }
+        if (typeof b.answer === 'string') it.answer = b.answer.slice(0, 500);
+        await kvSet(key, list);
+        return res.json({ success: true, item: it });
+      }
+      const add = Array.isArray(b.items) ? b.items : (b.q ? [b] : []);
+      if (!add.length) return res.status(400).json({ error: 'items または q が必要' });
+      for (const a of add) {
+        const q = String(a.q || '').slice(0, 300);
+        if (!q) continue;
+        if (list.some(x => x.q === q)) continue; // 同じ質問を二重に積まない
+        list.push({
+          id: 'c' + Date.now().toString(36) + Math.floor(list.length).toString(36),
+          q, why: String(a.why || '').slice(0, 300), field: String(a.field || '').slice(0, 40),
+          status: 'open', answer: '', at: new Date().toISOString(), doneAt: null,
+        });
+      }
+      if (list.length > 60) list = list.slice(-60);
+      await kvSet(key, list);
+      return res.json({ success: true, items: list, open: list.filter(x => x.status !== 'done').length });
+    }
+    if (req.method === 'DELETE') {
+      const id = req.query.id;
+      list = list.filter(x => x.id !== id);
+      await kvSet(key, list);
+      return res.json({ success: true, items: list });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+
+  // ── 確認事項の全店横断サマリー（どの店に何件残っているかを一覧で見る） ──
+  if (req.method === 'GET' && action === 'confirm-items-all') {
+    const managed = (await kvGet('managed_locations')) || [];
+    const rows = [];
+    for (const m of managed) {
+      const sid = String(m.locId || '').replace(/\//g, '_');
+      if (!sid) continue;
+      const items = (await kvGet(`confirm_items_${sid}`)) || [];
+      const open = items.filter(x => x.status !== 'done');
+      if (open.length) rows.push({ storeId: sid, storeName: m.title || '', open: open.length, items: open.map(x => ({ id: x.id, q: x.q, field: x.field })) });
+    }
+    rows.sort((a, b) => b.open - a.open);
+    return res.json({ stores: rows, totalOpen: rows.reduce((s, r) => s + r.open, 0) });
+  }
+
   // ── 独自情報・学習メモ（店舗ごと）。全コンテンツ生成が毎回読み込む蓄積メモ ──
   if (action === 'meo-memo') {
     const { storeId } = req.query;
