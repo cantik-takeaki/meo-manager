@@ -1994,7 +1994,11 @@ export default async function handler(req, res) {
     if (!locPart) return res.status(400).json({ error: 'locationName不明' });
     if (!token) return res.status(401).json({ error: 'GBP未連携' });
     try {
-      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,categories,phoneNumbers,websiteUri,profile`, { headers: { Authorization: `Bearer ${token}` } });
+      // metadata/openInfo/serviceArea も取る。
+      // ★重要: クチコミはリスティングが停止中・未公開でもAPIには残るため、「クチコミがある＝公開されている」ではない。
+      //   公開されているかは metadata.hasVoiceOfMerchant（＝掲載資格あり）と openInfo.status で判定する。
+      //   duplicateLocation が入っていれば重複として抑制されている。
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,categories,phoneNumbers,websiteUri,profile,metadata,openInfo,serviceArea,storefrontAddress,labels`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (d.error) return res.status(502).json({ error: d.error.message || 'GBP取得失敗', code: d.error.code });
       const pc = d.categories?.primaryCategory;
@@ -2003,7 +2007,18 @@ export default async function handler(req, res) {
       return res.json({ title: d.title, websiteUri: d.websiteUri || '', phone: d.phoneNumbers?.primaryPhone || '', hasDescription: !!(d.profile && d.profile.description),
         description: (d.profile && d.profile.description) || '',
         primary: pc ? { id: pc.name, displayName: pc.displayName } : null,
-        additional: ac.map(c => ({ id: c.name, displayName: c.displayName })) });
+        additional: ac.map(c => ({ id: c.name, displayName: c.displayName })),
+        // 掲載状態の診断用
+        published: !!(d.metadata && d.metadata.hasVoiceOfMerchant),   // false=公開されていない（未確認/停止/重複抑制）
+        openStatus: (d.openInfo && d.openInfo.status) || '',           // OPEN / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY
+        duplicateOf: (d.metadata && d.metadata.duplicateLocation) || '',
+        mapsUri: (d.metadata && d.metadata.mapsUri) || '',
+        placeId: (d.metadata && d.metadata.placeId) || '',
+        canOperateLocalPost: !!(d.metadata && d.metadata.canOperateLocalPost),
+        // 住所を出しているか（サービス提供地域のみのビジネスは storefrontAddress が無い）
+        hasStorefront: !!(d.storefrontAddress && (d.storefrontAddress.addressLines || []).length),
+        serviceAreaPlaces: ((d.serviceArea && d.serviceArea.places && d.serviceArea.places.placeInfos) || []).length,
+        metadataRaw: d.metadata || null });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
