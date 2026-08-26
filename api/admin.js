@@ -847,7 +847,9 @@ export default async function handler(req, res) {
     // 従量課金の月間コール上限(安全弁・GCP課金事故の再発防止)。
     // 毎日フル計測=約150件/日×30日=4500コール(≒$9/月)を想定して5000。減らすならenvで上書き。
     const _dfsMonthlyLimit = Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 5000);
-    const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 8);      // 1回の実行件数(60秒の関数上限に収める。DataForSEO Liveは1件数秒)
+    // 1回の実行件数の上限。並列取得＋時間予算(RANK_TIME_BUDGET_SEC)で実際の件数は自動調整されるため、
+    // ここは「予算内で測れるだけ測る」ための天井として大きめに置く（旧=8固定で一巡19日かかっていた）。
+    const _dfsPerRun = Math.max(1, parseInt(process.env.DATAFORSEO_MAX_CALLS_PER_RUN, 10) || 200);
     let budget, MAX_CALLS;
     if (_cronUseSerp) {
       const reserve = Math.ceil(SERPAPI_LIMIT * 0.2); // 手動取得用に2割温存
@@ -888,43 +890,71 @@ export default async function handler(req, res) {
     let _cursor = await kvGet('cron_rank_cursor');
     if (!Number.isFinite(_cursor) || _cursor >= jobs.length) _cursor = 0;
     const orderedJobs = jobs.length ? jobs.slice(_cursor).concat(jobs.slice(0, _cursor)) : [];
-    // カーソルは「先行更新」：関数が60秒制限で途中終了しても次回は続きから測れる（同じ先頭10件を測り続ける事故を防ぐ）。
-    if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + Math.min(MAX_CALLS, jobs.length)) % jobs.length);
+    // カーソルは「実測した件数だけ」進める（取得ループ直後に更新）。
+    // 天井(MAX_CALLS)で先行更新すると、時間予算で測れなかった分を飛ばして穴が空くため。
+    // 万一取得中に関数が落ちた場合はカーソル据え置き＝同じ範囲を測り直す（重複は許容・欠測は作らない）。
     let ok = 0, fail = 0, _processedCount = 0;
     const processed = [];
-    for (const job of orderedJobs) {
-      if (ok + fail >= MAX_CALLS) break;
-      _processedCount++;
-      try {
-        const { list, error, calls } = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
-        if (_cronUseSerp && calls) { used = await kvIncrBy(usedKey, calls); } // アトミック加算（並行実行のアンダーカウント防止・戻り値=真の合計）
-        else if (!_cronUseSerp && calls) { _dfsUsed = await kvIncrBy(_dfsUsedKey, calls); } // DataForSEO従量の使用数を計上
-        if (error) { fail++; processed.push({ store: job.st.name, kw: job.kw, error }); continue; }
-        const target = _normName(job.st.name);
+    // ── 並列取得＋時間予算 ──
+    // 逐次だと1件約5秒＝60秒の関数上限で8件しか測れず、150件の一巡に19日かかっていた。
+    // ネットワーク待ちを並列化し、時間予算内で測れるだけ測る。KVは競合を避けるため「取得=並列／保存=逐次」。
+    const CONC = Math.max(1, parseInt(process.env.RANK_CONCURRENCY, 10) || 8);
+    const DEADLINE = Date.now() + (Math.max(10, parseInt(process.env.RANK_TIME_BUDGET_SEC, 10) || 45) * 1000);
+    const targetsThisRun = orderedJobs.slice(0, MAX_CALLS);
+    const fetched = [];
+    for (let i = 0; i < targetsThisRun.length; i += CONC) {
+      if (Date.now() > DEADLINE) break; // 予算切れ＝次回のcronが回転カーソルで続きを測る
+      const batch = targetsThisRun.slice(i, i + CONC);
+      const rs = await Promise.all(batch.map(async job => {
+        try {
+          const r = await fetchLocalResults(job.kw, { location: job.area ? `${job.area},Japan` : '', ll: job.ll });
+          return { job, ...r };
+        } catch (e) { return { job, error: e.message, calls: 1 }; }
+      }));
+      fetched.push(...rs);
+      _processedCount += batch.length;
+    }
+    // 実測した分だけカーソルを進める（次回は必ず続きから＝全KWを確実に一巡）
+    if (jobs.length && _processedCount) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
+    // 使用コール数を集計して一括加算（アトミック・並列でも取りこぼさない）
+    const _callsTotal = fetched.reduce((s, r) => s + (r.calls || 0), 0);
+    if (_callsTotal) {
+      if (_cronUseSerp) used = await kvIncrBy(usedKey, _callsTotal);
+      else _dfsUsed = await kvIncrBy(_dfsUsedKey, _callsTotal);
+    }
+    // 店舗ごとにまとめて保存（同一店の複数KWを1回の読み書きで反映＝競合と書き潰しを防ぐ）
+    const byStore = new Map();
+    for (const r of fetched) {
+      const sid = r.job.st.storeId;
+      if (!byStore.has(sid)) byStore.set(sid, []);
+      byStore.get(sid).push(r);
+    }
+    for (const [sid, rs] of byStore) {
+      const ex = await kvGet(`rankings_${sid}`) || { history: [], keywords: [] };
+      ex.keywords = ex.keywords || [];
+      let entry = ex.history.find(h => h.date === today);
+      if (!entry) { entry = { date: today, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
+      entry.rankings = entry.rankings || [];
+      for (const r of rs) {
+        if (r.error) { fail++; processed.push({ store: r.job.st.name, kw: r.job.kw, error: r.error }); continue; }
+        const target = _normName(r.job.st.name);
         let rank = null;
-        list.forEach((item, i) => {
+        (r.list || []).forEach((item, i) => {
           if (rank) return;
           const t = _normName(item.title);
           if (t && (t.includes(target) || target.includes(t))) rank = item.position || (i + 1);
         });
-        // rankings履歴へ保存（rank-input相当）
-        const ex = await kvGet(`rankings_${job.st.storeId}`) || { history: [], keywords: [] };
-        ex.keywords = ex.keywords || [];
-        let ki = ex.keywords.indexOf(job.kw);
-        if (ki < 0) { ex.keywords.push(job.kw); ki = ex.keywords.length - 1; }
-        let entry = ex.history.find(h => h.date === today);
-        if (!entry) { entry = { date: today, rankings: [], recordedAt: new Date().toISOString() }; ex.history.push(entry); }
-        entry.rankings = entry.rankings || [];
+        let ki = ex.keywords.indexOf(r.job.kw);
+        if (ki < 0) { ex.keywords.push(r.job.kw); ki = ex.keywords.length - 1; }
         entry.rankings[ki] = (Number.isFinite(rank) && rank >= 1) ? rank : null;
-        entry.recordedAt = new Date().toISOString();
-        ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-        if (ex.history.length > 60) ex.history = ex.history.slice(-60);
-        await kvSet(`rankings_${job.st.storeId}`, ex);
-        // 競合順位も同時記録（追加APIコストなし）
-        await recordCompRanks(job.st.storeId, job.kw, rank, list);
         ok++;
-        processed.push({ store: job.st.name, kw: job.kw, rank });
-      } catch (e) { fail++; processed.push({ store: job.st.name, kw: job.kw, error: e.message }); }
+        processed.push({ store: r.job.st.name, kw: r.job.kw, rank });
+        await recordCompRanks(sid, r.job.kw, rank, r.list || []); // 競合順位も同時記録（追加APIコストなし）
+      }
+      entry.recordedAt = new Date().toISOString();
+      ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (ex.history.length > 60) ex.history = ex.history.slice(-60);
+      await kvSet(`rankings_${sid}`, ex);
     }
     // カーソルはループ前に先行更新済み（途中終了対策）。ここでは更新しない。
     const summary = {
@@ -943,23 +973,18 @@ export default async function handler(req, res) {
     const _doneToday = await kvIncrBy(_doneKey, ok + fail);
     summary.doneToday = _doneToday;
     summary.chainCount = _chainCount;
-    let _chained = false;
-    if ((ok + fail) > 0 && _doneToday < jobs.length && budget > 0 && _chainCount + 1 < CHAIN_MAX) {
-      await kvSet(_chainKey, _chainCount + 1);
-      const _base = process.env.SELF_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://meo.cantik.co.jp');
-      const _auth = process.env.CRON_SECRET ? { Authorization: `Bearer ${process.env.CRON_SECRET}` } : {};
-      // fire-and-forget（レスポンスを待たない＝この関数は60秒以内に終える）
-      fetch(`${_base}/api/admin?action=cron-rank&chain=1`, { headers: _auth }).catch(() => {});
-      _chained = true;
-    }
-    summary.chained = _chained;
+    // 注: 関数内から自分を fire-and-forget で呼ぶ「自己継続」はVercel(サーバーレス)ではレスポンス返却時に
+    // インスタンスが凍結されリクエストが破棄されるため機能しない（実測で確認）。よって並列＋時間予算で
+    // 1回の実行件数を最大化し、残りは回転カーソルで次回に引き継ぐ方式にする。
+    // 当日中に残りも測りたい場合は chain=1 を付けて再度呼ぶ（同日ガードを免除）。
     summary.remainingToday = Math.max(0, jobs.length - _doneToday);
+    if (_isChain) await kvSet(_chainKey, _chainCount + 1);
     await kvSet('cron_rank_last', summary);
 
     // 週次サマリーメール（RESEND設定時のみ・設定ページでOFF可）
     try {
       const notifyPref = await kvGet('notify_weekly');
-      if (notifyPref !== false && (ok + fail) > 0 && !_chained) { // チェーン継続中は送らない（完走時の1通だけ）
+      if (notifyPref !== false && (ok + fail) > 0 && summary.remainingToday === 0) { // 全KW完走時の1通だけ（途中では送らない）
         const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
         if (to) {
           const rows = processed.map(p => `<tr><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.store}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.kw}</td><td style="padding:4px 10px;border-bottom:1px solid #eee">${p.error ? '取得失敗' : (p.rank ? p.rank + '位' : '圏外')}</td></tr>`).join('');
