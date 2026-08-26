@@ -1964,11 +1964,24 @@ export default async function handler(req, res) {
     }
     if (typeof b.description === 'string') { bodyObj.profile = { description: b.description.slice(0, 750) }; masks.push('profile.description'); }
     if (typeof b.websiteUri === 'string') { bodyObj.websiteUri = b.websiteUri; masks.push('websiteUri'); }
-    if (typeof b.phone === 'string') { bodyObj.phoneNumbers = { primaryPhone: b.phone }; masks.push('phoneNumbers.primaryPhone'); }
-    // 主番号を差し替える際、それまでの番号を失わないよう副番号として残せるようにする（NAP統一時に店の携帯を消さないため）
-    if (Array.isArray(b.additionalPhones)) {
-      bodyObj.phoneNumbers = Object.assign({}, bodyObj.phoneNumbers, { additionalPhones: b.additionalPhones.slice(0, 2).map(String) });
-      masks.push('phoneNumbers.additionalPhones');
+    // 電話番号の更新。
+    // ★注意: updateMaskに `phoneNumbers.primaryPhone` のようなサブフィールドを指定すると
+    //   Googleが「Request contains an invalid argument」で必ず拒否する（同じ値の書き戻しでも失敗する）。
+    //   マスクは `phoneNumbers` （オブジェクト単位）でなければならない。
+    //   オブジェクト単位＝丸ごと置換なので、副番号(additionalPhones)を渡さない場合は
+    //   現在の副番号を読み取って引き継ぐ（店の携帯を消さないため）。
+    if (typeof b.phone === 'string') {
+      let addl = Array.isArray(b.additionalPhones) ? b.additionalPhones.slice(0, 2).map(String) : null;
+      if (!addl) {
+        try {
+          const cur = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=phoneNumbers`, { headers: { Authorization: `Bearer ${token}` } });
+          const cd = await cur.json();
+          addl = (cd.phoneNumbers && cd.phoneNumbers.additionalPhones) || [];
+        } catch (e) { addl = []; }
+      }
+      bodyObj.phoneNumbers = { primaryPhone: b.phone };
+      if (addl.length) bodyObj.phoneNumbers.additionalPhones = addl;
+      masks.push('phoneNumbers');
     }
     // サービス（自由記述サービス項目）: services=["メニュー名",...] ＋ カテゴリ(primaryCategoryId か serviceCategoryId)
     if (Array.isArray(b.services) && b.services.length) {
