@@ -2018,6 +2018,8 @@ export default async function handler(req, res) {
         // 住所を出しているか（サービス提供地域のみのビジネスは storefrontAddress が無い）
         hasStorefront: !!(d.storefrontAddress && (d.storefrontAddress.addressLines || []).length),
         serviceAreaPlaces: ((d.serviceArea && d.serviceArea.places && d.serviceArea.places.placeInfos) || []).length,
+        // 一覧も返す（絞り込みには placeId が必要。既存のIDをそのまま再利用するのが安全）
+        serviceAreaList: ((d.serviceArea && d.serviceArea.places && d.serviceArea.places.placeInfos) || []).map(p => ({ placeName: p.placeName, placeId: p.placeId })),
         metadataRaw: d.metadata || null });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
@@ -2045,6 +2047,20 @@ export default async function handler(req, res) {
     }
     if (typeof b.description === 'string') { bodyObj.profile = { description: b.description.slice(0, 750) }; masks.push('profile.description'); }
     if (typeof b.websiteUri === 'string') { bodyObj.websiteUri = b.websiteUri; masks.push('websiteUri'); }
+    // サービス提供地域の更新。body.serviceAreaPlaces = [{placeId, placeName}, ...]
+    // 広く取りすぎると1件あたりの関連性が薄まるため、主戦場に絞るのに使う。
+    // ★placeIdは新規に作れないので、既存のserviceAreaから取得したIDをそのまま渡す（gbp-getのserviceAreaListが返す）。
+    // マスクは phoneNumbers と同じ理由でオブジェクト単位 `serviceArea` を使う（サブフィールド指定は拒否される）。
+    if (Array.isArray(b.serviceAreaPlaces)) {
+      const infos = b.serviceAreaPlaces
+        .filter(p => p && p.placeId)
+        .slice(0, 20)
+        .map(p => ({ placeName: String(p.placeName || ''), placeId: String(p.placeId) }));
+      if (!infos.length) return res.status(400).json({ error: 'serviceAreaPlaces に placeId が必要です' });
+      bodyObj.serviceArea = { businessType: 'CUSTOMER_AND_BUSINESS_LOCATION', places: { placeInfos: infos } };
+      masks.push('serviceArea');
+    }
+
     // 電話番号の更新。
     // ★注意: updateMaskに `phoneNumbers.primaryPhone` のようなサブフィールドを指定すると
     //   Googleが「Request contains an invalid argument」で必ず拒否する（同じ値の書き戻しでも失敗する）。
