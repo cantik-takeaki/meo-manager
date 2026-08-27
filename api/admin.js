@@ -1965,6 +1965,63 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
+  // ── GBP投稿（キャンペーン/告知/認知）──
+  // api/posts.js は summary と callToAction しか送れず、OFFER/EVENT に必要な event・offer を組めない。
+  // posts.js はInstagram審査中で不可侵なので、こちら側に別エンドポイントを用意する。
+  // body: { locationName|storeId, topicType:'STANDARD'|'EVENT'|'OFFER'|'ALERT', summary,
+  //         callToActionType?, callToActionUrl?, mediaUrl?,
+  //         title?, startDate?'YYYY-MM-DD', endDate?, couponCode?, redeemOnlineUrl?, termsConditions?, dryRun? }
+  // ※ EVENT/OFFER は title と期間（schedule）が必須。OFFERはCTAを付けられない（Googleの仕様）。
+  if (req.method === 'POST' && action === 'gbp-post') {
+    const b = req.body || {};
+    let locationName = b.locationName || '';
+    let token = await getMasterToken();
+    if (!locationName && b.storeId) {
+      const m = ((await kvGet('managed_locations')) || []).find(x => String(x.locId || '').replace(/\//g, '_') === b.storeId || x.storeId === b.storeId);
+      if (m) { locationName = m.locationName || m.locId || ''; if (m.storeId) token = (await getAccessToken(m.storeId)) || token; }
+    }
+    if (!locationName) return res.status(400).json({ error: 'locationName不明' });
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    const topicType = ['STANDARD', 'EVENT', 'OFFER', 'ALERT'].includes(b.topicType) ? b.topicType : 'STANDARD';
+    const summary = String(b.summary || '').slice(0, 1500);
+    if (!summary) return res.status(400).json({ error: 'summary必須' });
+
+    const body = { topicType, summary, languageCode: 'ja' };
+    if (topicType === 'EVENT' || topicType === 'OFFER') {
+      const title = String(b.title || '').slice(0, 58);
+      if (!title) return res.status(400).json({ error: 'EVENT/OFFERはtitle必須（58文字以内）' });
+      const toDate = (s) => {
+        const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return m ? { year: +m[1], month: +m[2], day: +m[3] } : null;
+      };
+      const sd = toDate(b.startDate), ed = toDate(b.endDate);
+      if (!sd || !ed) return res.status(400).json({ error: 'EVENT/OFFERはstartDate・endDate必須（YYYY-MM-DD）' });
+      body.event = { title, schedule: { startDate: sd, endDate: ed } };
+    }
+    if (topicType === 'OFFER') {
+      const offer = {};
+      if (b.couponCode) offer.couponCode = String(b.couponCode).slice(0, 58);
+      if (b.redeemOnlineUrl) offer.redeemOnlineUrl = String(b.redeemOnlineUrl);
+      if (b.termsConditions) offer.termsConditions = String(b.termsConditions).slice(0, 1000);
+      if (Object.keys(offer).length) body.offer = offer;
+      // OFFERはCTAを併用できない（Googleが拒否する）ため付けない
+    } else if (b.callToActionType) {
+      body.callToAction = { actionType: b.callToActionType, url: b.callToActionUrl || '' };
+    }
+    if (b.mediaUrl && /^https?:\/\//i.test(b.mediaUrl)) body.media = [{ mediaFormat: 'PHOTO', sourceUrl: b.mediaUrl }];
+
+    if (b.dryRun) return res.json({ dryRun: true, locationName, body });
+    try {
+      const r = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/localPosts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (d.error) return res.status(502).json({ error: d.error.message, code: d.error.code });
+      return res.json({ success: true, name: d.name, state: d.state, searchUrl: d.searchUrl || '' });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
   // ── GBPカテゴリ検索（categoryId= "categories/gcid:xxx" を取得） ──
   if (req.method === 'GET' && action === 'gbp-categories') {
     const q = String(req.query.q || '').trim();
