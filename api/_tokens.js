@@ -66,7 +66,18 @@ export async function getMasterToken() {
 // これにより ID/PW ログインでも、cantikがGoogle連携済みなら常にGBP機能が使える。
 export async function getValidCookieToken(req, res) {
   const c = parseCookieHeader(req.headers.cookie || '');
-  if (!c.access_token) return await getMasterToken(); // cookie無し→マスター接続で常時ログイン
+  // 2026-10-21 ここが開いていた。cookie無し＝未ログインの相手にマスタートークンを返していたため、
+  //   /api/locations /api/posts /api/reviews が認証なしで通っていた（顧客20店の情報と口コミの取得、
+  //   さらにGBPへの投稿の書き込みまで誰でもできる状態だった）。
+  // マスターへのフォールバック自体は「ログイン済みだがGoogle連携をしていない管理者」のために要る。
+  //   ログイン済み（pw_session）か、機械からの呼び出し（CRON_SECRETのBearer）のときだけ許す。
+  //   それ以外は null を返し、呼び出し側の `if (!token) return 401` に落とす。
+  if (!c.access_token) {
+    const machine = !!process.env.CRON_SECRET
+      && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
+    if (!c.pw_session && !machine) return null;
+    return await getMasterToken();
+  }
   const expiresAt = parseInt(c.token_expires_at || '0', 10);
   // まだ有効（5分の余裕）ならそのまま
   if (expiresAt && Date.now() < expiresAt - 5 * 60 * 1000) return c.access_token;

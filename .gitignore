@@ -1,3 +1,9 @@
 .vercel
 .vercel
 .env
+
+# 機械からAPIに名乗るための共有秘密（2026-10-21）。実値はgitに載せない。
+# 正本は CantikVault/keys/meo-cron-secret.key（暗号化してgit共有）→ keys/install.sh がここへ置く。
+.cron-secret
+*secret*
+!vercel.json
