@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>
+(()=>{const q=new URLSearchParams(location.search);if(q.get('store')==='locations_2654171132731280268'){location.replace('/review-shunkatou.html'+location.search+location.hash);}})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
@@ -161,17 +165,18 @@
     <div class="chips" id="chips" style="margin-top:14px"></div>
     <input class="free" id="freeWord" type="text" placeholder="その他、感じたこと（任意）">
     <button class="btn btn-primary" id="genBtn" style="margin-top:18px" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>口コミの下書きを作る</button>
-    <p class="note">選んだ言葉をもとに、文章のたたき台を作成します。</p>
+    <p class="note">選んだ言葉をもとに、書き方のひな形を作ります。</p>
+    <p class="note" style="margin-top:10px"><a href="#" id="toLowLink" style="color:var(--sub)">Googleではなく、お店にだけ伝えたいことがある方はこちら</a></p>
   </div>
 
   <!-- STEP2（高評価）: 下書き確認・同意 -->
   <div class="card hidden" id="step2">
     <div class="step">STEP 3</div>
-    <h2>下書きができました</h2>
+    <h2>書き方のひな形です</h2>
     <div class="loading hidden" id="genLoading"><div class="spin"></div>作成中…</div>
     <div id="draftArea">
       <textarea class="free draft" id="draftText" rows="6"></textarea>
-      <p class="note">自由に修正できます。ご自身の言葉に直していただいて構いません。</p>
+      <p class="note" style="color:#b45309;font-weight:600">これはあくまでひな形です。ご自身の感想をもとに、自由に書き直してご投稿ください。</p>
       <div class="consent">
         <input type="checkbox" id="consent">
         <label for="consent">この内容（または修正したもの）を、自分の口コミとしてGoogleに投稿することに同意します。投稿は私自身が行うこと、店舗からの強制ではないことを理解しています。</label>
@@ -360,7 +365,9 @@ function chooseRating(n){
   const gate = SURVEY?.gateMode || 'branch';
   setTimeout(() => {
     document.getElementById('step0').classList.add('hidden');
-    if (gate === 'all' || n >= threshold){
+    // 2026-10-15：星で分けない（Googleの「否定的なクチコミを妨げる・肯定的なクチコミを選んで募る」禁止に合わせる）。
+    // 星に関係なく全員をGoogleの流れに案内する。お店にだけ伝えたい人は、STEP2の下の案内から店内フィードバックへ進める。
+    if (true){
       // 高評価 → Google誘導フロー
       document.getElementById('step1').classList.remove('hidden');
       setStep(2);
@@ -403,6 +410,9 @@ async function generate(){
     document.getElementById('draftText').value = '通信エラーが発生しました。もう一度お試しください。';
   }
 }
+
+// 誰でも（星に関係なく）お店にだけ伝える流れを選べる
+document.getElementById('toLowLink').onclick = (e) => { e.preventDefault(); document.getElementById('step1').classList.add('hidden'); document.getElementById('stepLow').classList.remove('hidden'); setStep(2); };
 
 // ── 低評価フロー ──
 const lowText = document.getElementById('lowText');

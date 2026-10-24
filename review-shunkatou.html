@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="color-scheme" content="light">
+  <title>ご感想をお聞かせください</title>
+  <link rel="stylesheet" href="assets/review-shunkatou/review.css?v=20261024-shunkatou">
+  <script src="assets/review-shunkatou/stores-data.js?v=20261024-shunkatou" defer></script>
+  <script src="assets/review-shunkatou/hp.js" defer></script>
+  <script src="assets/review-shunkatou/review.js?v=20261024-shunkatou" defer></script>
+  <link rel="stylesheet" href="assets/review-shunkatou/hp.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hina+Mincho&family=Noto+Sans+JP:wght@400;600;700&family=Noto+Serif+JP:wght@400;500;600&family=RocknRoll+One&family=Shippori+Mincho:wght@400;600&family=Shippori+Mincho+B1:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Zen+Old+Mincho:wght@400;600&display=swap">
+</head>
+<body>
+  <aside id="previewNotice" class="preview-notice" hidden>確認用です。回答・口コミは送信されません。</aside>
+  <div class="page-shell">
+    <header class="site-header">
+      <span id="headerName" class="header-name"></span>
+      <label class="language"><span class="sr-only" data-i18n="language">言語</span><select id="language" aria-label="表示言語"><option value="ja">日本語</option><option value="en">English</option><option value="zh">中文</option><option value="ko">한국어</option></select></label>
+    </header>
+    <section class="brand-hero" aria-labelledby="storeName">
+      <div class="brand-copy">
+        <p id="genre" class="genre"></p>
+        <h1 id="storeName"></h1>
+        <p id="area" class="area"></p>
+        <p class="hero-thanks" data-i18n="thanksVisit">ご来店ありがとうございました。</p>
+      </div>
+      <div class="hero-photo"><img id="storePhoto" alt="" width="800" height="600" fetchpriority="high"></div>
+    </section>
+    <main id="main" tabindex="-1">
+      <nav class="progress" aria-label="回答の手順"><ol><li id="progress0" aria-current="step"><span>1</span><b data-i18n="stepRating">評価</b></li><li id="progress1"><span>2</span><b data-i18n="stepComment">感想</b></li><li id="progress2"><span>3</span><b data-i18n="stepConfirm">確認</b></li></ol></nav>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <section class="stage" id="ratingStage" aria-labelledby="ratingTitle">
+        <p class="eyebrow" data-i18n="yourVoice">お客様の声をお聞かせください</p>
+        <h2 id="ratingTitle" data-i18n="ratingTitle">本日の満足度はいかがでしたか？</h2>
+        <p class="intro" data-i18n="ratingIntro">感じたままの評価を選んでください。</p>
+        <fieldset class="rating-field"><legend class="sr-only" data-i18n="ratingTitle">本日の満足度はいかがでしたか？</legend><div id="stars" class="stars"></div></fieldset>
+        <div class="rating-scale"><span data-i18n="lowRating">不満</span><span data-i18n="highRating">満足</span></div>
+        <p id="ratingLabel" class="rating-label" aria-live="polite" data-i18n="chooseStar">星を1つ選んでください</p>
+        <button id="ratingNext" class="primary" disabled data-i18n="nextComment">感想の入力へ進む</button>
+        <p class="note" data-i18n="noAutoPost">この画面の操作だけでGoogleに投稿されることはありません。</p>
+      </section>
+      <section class="stage" id="commentStage" hidden aria-labelledby="commentTitle">
+        <button class="back" data-back="rating" data-i18n="backRating">評価を選び直す</button>
+        <h2 id="commentTitle" data-i18n="commentTitle">印象に残ったことを教えてください</h2>
+        <p class="intro" data-i18n="commentIntro">当てはまる項目を選べます。複数選択もできます。</p>
+        <div id="points" class="points"></div>
+        <label for="freeWord" data-i18n="freeLabel">ご感想（任意）</label>
+        <textarea id="freeWord" rows="3" maxlength="1500" data-placeholder="freePlaceholder" placeholder="実際に体験したことをご自由にお書きください。"></textarea>
+        <button id="generate" class="primary" disabled data-i18n="makeDraft">内容をもとに下書きを作る</button>
+        <p class="note" data-i18n="editLater">作成後に文章を確認・修正できます。</p>
+<button id="privateFeedback" class="back private-link" data-i18n="privateFeedback">お店にだけ感想を伝える</button>
+      </section>
+      <section class="stage" id="confirmStage" hidden aria-labelledby="confirmTitle">
+        <button class="back" data-back="comment" data-i18n="backComment">感想の入力に戻る</button>
+        <h2 id="confirmTitle" data-i18n="confirmTitle">投稿する文章をご確認ください</h2>
+        <p class="intro" data-i18n="confirmIntro">実際のご体験と合っているかお確かめください。文章は自由に修正できます。</p>
+        <label for="draft" class="sr-only" data-i18n="draftLabel">口コミの下書き</label><textarea id="draft" rows="7" maxlength="1500"></textarea>
+        <label class="consent"><input id="consent" type="checkbox"><span data-i18n="consent">自分の体験と合っていることを確認しました。</span></label>
+        <button id="copy" class="primary" disabled data-i18n="copy">文章をコピーして次へ</button>
+        <button id="regenerate" class="secondary" data-i18n="regenerate">下書きを作り直す</button>
+        <p class="note" data-i18n="voluntary">投稿は任意です。最後の投稿操作はご本人がGoogle上で行います。</p>
+      </section>
+      <section class="stage" id="googleStage" hidden aria-labelledby="googleTitle">
+        <p class="eyebrow" data-i18n="lastStep">あと1つの操作です</p><h2 id="googleTitle" data-i18n="googleTitle">Googleで文章を貼り付けて投稿</h2>
+        <p id="copyMessage" class="intro" data-i18n="copied">文章をコピーしました。</p>
+        <ol class="instructions"><li data-i18n="googleHow1">下のボタンでGoogleの画面を開きます。</li><li data-i18n="googleHow2">評価を選び、文章を貼り付けます。</li><li data-i18n="googleHow3">内容を確認して「投稿」を押します。</li></ol>
+        <a id="googleLink" class="primary" target="_blank" rel="noopener noreferrer" data-i18n="openGoogle">Googleの口コミ投稿画面を開く</a>
+        <p class="note" data-i18n="googleAccount">Googleアカウントへのログインが必要な場合があります。</p>
+        <button class="secondary" data-back="confirm" data-i18n="backDraft">文章を確認・修正する</button>
+      </section>
+      <section class="stage" id="feedbackStage" hidden aria-labelledby="feedbackTitle">
+        <button class="back" data-back="rating" data-i18n="backRating">評価を選び直す</button><h2 id="feedbackTitle" data-i18n="feedbackTitle">詳しいご感想をお聞かせください</h2>
+        <p class="intro" data-i18n="feedbackIntro">こちらのご意見は店舗に届きます。Googleには公開されません。</p>
+        <label for="feedback" data-i18n="feedbackLabel">お気づきの点・ご感想</label><textarea id="feedback" maxlength="2000" rows="5"></textarea>
+        <label for="contact" data-i18n="contactLabel">返信を希望される方のご連絡先（任意）</label><input id="contact" maxlength="200" type="text" autocomplete="off">
+        <button id="sendFeedback" class="primary" disabled data-i18n="sendFeedback">店舗へ感想を送る</button>
+      </section>
+      <section class="stage" id="doneStage" hidden><h2 data-i18n="doneTitle">ご感想をありがとうございました</h2><p class="intro" data-i18n="doneText">いただいたお声を店舗で確認します。</p></section>
+      <section class="stage" id="stoppedStage" hidden><h2 data-i18n="stopped">ただいま受付を停止しています</h2><p class="intro" data-i18n="stoppedText">お手数ですが店舗スタッフにお知らせください。</p></section>
+    <div class="extra-actions" id="extraActions" hidden>
+<a id="lineLink" class="secondary" target="_blank" rel="noopener noreferrer" hidden data-i18n="openLine">LINEでお店を見る</a>
+<section id="leadBox" class="lead-box" hidden><h2 data-i18n="leadTitle">次回使えるお知らせ</h2><p id="leadMessage" class="note" data-i18n="leadMessage">お得な情報やクーポンをご希望の方は、メールをご登録ください（任意）。</p><form id="leadForm"><label for="leadEmail" data-i18n="leadEmail">メールアドレス（任意）</label><input id="leadEmail" type="email" autocomplete="email" maxlength="120" required><button id="leadSubmit" class="secondary" type="submit" data-i18n="leadSubmit">登録する</button></form><p id="leadStatus" class="lead-status" role="status"></p></section>
+</div></main>
+    <footer><span id="footerName"></span><p>ラクラクMEO</p></footer>
+  </div>
+</body>
+</html>

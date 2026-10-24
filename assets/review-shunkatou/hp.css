@@ -1,0 +1,109 @@
+/* HP visual language, scoped to the 12 verified official websites. */
+body[data-hp]{--line:#d9d3c8;--muted:#686158;--ink:#282521}
+body[data-hp] .site-header{height:80px;background:#fff;border-bottom:0;gap:18px}
+body[data-hp] .header-name{font-size:18px;letter-spacing:.06em}
+body[data-hp] .hp-logo{width:auto;max-width:230px;max-height:44px;object-fit:contain;object-position:left center}
+body[data-hp] .brand-hero{display:grid;grid-template-columns:1fr;min-height:280px;isolation:isolate;border:0;outline:0;background:#30261d}
+body[data-hp] .hero-photo{position:absolute;inset:0;height:100%;min-height:0;max-height:none;padding:0;border:0;border-radius:0;z-index:-2;order:0}
+body[data-hp] .hero-photo img{border:0;object-position:50% 50%}
+body[data-hp] .brand-hero::after{content:'';position:absolute;inset:0;background:rgba(24,14,8,.55);z-index:-1;pointer-events:none}
+body[data-hp] .brand-copy{display:flex;align-items:center;justify-content:center;text-align:center;padding:32px 24px;color:#fff}
+body[data-hp] .brand-copy h1{font-family:var(--display);font-size:46px;line-height:1.35;letter-spacing:.06em;color:inherit;font-weight:600}
+body[data-hp] .genre,body[data-hp] .area{color:inherit;align-self:auto;font-family:var(--sans);font-size:12px;letter-spacing:.08em}
+body[data-hp] .genre{margin:0 0 10px}
+body[data-hp] .area{margin-top:12px}
+body[data-hp] .hero-thanks{font-size:14px;line-height:1.9;margin-top:22px;font-family:var(--display)}
+body[data-hp] main{background:var(--paper)}
+body[data-hp] h2{font-size:24px;font-weight:500;line-height:1.65}
+body[data-hp] .primary:not(:disabled){background:var(--hp-button);border-color:var(--hp-button);color:var(--hp-on-button)}
+body[data-hp] .primary,body[data-hp] .secondary{border-radius:0}
+body[data-hp] .star{background:#fff;border-radius:0}
+body[data-hp=center] .brand-hero{border-bottom:4px solid var(--gold)}
+body[data-slug=minaya][data-hp] .brand-copy h1{font-size:50px}
+body[data-slug=minaya][data-hp] .brand-hero::after{background:rgba(58,14,4,.60)}
+body[data-hp=wood] .site-header,body[data-hp=wood] footer{background:#2b1d12 var(--hp-texture);color:#fff}
+body[data-hp=wood] .language select{color:#fff}
+body[data-hp=wood] .language option{color:#222}
+body[data-hp=wood] .brand-copy h1{font-size:39px;font-weight:400}
+body[data-hp=wood] .brand-hero{border-bottom:5px solid var(--gold)}
+body[data-hp=wood] .primary:not(:disabled){background:#ebaa21;border-color:#ebaa21;color:#1a1207}
+body[data-hp=corporate] .brand-hero{display:flex;flex-direction:column;min-height:0;background:var(--brand)}
+body[data-hp=corporate] .brand-hero::after{display:none}
+body[data-hp=corporate] .brand-copy{padding:24px 20px}
+body[data-hp=corporate] .brand-copy h1{font-size:27px;font-weight:700;letter-spacing:0}
+body[data-hp=corporate] .hero-photo{position:relative;height:150px;z-index:0}
+body[data-hp=corporate] .hero-thanks{margin-top:14px;font-family:var(--sans);font-size:13px}
+body[data-hp=chinese] .site-header{background:#b92d1b;color:#fff;border-bottom:3px solid var(--gold)}
+body[data-hp=chinese] .language select{color:#fff}
+body[data-hp=chinese] .language option{color:#222}
+body[data-hp=chinese] .brand-hero{outline:1px solid #d4ad63;outline-offset:-12px;border-bottom:5px solid #b92d1b}
+body[data-hp=chinese] .brand-copy h1{color:#f7dfa7;font-size:54px}
+body[data-hp=japanese] .site-header{height:82px}
+body[data-hp=japanese] .hp-logo{max-height:72px;max-width:60px}
+body[data-hp=japanese] .brand-copy{align-items:flex-end;text-align:right;padding-right:32px}
+body[data-hp=japanese] .brand-copy h1{font-size:56px;letter-spacing:.2em}
+body[data-hp=japanese] .brand-hero::after{background:rgba(20,22,16,.58)}
+body[data-hp=left] .brand-copy{align-items:flex-start;text-align:left;padding-left:32px}
+body[data-hp=left] .brand-hero{border-bottom:3px solid var(--gold)}
+body[data-hp=left] .brand-hero::after{background:rgba(31,23,18,.58)}
+body[data-hp=fresh] .site-header{height:82px;border-top:3px solid #d4d294}
+body[data-hp=fresh] .hp-logo{max-width:235px;max-height:50px}
+body[data-hp=fresh] .brand-hero{display:flex;flex-direction:column;min-height:0;background:var(--paper) var(--hp-texture) center/cover;padding:16px}
+body[data-hp=fresh] .brand-hero::after{display:none}
+body[data-hp=fresh] .hero-photo{position:relative;height:160px;z-index:0;order:-1}
+body[data-hp=fresh] .brand-copy{color:#35551f;background:#fffae7;padding:20px 16px}
+body[data-hp=fresh] .brand-copy h1{font-size:30px}
+body[data-hp=fresh] .genre{margin-bottom:6px}
+body[data-hp=fresh] .hero-thanks{margin-top:14px;font-size:13px}
+body[data-slug=kanpo-aroma][data-hp] .brand-copy h1{font-size:31px;letter-spacing:.05em}
+body[data-slug=kanpo-aroma][data-hp] .brand-hero::after{background:rgba(36,22,8,.53)}
+body[data-hp=airy] .site-header{height:88px}
+body[data-hp=airy] .hp-logo{max-width:64px;max-height:70px}
+body[data-hp=airy] .brand-copy{align-items:flex-start;text-align:left;padding:32px}
+body[data-hp=airy] .brand-hero::after{background:rgba(38,31,23,.52)}
+body[data-hp=airy] .brand-copy h1{font-size:51px;letter-spacing:.16em}
+body[data-hp=airy] main{background:#faf7f2}
+body[data-hp=fitness] .site-header{height:78px}
+body[data-hp=fitness] .hp-logo{max-width:235px;max-height:40px}
+body[data-hp=fitness] .brand-hero{display:flex;flex-direction:column;min-height:0;background:#f2e1ea}
+body[data-hp=fitness] .brand-hero::after{display:none}
+body[data-hp=fitness] .hero-photo{position:relative;height:185px;z-index:0;order:-1}
+body[data-hp=fitness] .hero-photo img{object-position:center 38%}
+body[data-hp=fitness] .brand-copy{padding:22px 24px;color:#713548}
+body[data-hp=fitness] .brand-copy h1{font-family:var(--display);font-size:32px;letter-spacing:0;font-weight:400}
+body[data-hp=fitness] .hero-thanks{margin-top:12px;font-size:13px}
+body[data-hp=fitness] .genre{margin-bottom:4px}
+body[data-hp=fitness] .area{margin-top:6px}
+body[data-hp=red] .site-header{background:#dd3333}
+body[data-hp=red] .language select{color:#fff}
+body[data-hp=red] .language option{color:#222}
+body[data-hp=red] .brand-hero{border-bottom:5px solid #dd3333}
+body[data-hp=red] .brand-copy h1{font-size:49px}
+@media(min-width:768px){body[data-hp] .brand-hero{min-height:320px}body[data-hp] .brand-copy{padding:40px}body[data-hp] .brand-copy h1{font-size:56px}body[data-hp=corporate] .brand-copy h1{font-size:34px}body[data-hp=corporate] .hero-photo{height:190px}body[data-hp=fitness] .hero-photo{height:260px}body[data-hp=fitness] .brand-copy h1{font-size:40px}body[data-hp=fresh] .hero-photo{height:230px}body[data-slug=kanpo-aroma][data-hp] .brand-copy h1{font-size:42px}}
+@media(max-width:374px){body[data-hp] .hp-logo{max-width:200px}body[data-hp] .brand-copy{padding-left:20px;padding-right:20px}body[data-hp] h2{font-size:22px}}
+
+/* Generated from 追加調査/kenbien-ref.json; portal-wide purple controls excluded. */
+body[data-hp=salon-banner]{--store-accent:rgb(255,0,0);--store-surface:rgb(245,243,241);--store-banner-ratio:3}
+body[data-hp=salon-banner] .site-header{border-top:4px solid var(--store-accent);height:66px}
+body[data-hp=salon-banner] .brand-hero{display:flex;flex-direction:column;min-height:0;background:var(--store-surface);border-bottom:3px solid var(--store-accent)}
+body[data-hp=salon-banner] .brand-hero::after{display:none}
+body[data-hp=salon-banner] .hero-photo{position:relative;width:100%;height:auto;aspect-ratio:var(--store-banner-ratio);min-height:0;z-index:0;order:-1}
+body[data-hp=salon-banner] .hero-photo img{object-fit:contain;object-position:center}
+body[data-hp=salon-banner] .brand-copy{padding:20px 24px;color:#333}
+body[data-hp=salon-banner] .brand-copy h1{font-size:28px;letter-spacing:.1em;font-family:"Noto Serif JP","Yu Mincho",serif}
+body[data-hp=salon-banner] .genre{margin-bottom:4px;font-size:12px}
+body[data-hp=salon-banner] .area{margin-top:4px}
+body[data-hp=salon-banner] .hero-thanks{margin-top:12px;font-size:13px}
+body[data-hp=salon-banner] main{background:white}
+body[data-hp=salon-banner] .progress li[aria-current]{border-color:var(--store-accent)}
+body[data-hp=salon-banner] .star.selected{border-color:var(--store-accent);background:var(--store-surface)}
+
+/* JEANS: original logo pixels from the official corporate banner. */
+body[data-slug=jeans][data-hp]{--jeans-logo-green:rgb(130,191,36);--jeans-logo-width:220px;--jeans-header-height:106px;--jeans-logo-gap:18px}
+body[data-slug=jeans][data-hp] .site-header{height:var(--jeans-header-height);background:var(--jeans-logo-green);gap:var(--jeans-logo-gap)}
+body[data-slug=jeans][data-hp] .header-name{flex:1;min-width:0}
+body[data-slug=jeans][data-hp] .hp-logo-crop{display:block;position:relative;overflow:hidden;width:min(100%,var(--jeans-logo-width))}
+body[data-slug=jeans][data-hp] .hp-logo-crop .hp-logo{position:absolute;max-width:none;max-height:none;object-fit:contain}
+body[data-slug=jeans][data-hp] .language{flex-shrink:0}
+body[data-slug=jeans][data-hp] .language select{color:var(--ink)}
+body[data-slug=jeans][data-hp] .brand-copy{background:var(--paper);color:var(--ink)}

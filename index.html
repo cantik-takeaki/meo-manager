@@ -13575,5 +13575,9 @@ async function checkNow() {
 
 init();
 </script>
+<!-- ?v= はキャッシュ避け。2026-09-10に実測で、更新後もブラウザが古い版を実行していた
+     （fetchでは新版が取れるのにページのscriptは旧版＝confirmが包まれず辞書も古い）。
+     録画中に古い版が動くと画面が日本語のままになるので、更新のたびに日付を上げる。 -->
+<script src="assets/appreview-en.js?v=20260912b"></script>
 </body>
 </html>
