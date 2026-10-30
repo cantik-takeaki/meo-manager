@@ -1,6 +1,9 @@
 // api/admin.js — 店舗登録・順位入力（統合）
 import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
+import { shindanOne, fetchPerf } from './_shindan.js';
+import { classifyReview, findAffirm, findUnsupported, findEffectClaims, findRebuttal, REPLY_RULE } from './_review_safety.js';
+import { pushReviewAlerts, pushTest, lineTarget, formatBubble, nextPending, moveToEnd, withNext, listText, LINE_TO_KEY, LINE_TOKEN_KEY, PENDING_PREFIX } from './_review_line.js';
 
 function parseCookies(req) {
   const c = {};
@@ -33,7 +36,14 @@ const _hoursTok = (s) => {
   const z = String(s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/：/g, ':');
   return [...z.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => `${parseInt(m[1], 10)}:${m[2]}`);
 };
-const _fmtGbpT = (t) => typeof t === 'string' ? (t.length === 4 ? `${parseInt(t.slice(0, 2), 10)}:${t.slice(2)}` : t) : (t && t.hours != null ? `${t.hours}:${String(t.minutes || 0).padStart(2, '0')}` : '');
+const _fmtGbpT = (t) => {
+  // Google の TimeOfDay は protobuf の既定値を省略するため、0時は {} で返る。
+  // 旧実装は `t.hours != null` で弾いて空文字にしていた＝「0:00-3:00」が「-3:00」になり
+  // 改ざん検知が毎回この差分を報告していた（実データは変わっていない）。2026-08-30 修正。
+  if (typeof t === 'string') return t.length === 4 ? `${parseInt(t.slice(0, 2), 10)}:${t.slice(2)}` : t;
+  if (t && typeof t === 'object') return `${t.hours || 0}:${String(t.minutes || 0).padStart(2, '0')}`;
+  return '';
+};
 async function fetchCurrentGbpInfo(locationName, token) {
   const locPart = String(locationName).match(/locations\/[^/]+/)?.[0];
   if (!locPart) return { error: 'no_location' };
@@ -175,11 +185,51 @@ async function geocodeCandidates(q, limit = 5) {
   } catch (e) { return []; }
 }
 
-// SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
-async function recordCompRanks(storeId, keyword, selfRank, list) {
+// 競合の自動登録（追加APIコストなし・順位を測ったときのSERP上位からそのまま拾う）
+// なぜ要るか：2026-10-21時点で19店すべて競合が0件だった＝comp_historyの仕組みが空回りしていた。
+//   競合が入っていないと「誰に負けているか」「口コミと写真をあとどれだけ足せば並ぶか」が出ない。
+// 入れ方：上位5店のうち自店を除いたものを、その店の競合として一度だけ自動登録する。
+//   手で登録した競合がある店には触らない（社長・担当が決めた並びを上書きしない）。
+async function autoRegisterCompetitors(storeId, selfName, list) {
   try {
-    const registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
-    if (!registered.length) return null;
+    if (!storeId || !Array.isArray(list) || !list.length) return null;
+    const existing = await kvGet(`competitors_${storeId}`) || [];
+    if (existing.length) return null;                 // 既にあるなら触らない
+    const target = _normName(selfName);
+    const picked = [];
+    for (const [i, item] of list.entries()) {
+      if (picked.length >= 5) break;
+      const t = _normName(item.title);
+      if (!t) continue;
+      if (target && (t.includes(target) || target.includes(t))) continue;   // 自店は除く
+      picked.push({
+        id: `auto_${Date.now()}_${i}`,
+        name: item.title,
+        placeId: item.place_id || '',
+        rating: item.rating ?? null,
+        reviews: item.reviews ?? null,
+        compare: true,
+        source: 'auto',                                // 自動で入れた印。手動登録と区別する
+        addedAt: new Date().toISOString(),
+        firstRank: item.position || (i + 1),
+      });
+    }
+    if (!picked.length) return null;
+    await kvSet(`competitors_${storeId}`, picked);
+    return picked;
+  } catch (e) { return null; }                         // 失敗で順位計測本体を落とさない
+}
+
+// SERP結果から登録済み競合の順位を照合してcomp_historyへ記録（fetch-rank/cron-rank共通・追加APIコストなし）
+async function recordCompRanks(storeId, keyword, selfRank, list, selfName = '') {
+  try {
+    let registered = (await kvGet(`competitors_${storeId}`) || []).filter(c => c.compare !== false);
+    if (!registered.length) {
+      // 競合が1件も無い店は、このSERPの上位5店をそのまま競合として入れてから記録に進む（追加コストなし）
+      const added = await autoRegisterCompetitors(storeId, selfName, list);
+      registered = (added || []).filter(c => c.compare !== false);
+      if (!registered.length) return null;
+    }
     const comps = registered.map(c => {
       let cRank = null, cMatched = null, cRating = null, cReviews = null;
       const cnPlace = String(c.placeId || '').trim();
@@ -294,6 +344,33 @@ export default async function handler(req, res) {
         }
       } catch (e) { /* 自動解決の失敗は無視（従来挙動のまま返す） */ }
     }
+    // ★業種を返す（2026-10-27）。口コミページの「良かった点」の選択肢を業種に合わせるために要る。
+    //   これが無いと全店で同じ汎用の選択肢が出て、飲食店なのに施術の話が混ざる。
+    //   出どころは knowledge → 改ざん検知の正規情報 → GBPのカテゴリ の順。
+    if (!merged.category) {
+      try {
+        const _kn = await kvGet(`knowledge_${storeId}`);
+        if (_kn && _kn.category) merged.category = _kn.category;
+        if (!merged.category) {
+          const _st = await kvGet(`settings_${storeId}`);
+          if (_st && _st.info && _st.info.category) merged.category = _st.info.category;
+        }
+        if (!merged.category) {
+          const managed2 = (await kvGet('managed_locations')) || [];
+          const hit2 = managed2.find(m => String(m.locId || m.locationName || '').replace(/\//g, '_') === storeId);
+          const locPath2 = String((hit2 && (hit2.locId || hit2.locationName)) || '').match(/locations\/[^/]+/);
+          const token2 = locPath2 ? await getMasterToken() : null;
+          if (locPath2 && token2) {
+            const r2 = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPath2[0]}?readMask=title,categories`,
+              { headers: { Authorization: `Bearer ${token2}` } });
+            const d2 = await r2.json().catch(() => ({}));
+            const c2 = d2 && d2.categories && d2.categories.primaryCategory;
+            if (c2 && c2.displayName) merged.category = c2.displayName;
+            if (!merged.title && d2 && d2.title) merged.title = d2.title;
+          }
+        }
+      } catch (e) { /* 業種が取れなくても口コミページ自体は開く */ }
+    }
     return res.json(merged);
   }
 
@@ -361,10 +438,73 @@ export default async function handler(req, res) {
   //   （従来はゲートで401になり cron-rank/cron-tamper 本体に到達できず、cronが一度も発火していなかった）
   const _c = parseCookies(req);
   const access_token = _c.access_token;
-  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper');
+  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper' || action === 'cron-review-reply');
   const _cronAuthOk = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
-  if (!(_isCronAction && _cronAuthOk) && !access_token && !_c.pw_session) {
+  // 口コミ返信のLINE承認（cantik.co.jp/line/webhook.php から呼ばれる）。管理者Cookieの代わりに共有の合言葉で通す
+  let _approveAuthOk = false;
+  if (action === 'review-approve' || action === 'review-edit') {
+    const sec = await kvGet('review_approve_secret');
+    _approveAuthOk = !!sec && (req.headers.authorization || '') === `Bearer ${sec}`;
+    if (!_approveAuthOk) return res.status(401).json({ text: '認証に失敗しました。' });
+  }
+  if (!(_isCronAction && _cronAuthOk) && !_approveAuthOk && !access_token && !_c.pw_session) {
     return res.status(401).json({ error: '管理者ログインが必要です' });
+  }
+
+  // ── 店舗ごとの更新停止（社長指示 2026-10-06：麻辣王酒場は投稿・返信を含む自動のMEO対策を一旦止める） ──
+  //   KV `meo_paused_stores` = [{ lid, title, at, reason }]（lid＝locations/ の数字）
+  //   停止中の店は、口コミ自動返信（cron）から外し、投稿・基本情報・属性の更新を受け付けない。
+  //   ※ api/posts.js は Instagram 審査中で触れないため、そちらの投稿経路はルール（共有ログ・絶対遵守）で止める。
+  const _lidOf = (s) => (String(s || '').match(/locations[\/_](\d+)/) || [])[1] || (/^\d+$/.test(String(s || '')) ? String(s) : '');
+  if (action === 'meo-pause') {
+    const list = (await kvGet('meo_paused_stores')) || [];
+    if (req.method === 'GET') return res.json({ paused: list });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const lid = _lidOf(b.storeId || b.locationName);
+      if (!lid) return res.status(400).json({ error: 'storeId（locations_数字）が必要です' });
+      const next = list.filter(x => x.lid !== lid);
+      if (b.paused !== false) next.push({ lid, title: String(b.title || ''), at: new Date().toISOString(), reason: String(b.reason || '') });
+      await kvSet('meo_paused_stores', next);
+      return res.json({ success: true, paused: next });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+  if (req.method === 'POST' && ['gbp-post', 'gbp-update', 'gbp-attributes-set'].includes(action)) {
+    const lid = _lidOf(req.query.storeId || (req.body || {}).storeId || (req.body || {}).locationName);
+    const hit = lid && ((await kvGet('meo_paused_stores')) || []).find(x => x.lid === lid);
+    if (hit) return res.status(423).json({ error: `${hit.title || 'この店舗'}は社長指示で更新を停止中です（${String(hit.at).slice(0, 10)}〜）`, paused: true });
+  }
+
+  // ── 店舗データの書き出し（読み取りのみ。契約解除・削除の前の退避用）──
+  //   社長指示 2026-10-07「麻辣王酒場はラクラクMEOから削除」。消す前に全部残す（§1-34）。
+  //   鍵・トークン（gbp_tokens_/ig_conn_/line_conn_）は書き出さない。
+  if (action === 'store-export' && req.method === 'GET') {
+    const lid = _lidOf(req.query.storeId);
+    if (!lid) return res.status(400).json({ error: 'storeId（locations_数字）が必要です' });
+    const sid = `locations_${lid}`;
+    const keys = ['knowledge', 'rankings', 'review_draft', 'review_stats', 'settings', 'actionlog', 'kpi', 'leads', 'citation',
+                  'client', 'comp_history', 'competitors', 'confirm_items', 'meo_memo', 'rank_point', 'post_drafts', 'media', 'aio', 'notion_page'];
+    const out = {};
+    for (const k of keys) { const v = await kvGet(`${k}_${sid}`); if (v != null) out[`${k}_${sid}`] = v; }
+    const managed = ((await kvGet('managed_locations')) || []).find(m => _lidOf(m.locId) === lid) || null;
+    // live=1：Googleに出ている口コミ（返信つき）と投稿を全ページ取得する（読み取りのみ）
+    let live = null;
+    if (req.query.live === '1' && managed && managed.locationName) {
+      const token = managed.storeId ? (await getAccessToken(managed.storeId)) || await getMasterToken() : await getMasterToken();
+      const H = { Authorization: `Bearer ${token}` };
+      const all = async (path, field) => {
+        const items = []; let pt = '';
+        for (let i = 0; i < 40; i++) {
+          const d = await (await fetch(`https://mybusiness.googleapis.com/v4/${managed.locationName}/${path}?pageSize=50${pt ? '&pageToken=' + encodeURIComponent(pt) : ''}`, { headers: H })).json();
+          if (d.error) { items.push({ _error: d.error.message }); break; }
+          items.push(...(d[field] || [])); pt = d.nextPageToken || ''; if (!pt) break;
+        }
+        return items;
+      };
+      live = { reviews: await all('reviews', 'reviews'), posts: await all('localPosts', 'localPosts') };
+    }
+    return res.json({ exportedAt: new Date().toISOString(), sid, managed, data: out, live });
   }
 
   // ── 管理対象ロケーション（オーナー登録済みGBPから管理者が選抜して登録） ──
@@ -520,6 +660,258 @@ export default async function handler(req, res) {
       const t = await r.text(); let d = {}; try { d = JSON.parse(t); } catch {}
       return res.status(r.status).json({ error: d.message ? `LINE送信失敗: ${d.message}` : `LINE送信失敗(${r.status})` });
     } catch (e) { return res.status(502).json({ error: 'LINE送信に失敗しました: ' + e.message }); }
+  }
+
+  // ── 口コミ確認依頼のLINE送信先（社長指示 2026-10-06：★3以下は公式LINEで社長と従業員に確認） ──
+  //   トークンは line-conn（storeId=_review_alert）で保存。ここは送信先（userId / groupId）だけを扱う。
+  if (action === 'review-alert-line') {
+    if (req.method === 'GET') {
+      const conn = await kvGet(LINE_TOKEN_KEY);
+      const conf = (await kvGet(LINE_TO_KEY)) || {};
+      const to = Array.isArray(conf.to) ? conf.to : [];
+      return res.json({ connected: !!(conn && conn.token), count: to.length, to: to.map(x => x.slice(0, 7) + '…') });
+    }
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      const prev = (await kvGet(LINE_TO_KEY)) || {};
+      const to = b.to ? [...new Set((b.to || []).map(x => String(x || '').trim()))] : (prev.to || []);
+      const group = b.group !== undefined ? String(b.group || '').trim() : (prev.group || '');
+      const bad = [...to, ...(group ? [group] : [])].filter(x => !/^[UCR][0-9a-f]{32}$/.test(x));
+      if (bad.length) return res.status(400).json({ error: 'userId / groupId の形式ではありません', bad: bad.map(x => x.slice(0, 7)) });
+      await kvSet(LINE_TO_KEY, { to, group, at: new Date().toISOString() });
+      return res.json({ success: true, count: to.length, group: group ? group.slice(0, 7) + '…' : '' });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+  if (action === 'review-alert-line-test' && req.method === 'POST') {
+    return res.json(await pushTest());
+  }
+  // 公式LINEのチャネルシークレット（api/line-hook.js の署名検証に使う）。値は返さない
+  if (action === 'line-channel-secret') {
+    if (req.method === 'GET') return res.json({ set: !!(await kvGet('line_channel_secret__review_alert')) });
+    if (req.method === 'POST') {
+      const s = String((req.body || {}).secret || '').trim();
+      if (!/^[0-9a-f]{32}$/.test(s)) return res.status(400).json({ error: 'チャネルシークレットの形式が違います（32字の英数字）' });
+      await kvSet('line_channel_secret__review_alert', s);
+      return res.json({ success: true });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+  // 受け口（api/line-hook.js）が見たグループの一覧
+  if (action === 'line-seen-groups' && req.method === 'GET') {
+    const seen = (await kvGet('line_seen_groups')) || {};
+    const conf = (await kvGet(LINE_TO_KEY)) || {};
+    return res.json({ groups: Object.entries(seen).map(([id, v]) => ({ id: id.slice(0, 7) + '…', name: v.name, lastAt: v.lastAt, isReviewGroup: id === conf.group })) });
+  }
+  // LINEの Webhook URL の切り替え（社長のOK後にだけ使う）。to=meo → ラクラクMEOの受け口へ／to=restore → 元に戻す
+  if (action === 'line-webhook-switch' && req.method === 'POST') {
+    const conn = await kvGet(LINE_TOKEN_KEY);
+    if (!conn || !conn.token) return res.status(400).json({ error: 'LINEのトークンが未設定' });
+    const H = { Authorization: `Bearer ${conn.token}`, 'Content-Type': 'application/json' };
+    const cur = await (await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', { headers: H })).json();
+    const to = (req.body || {}).to;
+    let endpoint;
+    if (to === 'meo') {
+      if (!(await kvGet('line_webhook_prev'))) await kvSet('line_webhook_prev', { endpoint: cur.endpoint || '', at: new Date().toISOString() });
+      endpoint = 'https://meo-manager-rho.vercel.app/api/line-hook';
+    } else if (to === 'restore') {
+      endpoint = ((await kvGet('line_webhook_prev')) || {}).endpoint || 'https://cantik.co.jp/line/webhook.php';
+    } else return res.status(400).json({ error: "to は 'meo' か 'restore'" });
+    const put = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', { method: 'PUT', headers: H, body: JSON.stringify({ endpoint }) });
+    const test = await (await fetch('https://api.line.me/v2/bot/channel/webhook/test', { method: 'POST', headers: H, body: JSON.stringify({ endpoint }) })).json();
+    return res.json({ before: cur.endpoint || '', after: endpoint, putStatus: put.status, test });
+  }
+  // ── LINEで打った文で返信案を差し替える（webhook.php が、グループ／個別トークの文字メッセージを渡してくる）──
+  //   社長指示 2026-10-07「ラインでこっちが修正して欲しい場合、文をこちらで打てるようにして、それを反映するように」
+  //   対象の決め方：①「文を直す」を押した人の、15分以内の次の発言 ②「修正 番号」で始まる発言
+  //   それ以外の普段の会話は { ignore: true } を返して何もしない。
+  if (action === 'review-edit' && req.method === 'POST') {
+    const b = req.body || {};
+    const conf = (await kvGet(LINE_TO_KEY)) || {};
+    const fromGroup = b.sourceType === 'group' && conf.group && b.groupId === conf.group;
+    const fromUser = b.sourceType === 'user' && (conf.to || []).includes(b.userId);
+    if (!fromGroup && !fromUser) return res.json({ ignore: true });
+    let text = String(b.text || '').trim();
+    let id = '';
+    // 「一覧」「次」「確認 番号」（1件ずつ方式の操作）
+    if (/^(一覧|いちらん|リスト)$/.test(text)) return res.json({ messages: [{ type: 'text', text: await listText() }] });
+    if (/^(次|つぎ|次へ)$/.test(text)) {
+      const { next, remaining } = await nextPending();
+      return res.json({ messages: next ? [{ type: 'text', text: `確認待ち ${remaining}件。次の口コミです。` },
+        { type: 'flex', altText: `口コミの確認：${next.store} ★${next.star}`.slice(0, 390), contents: formatBubble(next) }]
+        : [{ type: 'text', text: '確認待ちの口コミはありません。' }] });
+    }
+    const mk = text.match(/^確認\s*([0-9a-f]{10})$/);
+    if (mk) {
+      const p0 = await kvGet(PENDING_PREFIX + mk[1]);
+      return res.json({ messages: p0 && p0.status === 'pending'
+        ? [{ type: 'flex', altText: `口コミの確認：${p0.store} ★${p0.star}`.slice(0, 390), contents: formatBubble(p0) }]
+        : [{ type: 'text', text: 'その番号の確認待ちは見つかりませんでした（対応済みの可能性があります）。' }] });
+    }
+    const m = text.match(/^修正\s*([0-9a-f]{10})\s*\n?([\s\S]*)$/);
+    if (m) { id = m[1]; text = m[2].trim(); }
+    else {
+      const st = await kvGet(`rv_edit_state_${b.userId || 'x'}`);
+      if (st && st.id && Date.now() - new Date(st.at).getTime() < 15 * 60e3) id = st.id;
+    }
+    if (!id) return res.json({ ignore: true });
+    await kvSet(`rv_edit_state_${b.userId || 'x'}`, null);
+    const key = PENDING_PREFIX + id;
+    const p = await kvGet(key);
+    const T = (t) => res.json({ messages: [{ type: 'text', text: t }] });
+    if (!p) return T('対象の口コミが見つかりませんでした。');
+    if (p.status !== 'pending') return T(`この口コミはすでに対応済みのため、直せません（${p.status}）。`);
+    // 絵文字は消す（cantik全社ルール）。長さはGoogleの上限（4,096字）まで
+    const clean = text.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, '').replace(/[ \t　]+\n/g, '\n').trim().slice(0, 4000);
+    if (!clean) return T('直した文が空でした。もう一度「文を直す」を押して、文を送ってください。');
+    const af = findAffirm(clean, p.review), un = findUnsupported(clean, p.review);
+    const warnings = [...new Set([...af.affirm, ...un.storeInfo, ...un.visit, ...findEffectClaims(clean), ...findRebuttal(clean)])].slice(0, 4);
+    const next = { ...p, reply: clean, humanEdited: true, editedBy: b.userId || '', editedAt: new Date().toISOString(), warnings };
+    await kvSet(key, next);
+    const label = `${p.store} ★${p.star} ${p.name || ''}さん`;
+    return res.json({ messages: [
+      { type: 'text', text: `返信案を差し替えました：${label}\n内容を確認して「この返信で送る」を押してください。${warnings.length ? `\n注意：${warnings.join('・')} が含まれています（このまま送ることもできます）。` : ''}` },
+      { type: 'flex', altText: `直した返信の確認：${label}`.slice(0, 390), contents: formatBubble(next) },
+    ] });
+  }
+
+  // LINE承認の合言葉（webhook.php の config.php と同じ値）。値は返さない
+  if (action === 'review-approve-secret') {
+    if (req.method === 'GET') return res.json({ set: !!(await kvGet('review_approve_secret')) });
+    if (req.method === 'POST') {
+      const s = String((req.body || {}).secret || '').trim();
+      if (!/^[0-9a-f]{32,}$/.test(s)) return res.status(400).json({ error: '合言葉の形式が違います' });
+      await kvSet('review_approve_secret', s);
+      return res.json({ success: true });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+  // カードの見本を送る（返信済みの口コミを使う＝押しても「店側で返信済み」で止まり、Googleには何も送られない）
+  if (action === 'review-alert-line-card-test' && req.method === 'POST') {
+    const b = req.body || {};
+    const managed = (await kvGet('managed_locations')) || [];
+    const m = managed.find(x => String(x.locId || '').replace(/\//g, '_') === b.storeId) || managed[0];
+    const sid = String(m.locId || '').replace(/\//g, '_');
+    const token = m.storeId ? (await getAccessToken(m.storeId)) || await getMasterToken() : await getMasterToken();
+    const rd = await (await fetch(`https://mybusiness.googleapis.com/v4/${m.locationName}/reviews`, { headers: { Authorization: `Bearer ${token}` } })).json();
+    const STAR = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+    const rv = (rd.reviews || []).find(x => x.reviewReply && x.reviewReply.comment && x.comment);
+    if (!rv) return res.status(404).json({ error: '見本に使える返信済みの口コミがありません' });
+    const companyMap = (await kvGet('store_company')) || {};
+    const r = await pushReviewAlerts([{ reviewId: rv.reviewId, store: m.title, company: companyMap[_lidOf(sid)] || '', sid,
+      locationName: m.locationName, star: STAR[rv.starRating] || 0, name: rv.reviewer?.displayName || '',
+      date: String(rv.createTime || '').slice(0, 10), review: rv.comment, reply: '【見本】' + rv.reviewReply.comment }], { allowUsers: true });
+    return res.json(r);
+  }
+
+  // 既にある返信の差し替えカードを送る（監査で見つかった返信。店の了解を取ってから押す・社長指示 2026-10-07 A案）
+  //   items=[{ sid, locationName, reviewId, store, star, name, date, review, currentReply, reply }]
+  if (action === 'review-replace-cards' && req.method === 'POST') {
+    const items = ((req.body || {}).items || []).filter(x => x && x.reviewId && x.locationName && String(x.reply || '').trim());
+    if (!items.length) return res.status(400).json({ error: '対象がありません' });
+    const companyMap = (await kvGet('store_company')) || {};
+    const queue = items.map(x => ({ ...x, company: companyMap[_lidOf(x.sid)] || '', replace: true }));
+    return res.json(await pushReviewAlerts(queue, { groupByStore: true }));
+  }
+
+  // 店舗ごとの企業名（LINEのカードに「企業名／店舗名」で出す）。KV `store_company` = { lid: 企業名 }
+  if (action === 'store-company') {
+    const map = (await kvGet('store_company')) || {};
+    if (req.method === 'GET') return res.json({ map });
+    if (req.method === 'POST') {
+      const b = req.body || {};
+      for (const [k, v] of Object.entries(b.map || {})) { const lid = _lidOf(k); if (lid) { if (v) map[lid] = String(v).slice(0, 60); else delete map[lid]; } }
+      await kvSet('store_company', map);
+      return res.json({ success: true, map });
+    }
+    return res.status(405).json({ error: 'method' });
+  }
+
+  // ── 口コミ返信のLINE承認（グループの2人のどちらかが「この返信で送る」を押したらGoogleに投稿する）──
+  //   社長指示 2026-10-06「グループでokと連絡したらクチコミするように／2人しかいないからどちらかがokしたらいい」
+  //   呼び出し元＝cantik.co.jp/line/webhook.php（LINEの署名はそちらで検証済み）。返す { text } をグループに返信する。
+  //   守ること：押した瞬間に記録（二重投稿なし）／停止中の店は送らない／店がすでに返信していたら上書きしない／
+  //             送る直前に事実を認める表現・絵文字をもう一度調べる。
+  if (action === 'review-approve' && req.method === 'POST') {
+    const b = req.body || {};
+    const say = (text, extra = {}) => res.json({ text, ...extra });
+    // 結果の文に、次の確認待ちのカードを添えて返す（1件ずつ方式・社長指示 2026-10-07）
+    const sayNext = async (text, excludeId = '') => res.json({ text, messages: await withNext(text, excludeId) });
+    const conf = (await kvGet(LINE_TO_KEY)) || {};
+    const fromGroup = b.sourceType === 'group' && conf.group && b.groupId === conf.group;
+    const fromUser = b.sourceType === 'user' && (conf.to || []).includes(b.userId);
+    if (!fromGroup && !fromUser) return say('このトークからは口コミの返信を操作できません。');
+    const id = String(b.id || '').replace(/[^0-9a-f]/g, '');
+    const key = PENDING_PREFIX + id;
+    const p = id ? await kvGet(key) : null;
+    if (!p) return say('対象の口コミが見つかりませんでした。ラクラクMEOの口コミ画面で確認してください。');
+    const label = `${p.store} ★${p.star} ${p.name || ''}さん`;
+    const STATUS = { sending: '送信処理中', sent: '送信済み', rejected: '送らないに決定済み', skipped_paused: '更新停止中のため未送信',
+                     skipped_replied: '店側で返信済み', skipped_changed: '店側で返信が変わっていたため未送信', blocked: '使えない表現のため未送信', failed: '送信失敗' };
+    if (p.status !== 'pending') return sayNext(`この口コミはすでに対応済みです（${STATUS[p.status] || p.status}）：${label}`);
+    const now = new Date().toISOString();
+    if (b.decision === 'ng') {
+      await kvSet(key, { ...p, status: 'rejected', by: b.userId || '', at: now });
+      return sayNext(`送らないにしました：${label}`, id);
+    }
+    // 「文を直す」：押した人が次にこのトークへ送った文で返信案を差し替える（15分以内）。社長指示 2026-10-07
+    if (b.decision === 'edit') {
+      await kvSet(`rv_edit_state_${b.userId || 'x'}`, { id, at: now });
+      // 今の返信案を「素の吹き出し」でもう1通返す（長押しでコピーして直せるように。社長指示 2026-10-20）。
+      // ボタンへの返事は応答メッセージ＝LINEの通数に数えられないので、無料枠は使わない。
+      const guide = `返信の文を直します：${label}\n下の文をコピーして直し、このトークに送ってください（15分以内）。\n（「修正 ${id}」と書いて改行し、続けて文を送っても直せます）`;
+      const msgs = [{ type: 'text', text: guide }];
+      if (String(p.reply || '').trim()) msgs.push({ type: 'text', text: String(p.reply).slice(0, 4900) });
+      return res.json({ text: guide, messages: msgs });
+    }
+    // 「あとで」：順番待ちの最後に回して次の1件を出す（店の了解待ちなど）
+    if (b.decision === 'later') { await moveToEnd(id); return sayNext(`あとでにしました：${label}`, id); }
+    if (b.decision !== 'ok') return say('操作を判別できませんでした。');
+    // ★押した瞬間に記録（結果を待たない）。もう1人が続けて押しても「対応済み」になる
+    await kvSet(key, { ...p, status: 'sending', by: b.userId || '', at: now });
+    const fin = async (status, extra = {}) => kvSet(key, { ...p, status, by: b.userId || '', at: now, doneAt: new Date().toISOString(), ...extra });
+    const pausedLids = new Set(((await kvGet('meo_paused_stores')) || []).map(x => x.lid));
+    if (pausedLids.has(_lidOf(p.sid) || _lidOf(p.locationName))) { await fin('skipped_paused'); return sayNext(`${p.store}は更新停止中のため送りませんでした。`); }
+    const af = findAffirm(p.reply, p.review);
+    const un = findUnsupported(p.reply, p.review);
+    const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u.test(p.reply || '');
+    // 人がLINEで打った文（humanEdited）は、その人の判断として送る（確認カードで注意は出している）
+    const ng = p.humanEdited ? (emoji ? ['絵文字'] : [])
+      : [...af.affirm, ...af.restated, ...un.storeInfo, ...un.visit, ...findEffectClaims(p.reply), ...findRebuttal(p.reply), ...(emoji ? ['絵文字'] : [])];
+    if (!String(p.reply || '').trim() || ng.length) {
+      await fin('blocked');
+      return sayNext(`返信案に使えない表現があるため送りませんでした：${label}\n（${ng.slice(0, 3).join('・') || '本文が空'}）\nラクラクMEOの口コミ画面で作り直してください。`);
+    }
+    const managed = (await kvGet('managed_locations')) || [];
+    const m = managed.find(x => String(x.locId || '').replace(/\//g, '_') === p.sid) || {};
+    const token = m.storeId ? (await getAccessToken(m.storeId)) || await getMasterToken() : await getMasterToken();
+    try {
+      const cur = await (await fetch(`https://mybusiness.googleapis.com/v4/${p.locationName}/reviews/${p.reviewId}`, { headers: { Authorization: `Bearer ${token}` } })).json();
+      if (cur.error) { await fin('failed', { error: cur.error.message }); return sayNext(`口コミを確認できなかったため送りませんでした：${label}\n（${cur.error.message}）`); }
+      if (cur.reviewReply && cur.reviewReply.comment) {
+        if (!p.replace) { await fin('skipped_replied'); return sayNext(`店側ですでに返信済みのため送りませんでした：${label}`); }
+        // 差し替え：監査したときの返信から店が自分で変えていたら上書きしない（麻辣王酒場の例）
+        const norm = (x) => String(x || '').replace(/\s+/g, '');
+        if (p.currentReply && norm(cur.reviewReply.comment) !== norm(p.currentReply)) {
+          await fin('skipped_changed'); return sayNext(`今の返信が監査したときから変わっているため、差し替えませんでした：${label}\n（店側で直された可能性があります）`);
+        }
+      }
+      const pr = await fetch(`https://mybusiness.googleapis.com/v4/${p.locationName}/reviews/${p.reviewId}/reply`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: p.reply }),
+      });
+      const pd = await pr.json();
+      if (pd.error) { await fin('failed', { error: pd.error.message }); return sayNext(`送信に失敗しました：${label}\n（${pd.error.message}）`); }
+    } catch (e) { await fin('failed', { error: e.message }); return sayNext(`送信に失敗しました：${label}\n（${e.message}）`); }
+    await fin('sent');
+    // 送信済みの記録（cronが二度作らない）・監査ログ・下書きの片付け
+    const sent = new Set((await kvGet('review_reply_sent')) || []); sent.add(p.reviewId);
+    await kvSet('review_reply_sent', [...sent].slice(-1000));
+    const audit = (await kvGet('review_reply_log')) || [];
+    audit.unshift({ at: new Date().toISOString(), store: p.store, reviewId: p.reviewId, star: p.star, reply: p.reply, via: 'LINE承認', by: b.userId || '' });
+    if (audit.length > 200) audit.length = 200; await kvSet('review_reply_log', audit);
+    const dk = `review_draft_${p.sid}`; const drafts = (await kvGet(dk)) || [];
+    await kvSet(dk, drafts.filter(d => d.reviewId !== p.reviewId));
+    return sayNext(`送信しました：${label}\nGoogleの審査が終わると、口コミの下に表示されます。`);
   }
 
   // ── 口コミPOP: 保存デザインテンプレ（Canva/アップロード画像を再利用） ──
@@ -866,13 +1258,15 @@ export default async function handler(req, res) {
     const seen = new Set();
     for (const m of managed) { const sid = String(m.locId || '').replace(/\//g, '_'); if (sid && !seen.has(sid)) { seen.add(sid); stores.push({ storeId: sid, name: m.title || '' }); } }
     for (const s of manual) { if (s.storeId && !seen.has(s.storeId)) { seen.add(s.storeId); stores.push({ storeId: s.storeId, name: s.storeName || '' }); } }
-    // 計測ジョブ＝優先度A・有効のKWのみ
+    // 計測ジョブ＝有効なKW全部（優先度A・Bとも。2026-10-21に変更）
     const jobs = [];
     for (const st of stores) {
       if (!st.name) continue;
       if (/^【デモ】|^\[デモ\]/.test(st.name)) continue; // デモ店舗は実在しないため計測しない（従量課金の無駄）
       const rk = await kvGet(`rankings_${st.storeId}`) || {};
       const meta = rk.meta || {};
+      // その店の最終計測日（後段の公平化ソートで使う）。history は日付昇順だが念のため最大値を取る。
+      st._lastMeasured = (rk.history || []).reduce((m, h) => (String(h.date) > m ? String(h.date) : m), '');
       // 計測地点(rank_point)があれば ll を付与。無ければ店舗住所からgeocodeして座標を得る
       // （DataForSEOのGoogleマップは座標が実質必須。国レベルだと0件になるため）。
       const rp = await kvGet(`rank_point_${st.storeId}`);
@@ -894,11 +1288,20 @@ export default async function handler(req, res) {
       }
       (rk.keywords || []).forEach(kw => {
         const m = meta[kw] || {};
-        if (kw && m.enabled !== false && m.priority === 'A' && !_doneKws.has(kw)) jobs.push({ st, kw, area: m.area || '', ll });
+        // 2026-10-21：優先度Bの語が一度も測られていなかった（Aだけを対象にしていたため）。
+        // 社長指示「全部のキーワードで取得できるように」。有効な語は優先度に関係なく全部測る。
+        // 並び順ではAを先に消化する（予算が尽きたときにBから落ちるように）。
+        if (kw && m.enabled !== false && !_doneKws.has(kw)) jobs.push({ st, kw, area: m.area || '', ll, pri: m.priority === 'A' ? 0 : 1 });
       });
     }
-    // ── 回転カーソル：毎回続きから測って全KWを一巡させる（先頭N件に偏らない） ──
-    // jobsは「当日まだ測っていないKW」だけなので、通常は先頭から順に処理すれば穴なく一巡する。
+    // ── 公平化：長く測られていない店から先に測る ──
+    // jobsは「当日まだ測っていないKW」だけなので、1日に何度も走るなら先頭から順で穴なく一巡する。
+    // だが実際のcronは1日1回（vercel.json: 0 18 * * *）で、時間予算35秒×並列8＝1回およそ39件が天井。
+    // 日が変わるとjobsは再び全件（実測148件）に戻るため、毎日「先頭39件」だけを測り直し、
+    // 後半の店は永久に測られない状態になっていた（2026-09-04実測：14店が8/26のまま9日間放置）。
+    // → 店ごとの最終計測日が古い順に並べ替えて、取り残された店から先に消化する。
+    // 測られていない店から先に。同じ店の中では優先度A→Bの順。
+    jobs.sort((a, b) => String(a.st._lastMeasured || '').localeCompare(String(b.st._lastMeasured || '')) || ((a.pri || 0) - (b.pri || 0)));
     // カーソルはremeasure=1（全KWを測り直す）時のみ使う。
     let _cursor = req.query.remeasure === '1' ? (await kvGet('cron_rank_cursor')) : 0;
     if (!Number.isFinite(_cursor) || _cursor >= jobs.length) _cursor = 0;
@@ -965,12 +1368,62 @@ export default async function handler(req, res) {
         ex.history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
         if (ex.history.length > 60) ex.history = ex.history.slice(-60);
         await kvSet(`rankings_${sid}`, ex);
+
+        // ── 競合（追加APIコストなし。いま取ったSERPをそのまま使う） ──
+        // 店ごとに KV の読み1回・書き1回にまとめる（1KWごとに往復すると60秒を超えるため）。
+        // 競合が未登録の店は、このSERPの上位5店をそのまま競合として入れる。
+        try {
+          const selfName = (list[0] && list[0].job.st.name) || '';
+          let comps = await kvGet(`competitors_${sid}`) || [];
+          if (!comps.length) {
+            const seed = (list.find(r => !r.error && (r.list || []).length) || {}).list || [];
+            comps = (await autoRegisterCompetitors(sid, selfName, seed)) || [];
+          }
+          const active = comps.filter(c => c.compare !== false);
+          if (active.length) {
+            const histKey = `comp_history_${sid}`;
+            const hist = await kvGet(histKey) || [];
+            let touched = false;
+            for (const r of list) {
+              if (r.error || !(r.list || []).length) continue;
+              // 自店の順位に加えて、評価と口コミ数も同じSERPから拾う（競合との差を出すのに要る）
+              const me = (() => {
+                const t0 = _normName(selfName);
+                for (const [i, it] of r.list.entries()) {
+                  const t = _normName(it.title);
+                  if (t && t0 && (t.includes(t0) || t0.includes(t)))
+                    return { rank: it.position || (i + 1), rating: it.rating ?? null, reviews: it.reviews ?? null };
+                }
+                return { rank: null, rating: null, reviews: null };
+              })();
+              const selfRank = me.rank;
+              const rows = active.map(c => {
+                const cPlace = String(c.placeId || '').trim();
+                const cn = _normName(c.name);
+                for (const [i, it] of r.list.entries()) {
+                  if (cPlace && it.place_id && it.place_id === cPlace) return { id: c.id, rank: it.position || (i + 1), rating: it.rating ?? null, reviews: it.reviews ?? null };
+                  const t = _normName(it.title);
+                  if (cn && t && (t.includes(cn) || cn.includes(t))) return { id: c.id, rank: it.position || (i + 1), rating: it.rating ?? null, reviews: it.reviews ?? null };
+                }
+                return { id: c.id, rank: null, rating: null, reviews: null };
+              });
+              const e2 = { date: today, keyword: r.job.kw, self: selfRank, selfRating: me.rating, selfReviews: me.reviews, comps: rows };
+              const dup = hist.findIndex(h => h.date === today && h.keyword === r.job.kw);
+              if (dup >= 0) hist[dup] = e2; else hist.push(e2);
+              touched = true;
+            }
+            if (touched) {
+              while (hist.length > 800) hist.shift();
+              await kvSet(histKey, hist);
+            }
+          }
+        } catch (e) { /* 競合の記録に失敗しても順位計測は通す */ }
       }
       // カーソルはバッチ毎に前進（途中終了しても次回は続きから＝欠測を作らない）
       if (jobs.length) await kvSet('cron_rank_cursor', (_cursor + _processedCount) % jobs.length);
     }
-    // 競合順位(recordCompRanks)はKV往復が多く60秒を圧迫するため、自動計測ループでは呼ばない。
-    // 競合順位は手動計測(fetch-rank)時に記録される。
+    // 競合順位は上の店舗単位ループの中で、同じSERPから追加コストゼロで記録している（2026-10-21）。
+    // 1KWごとにKV往復すると60秒を超えるため、店ごとに読み1回・書き1回にまとめてある。
     const summary = {
       at: new Date().toISOString(), date: today,
       provider: _cronUseSerp ? 'serpapi' : 'dataforseo',
@@ -1069,6 +1522,198 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) { /* メール失敗で本体を落とさない */ }
+    return res.json(summary);
+  }
+
+  // ── 口コミ自動返信のモード切替（'auto' / 'draft' / 'off'）──
+  // 既定は 'draft'（KVに値が無ければ送信しない＝安全側に倒す）。
+  if (action === 'review-autoreply-mode') {
+    if (req.method === 'GET') {
+      return res.json({
+        mode: (await kvGet('review_autoreply_mode')) || 'draft',
+        last: (await kvGet('cron_review_reply_last')) || null,
+        logCount: ((await kvGet('review_reply_log')) || []).length,
+      });
+    }
+    if (req.method === 'POST') {
+      const m = String((req.body || {}).mode || '');
+      if (!['auto', 'draft', 'off'].includes(m)) return res.status(400).json({ error: "mode は auto / draft / off" });
+      await kvSet('review_autoreply_mode', m);
+      return res.json({ success: true, mode: m });
+    }
+  }
+
+  // ── 口コミ返信の下書き一覧（★3以下・ゲート未通過・draftモードのもの）──
+  if (req.method === 'GET' && action === 'review-drafts') {
+    const { storeId } = req.query;
+    if (storeId) return res.json({ drafts: (await kvGet(`review_draft_${storeId}`)) || [] });
+    const managed = await kvGet('managed_locations') || [];
+    const out = [];
+    for (const m of managed) {
+      const sid = String(m.locId || '').replace(/\//g, '_');
+      const d = (await kvGet(`review_draft_${sid}`)) || [];
+      if (d.length) out.push({ store: m.title || sid, storeId: sid, count: d.length, drafts: d.slice(0, 10) });
+    }
+    return res.json({ stores: out, total: out.reduce((a, b) => a + b.count, 0) });
+  }
+
+  // ── 口コミ自動返信（Vercel Cron / launchd から叩く）──
+  // 設計＝MEOシステム/口コミ自動返信_設計_2026-09.md
+  //   ★4-5 … 生成 → 品質ゲート → 自動送信（本文に強いクレームがあれば送らない）
+  //   ★3以下 … 生成（クレームは社長の定型）→ 下書き保存 → 送信しない → 公式LINEで社長と従業員に確認依頼
+  //   （社長叱責 2026-10-06・麻辣王酒場：★1に「ご指摘のとおりです。店として改めます。」と返した。絶対遵守 §1-40）
+  // 停止スイッチ＝KV `review_autoreply_mode`（'auto' / 'draft' / 'off'・既定は 'draft'）
+  if (req.method === 'GET' && action === 'cron-review-reply') {
+    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}` && !access_token && !_c.pw_session) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const mode = (await kvGet('review_autoreply_mode')) || 'draft';
+    if (mode === 'off') return res.json({ skipped: 'review_autoreply_mode=off' });
+
+    // VERCEL_URL は「そのデプロイ固有のURL」で、Vercelの保護が有効だと自分自身への
+    // 内部呼び出しが401になる。安定した本番ドメインを先に使う（2026-09-13・生成が全件空だった原因）。
+    const BASE = (process.env.REDIRECT_URI || '').replace(/\/api\/.*$/, '')
+      || 'https://meo-manager-rho.vercel.app';
+    const masterToken = await getMasterToken();
+    const managed = await kvGet('managed_locations') || [];
+    const sentIds = new Set((await kvGet('review_reply_sent')) || []);
+    const alerted = new Set((await kvGet('review_line_alerted')) || []);   // LINEで確認依頼を送った口コミ
+    const lineQueue = [];
+    const summary = { at: new Date().toISOString(), mode, checked: 0, sent: 0, drafted: 0, skipped: 0, paused: [], failed: [] };
+    const audit = (await kvGet('review_reply_log')) || [];
+    const pausedLids = new Set(((await kvGet('meo_paused_stores')) || []).map(x => x.lid));
+    const companyMap = (await kvGet('store_company')) || {};
+
+    for (const m of managed) {
+      const locationName = m.locationName || '';
+      if (!locationName) continue;
+      const sid = String(m.locId || '').replace(/\//g, '_');
+      // 更新停止中の店は、下書きもLINEも作らずに飛ばす（社長指示 2026-10-06・麻辣王酒場）
+      if (pausedLids.has(_lidOf(sid) || _lidOf(locationName))) { summary.paused.push(m.title || sid); continue; }
+      const token = m.storeId ? (await getAccessToken(m.storeId)) || masterToken : masterToken;
+      if (!token) { summary.skipped++; continue; }
+      try {
+        const rr = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/reviews`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const rd = await rr.json();
+        if (rd.error) { summary.failed.push([m.title, rd.error.message]); continue; }
+        const STAR = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+        const unreplied = (rd.reviews || []).filter(x => !x.reviewReply && !sentIds.has(x.reviewId));
+        summary.checked += unreplied.length;
+
+        // 直近の返信（書き出し重複の判定に使う）
+        const past = (rd.reviews || []).filter(x => x.reviewReply?.comment)
+          .slice(0, 5).map(x => x.reviewReply.comment);
+        const knowledge = (await kvGet(`knowledge_${sid}`)) || {};
+
+        for (const rv of unreplied) {
+          const star = STAR[rv.starRating] || 0;
+          const isPositive = star >= 4;
+          const cls = classifyReview(rv.comment || '', star);
+          try {
+            const g = await fetch(`${BASE}/api/generate-content`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                locationId: sid,
+                type: isPositive ? 'reply_positive' : 'reply_negative',
+                reviewText: rv.comment || '',
+                rating: star,
+                reviewerName: rv.reviewer?.displayName || '',
+                pastReplies: past,
+              }),
+            }).then(r => r.json());
+            const body = String(g.content || '').trim();
+            const gateOk = !g.meta?.gate || g.meta.gate.ok;
+            // 社長指示 2026-10-07「今後全ての口コミに対する返信はグループで確認するようにして」
+            //   ★の数に関係なく、すべての返信を公式LINEのグループで確認してから送る（自動送信はしない）。
+            //   背景＝麻辣王酒場から契約解除の申し入れ（店の確認なしにオーナー名義で返信したため）。
+            const needsHuman = true;
+
+            // すべて下書き保存し、グループで確認してから送る
+            if (needsHuman || !isPositive || !gateOk || mode !== 'auto') {
+              const key = `review_draft_${sid}`;
+              const drafts = (await kvGet(key)) || [];
+              const rec = { reviewId: rv.reviewId, star, name: rv.reviewer?.displayName || '',
+                            review: (rv.comment || '').slice(0, 500), reply: body,
+                            gate: g.meta?.gate || null, at: new Date().toISOString(),
+                            rule: REPLY_RULE, template: !!g.meta?.template, hits: cls.hits,
+                            reason: star <= 3 ? '★3以下（公式LINEのグループで確認）'
+                                  : cls.needsHuman ? '本文にクレームあり（公式LINEのグループで確認）'
+                                  : 'すべての返信はグループで確認（社長指示 2026-10-07）' };
+              const at = drafts.findIndex(d => d.reviewId === rv.reviewId);
+              if (at < 0) {
+                drafts.unshift(rec);
+                if (drafts.length > 50) drafts.length = 50;
+                await kvSet(key, drafts);
+              } else if ((!String(drafts[at].reply || '').trim() && body) || drafts[at].rule !== REPLY_RULE) {
+                // 本文が空の下書きは作り直す。AI生成が落ちた日に空のまま居座り、
+                // 「既にある」判定で二度と埋まらなくなっていた（2026-09-13実測・8件全部が空）。
+                // 旧ルール（2026-10-06より前＝クレームを認める文）で作った下書きも作り直す。
+                drafts[at] = rec;
+                await kvSet(key, drafts);
+              }
+              if (needsHuman && !alerted.has(rv.reviewId)) {
+                lineQueue.push({ reviewId: rv.reviewId, store: m.title, company: companyMap[_lidOf(sid)] || '',
+                                 sid, locationName, star, name: rv.reviewer?.displayName || '',
+                                 date: String(rv.createTime || '').slice(0, 10), review: rv.comment || '', reply: body });
+              }
+              summary.drafted++;
+              if (!body) summary.failed.push([m.title, String(rv.reviewId).slice(0, 12), '生成が空: ' + JSON.stringify(g).slice(0, 180)]);
+              continue;
+            }
+
+            // 自動送信（★4-5・ゲート通過・mode=auto のときだけ）
+            const pr = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/reviews/${rv.reviewId}/reply`, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comment: body }),
+            });
+            const pd = await pr.json();
+            if (pd.error) { summary.failed.push([m.title, rv.reviewId, pd.error.message]); continue; }
+            sentIds.add(rv.reviewId);
+            summary.sent++;
+            audit.unshift({ at: new Date().toISOString(), store: m.title, reviewId: rv.reviewId,
+                            star, reply: body, gate: g.meta?.gate || null });
+            past.unshift(body);
+          } catch (e) { summary.failed.push([m.title, rv.reviewId, e.message]); }
+        }
+      } catch (e) { summary.failed.push([m.title, e.message]); }
+    }
+
+    if (audit.length > 200) audit.length = 200;
+    await kvSet('review_reply_log', audit);
+    await kvSet('review_reply_sent', [...sentIds].slice(-1000));
+
+    // 公式LINEで社長と従業員に確認を依頼（★3以下・クレームを含む口コミ）
+    //   送る「前に」送信済みとして記録する。結果を待ってから記録すると、
+    //   途中で落ちた日に翌日また同じ依頼が届く（2026-09-27 メール42社重複送信の再発防止）。
+    //   グループが未設定のうちは送らず、送信済みにもしない（設定後の実行でまとめて届く）。
+    if (lineQueue.length) {
+      const tg = await lineTarget();
+      if (tg.error) summary.line = { skipped: tg.error, items: lineQueue.length };
+      else {
+        for (const q of lineQueue) alerted.add(q.reviewId);
+        await kvSet('review_line_alerted', [...alerted].slice(-1000));
+        try { summary.line = await pushReviewAlerts(lineQueue); }
+        catch (e) { summary.line = { error: e.message }; }
+      }
+    }
+    await kvSet('cron_review_reply_last', summary);
+
+    // 下書きが出たらメールで知らせる（★3以下は人が読む必要があるため）
+    try {
+      if (summary.drafted > 0 && (await kvGet('notify_review_draft')) !== false) {
+        const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
+        if (to) {
+          await sendMail(to, `【ラクラクMEO】口コミ返信の下書きが${summary.drafted}件あります`,
+            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">確認が必要な口コミ返信があります</h2>` +
+            `<p>自動送信 ${summary.sent}件 / 下書き ${summary.drafted}件（★3以下・ゲート未通過・draftモードのもの）</p>` +
+            `<p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで確認する →</a></p></div>`);
+        }
+      }
+    } catch (e) { /* メール失敗で本体を落とさない */ }
+
     return res.json(summary);
   }
 
@@ -1263,7 +1908,7 @@ export default async function handler(req, res) {
       });
       const top = list.slice(0, 20).map((item, i) => ({ position: item.position || (i + 1), title: item.title, rating: item.rating || null, reviews: item.reviews || null }));
       // ── 競合順位の同時記録（同じ検索結果を使うだけ＝枠を消費しない） ──
-      const comps = storeId ? await recordCompRanks(storeId, keyword, rank, list) : null;
+      const comps = storeId ? await recordCompRanks(storeId, keyword, rank, list, store) : null;
       return res.json({ keyword, location: location || null, rank, matched, found: rank !== null, top, comps, provider: useSerp ? 'serpapi' : 'dataforseo', checkedAt: new Date().toISOString() });
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -1982,8 +2627,16 @@ export default async function handler(req, res) {
     }
     if (!locationName) return res.status(400).json({ error: 'locationName不明' });
     if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    // 停止中の店には投稿しない（麻辣王酒場など・社長指示 2026-10-06）
+    {
+      const lid = _lidOf(b.storeId || locationName);
+      const paused = lid && ((await kvGet('meo_paused_stores')) || []).find(x => x.lid === lid);
+      if (paused) return res.status(423).json({ error: `${paused.title || 'この店舗'}は更新停止中です`, paused: true });
+    }
     const topicType = ['STANDARD', 'EVENT', 'OFFER', 'ALERT'].includes(b.topicType) ? b.topicType : 'STANDARD';
-    const summary = String(b.summary || '').slice(0, 1500);
+    // ★送信口の最終ガード（社長指示 2026-10-07）：絵文字・【見出し】・住所貼付を公開前に除去
+    const { sanitizePostText } = await import('./_post_sanitize.js');
+    const summary = sanitizePostText(b.summary, b.storeName || '').slice(0, 1500);
     if (!summary) return res.status(400).json({ error: 'summary必須' });
 
     const body = { topicType, summary, languageCode: 'ja' };
@@ -2038,6 +2691,263 @@ export default async function handler(req, res) {
   }
 
   // ── GBP現在の店舗情報を取得（カテゴリID付き。更新前の確認用） ──
+  // ── グリッド計測（面で測る） ──
+  // GET /api/admin?action=grid&storeId=xxx&keyword=池袋 整体[&n=5&step=400][&run=1]
+  //   run無し … 保存済みの結果と履歴を返す（無料・読み取りのみ）
+  //   run=1   … 実際に測る。n×n地点ぶんのAPIコールを使うので、必ず見積りを返してから回る。
+  //
+  // なぜ面で測るか：Googleの順位は「関連性・距離・知名度」で決まるとGoogle公式に書いてある。
+  //   距離が入っている以上、検索した人の場所で順位が変わる。1地点では「どこまで届いているか」が出ない。
+  //   米国1,100社・225地点の実測では、自店の場所で1位なのは56%、1マイル離れると平均8位まで落ちる。
+  //
+  // 出すのは2つだけ。SoLV（上位3位に入った地点の割合）と全地点の平均順位。
+  //   他社が出すARP等は計算式が公開されておらず再現できないので使わない。
+  // ★この数字を先方に「順位」として出さない。ズームで変わる。社内で上下の変化を見る用。
+  if (req.method === 'GET' && action === 'grid') {
+    const storeId = req.query.storeId || '';
+    const keyword = String(req.query.keyword || '').trim();
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const histKey = `grid_${storeId}`;
+    const hist = await kvGet(histKey) || [];
+
+    if (req.query.run !== '1') {
+      const forKw = keyword ? hist.filter(h => h.keyword === keyword) : hist;
+      return res.json({ storeId, keyword: keyword || null, count: forKw.length, history: forKw.slice(-24), latest: forKw[forKw.length - 1] || null });
+    }
+    if (!keyword) return res.status(400).json({ error: 'keyword必須' });
+
+    // 格子の大きさ。既定は5×5・400m間隔＝1辺1.6kmの範囲を25地点で見る。
+    const n = Math.min(7, Math.max(3, Number(req.query.n) || 5));
+    const stepM = Math.min(1500, Math.max(100, Number(req.query.step) || 400));
+    const need = n * n;
+
+    // 計測地点の中心＝店の座標。rank_point があればそれ、無ければ住所をgeocode。
+    let center = await kvGet(`rank_point_${storeId}`);
+    if (!center || !Number.isFinite(center.lat)) {
+      const managed = await kvGet('managed_locations') || [];
+      const m = managed.find(x => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+      const g = m ? await geocodeQuery(m.address || m.title || '') : null;
+      if (g) center = { lat: g.lat, lng: g.lng };
+    }
+    if (!center || !Number.isFinite(center.lat)) return res.status(400).json({ error: '計測地点が決まっていません。先に計測地点を設定してください' });
+
+    // ── 費用のガード。回る前に必ず残りを確認する ──
+    const ym2 = new Date().toISOString().slice(0, 7);
+    const provider2 = (process.env.RANK_PROVIDER || 'serpapi').toLowerCase();
+    const useDfs = provider2 === 'dataforseo' && (process.env.DATAFORSEO_B64 || process.env.DATAFORSEO_LOGIN);
+    const limitKey = useDfs ? `dfs_usage_${ym2}` : `serpapi_usage_${ym2}`;
+    const limit = useDfs ? (Math.max(1, parseInt(process.env.DATAFORSEO_MONTHLY_LIMIT, 10) || 5000)) : SERPAPI_LIMIT;
+    let used2 = await kvGet(limitKey) || 0;
+    // グリッドは1回で25コール使う。毎日の順位計測を食い潰さないよう、月枠の3割までに抑える。
+    const gridCap = Math.floor(limit * 0.3);
+    const gridUsedKey = `grid_usage_${ym2}`;
+    const gridUsed = await kvGet(gridUsedKey) || 0;
+    if (gridUsed + need > gridCap)
+      return res.status(429).json({ error: `グリッド計測の今月の枠に達しました（今月${gridUsed}／上限${gridCap}コール）。毎日の順位計測を残すための上限です`, gridUsed, gridCap, need });
+    if (used2 + need > limit)
+      return res.status(429).json({ error: `今月の残りが足りません（残り${Math.max(0, limit - used2)}／必要${need}）`, remaining: Math.max(0, limit - used2), need });
+
+    // n×n の格子を作る。中心が店。
+    const half = (n - 1) / 2;
+    const dLat = stepM / 111320;                                            // 緯度1度 ≒ 111.32km
+    const dLng = stepM / (111320 * Math.cos(center.lat * Math.PI / 180));   // 経度は緯度で縮む
+    const pts = [];
+    for (let r = -half; r <= half; r++) for (let c = -half; c <= half; c++)
+      pts.push({ row: r + half, col: c + half, lat: center.lat + r * dLat, lng: center.lng + c * dLng, distM: Math.round(Math.hypot(r * stepM, c * stepM)) });
+
+    const managed2 = await kvGet('managed_locations') || [];
+    const mm = managed2.find(x => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+    const selfName = String(req.query.store || (mm && mm.title) || '');
+    const target = _normName(selfName);
+    const results = [];
+    let calls = 0;
+    // 5地点ずつ。1回の関数実行が60秒を超えないようにする。
+    for (let i = 0; i < pts.length; i += 5) {
+      const chunk = pts.slice(i, i + 5);
+      const rs = await Promise.all(chunk.map(async (pt) => {
+        try {
+          const { list, error, calls: c } = await fetchLocalResults(keyword, { ll: `${pt.lat},${pt.lng},14z` });
+          return { pt, list, error, c: c || 0 };
+        } catch (e) { return { pt, error: e.message, c: 1 }; }
+      }));
+      for (const r of rs) {
+        calls += r.c;
+        if (r.error) { results.push({ ...r.pt, rank: null, error: r.error }); continue; }
+        let rank = null;
+        (r.list || []).forEach((item, idx) => {
+          if (rank) return;
+          const t = _normName(item.title);
+          if (t && target && (t.includes(target) || target.includes(t))) rank = item.position || (idx + 1);
+        });
+        results.push({ ...r.pt, rank, total: (r.list || []).length });
+      }
+    }
+    if (calls) used2 = await kvIncrBy(limitKey, calls);
+    await kvIncrBy(gridUsedKey, calls);
+
+    const got = results.filter(x => !x.error);
+    const ranked = got.filter(x => Number.isFinite(x.rank));
+    const rec = {
+      date: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10),
+      keyword, grid: { n, stepM, zoom: 14 }, center,
+      // SoLV＝上位3位に入った地点の割合。面でどこまで届いているかを1つの数字にしたもの。
+      solv3: got.length ? Number((ranked.filter(x => x.rank <= 3).length / got.length * 100).toFixed(1)) : null,
+      top10Pct: got.length ? Number((ranked.filter(x => x.rank <= 10).length / got.length * 100).toFixed(1)) : null,
+      avgRank: ranked.length ? Number((ranked.reduce((s2, x) => s2 + x.rank, 0) / ranked.length).toFixed(1)) : null,
+      measured: got.length, failed: results.length - got.length, calls,
+      results,
+    };
+    hist.push(rec);
+    while (hist.length > 48) hist.shift();
+    await kvSet(histKey, hist);
+    // 同じキーワードの前回と比べる（上下が分かるようにする）
+    const same = hist.filter(h => h.keyword === keyword);
+    const prev = same.length > 1 ? same[same.length - 2] : null;
+    return res.json({
+      storeId, ...rec,
+      prev: prev ? { date: prev.date, solv3: prev.solv3, avgRank: prev.avgRank } : null,
+      monthUsed: (await kvGet(gridUsedKey)) || calls, monthCap: gridCap,
+      note: 'この数字を先方に順位として出さない。ズームで変わるため、社内で上下を見る用',
+    });
+  }
+
+  // ── GBPの実績（表示・電話・ルート・サイト。読み取りのみ） ──
+  // GET /api/admin?action=performance&storeId=xxx[&months=6]
+  // Googleが返す実数だけを出す。順位と違ってズームや地点で変わらないので、先方に出せるのはこちら。
+  // 前年同期比も返す。季節の波を効果と取り違えないため、比べるのは常に前年の同じ期間。
+  if (req.method === 'GET' && action === 'performance') {
+    const storeId = req.query.storeId || '';
+    const managed = await kvGet('managed_locations') || [];
+    const m = managed.find((x) => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+    const name = req.query.locationName || (m && (m.locId || m.locationName)) || '';
+    const lid = String(name).match(/locations\/([^/]+)/)?.[1];
+    if (!lid) return res.status(400).json({ error: 'storeId か locationName が必要' });
+    const token = (m && m.storeId ? (await getAccessToken(m.storeId)) : null) || await getMasterToken();
+    if (!token) return res.status(401).json({ error: 'GBP未連携' });
+    const perf = await fetchPerf(lid, token);
+    const MAPS = ['BUSINESS_IMPRESSIONS_DESKTOP_MAPS', 'BUSINESS_IMPRESSIONS_MOBILE_MAPS'];
+    const SRCH = ['BUSINESS_IMPRESSIONS_DESKTOP_SEARCH', 'BUSINESS_IMPRESSIONS_MOBILE_SEARCH'];
+    const sum = (a, b, keys) => Object.entries(perf.daily || {})
+      .filter(([d]) => d >= a && d <= b)
+      .reduce((s2, [, v]) => s2 + keys.reduce((t, k) => t + (v[k] || 0), 0), 0);
+    const back = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const months = Math.min(18, Math.max(1, Number(req.query.months) || 6));
+    const A = back(months * 30 + 14), B = back(14);   // 直近14日はGoogleの集計が遅れるので外す
+    const ly = (d) => `${Number(d.slice(0, 4)) - 1}${d.slice(4)}`;
+    const pack = (keys) => {
+      const now = sum(A, B, keys), prev = sum(ly(A), ly(B), keys);
+      // 母数が小さいと率が暴れる。前年が30未満のときは率を出さない。
+      return { now, lastYear: prev, yoyPct: prev >= 30 ? Number(((now / prev - 1) * 100).toFixed(1)) : null };
+    };
+    // 月ごとの推移（グラフ用）
+    const monthly = {};
+    for (const [d, v] of Object.entries(perf.daily || {})) {
+      const ym = d.slice(0, 7);
+      const t = (monthly[ym] = monthly[ym] || { maps: 0, search: 0, calls: 0, directions: 0, website: 0 });
+      t.maps += MAPS.reduce((s2, k) => s2 + (v[k] || 0), 0);
+      t.search += SRCH.reduce((s2, k) => s2 + (v[k] || 0), 0);
+      t.calls += v.CALL_CLICKS || 0;
+      t.directions += v.BUSINESS_DIRECTION_REQUESTS || 0;
+      t.website += v.WEBSITE_CLICKS || 0;
+    }
+    return res.json({
+      storeId, locationName: name, period: { from: A, to: B, months },
+      maps: pack(MAPS), search: pack(SRCH),
+      calls: pack(['CALL_CLICKS']), directions: pack(['BUSINESS_DIRECTION_REQUESTS']), website: pack(['WEBSITE_CLICKS']),
+      actions: pack(['CALL_CLICKS', 'BUSINESS_DIRECTION_REQUESTS', 'WEBSITE_CLICKS']),
+      monthly: Object.fromEntries(Object.entries(monthly).sort()),
+      note: '直近14日はGoogleの集計が遅れるため除いてある。前年の実数が30未満の指標は率を出さない',
+    });
+  }
+
+  // ── 競合との差（読み取りのみ・追加APIコストなし） ──
+  // GET /api/admin?action=comp-gap&storeId=xxx
+  // 順位を測ったときに同じSERPから拾っておいた競合の評価・口コミ数と、自店を並べる。
+  // 出すもの：自店の順位と、上に居る競合が何を持っているか。「あとどれだけ足せば並ぶか」。
+  // ★「これを足せば上がる」とは言えない（相関であって因果ではない）。差を数字で見せるまで。
+  if (req.method === 'GET' && action === 'comp-gap') {
+    const storeId = req.query.storeId || '';
+    if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+    const comps = await kvGet(`competitors_${storeId}`) || [];
+    const hist = await kvGet(`comp_history_${storeId}`) || [];
+    if (!hist.length) return res.json({ storeId, keywords: [], note: '競合の記録がまだありません。順位計測が1回走ると記録されます' });
+    const nameOf = Object.fromEntries(comps.map(c => [c.id, c.name]));
+    // キーワードごとに最新の記録を取る
+    const latest = {};
+    for (const h of hist) {
+      if (!latest[h.keyword] || h.date > latest[h.keyword].date) latest[h.keyword] = h;
+    }
+    const out = Object.values(latest).map(h => {
+      const rows = (h.comps || [])
+        .filter(c => c.rank != null)
+        .map(c => ({ name: nameOf[c.id] || c.id, rank: c.rank, rating: c.rating, reviews: c.reviews }))
+        .sort((a, b) => a.rank - b.rank);
+      // 自店より上に居る競合だけを「追う相手」として見る
+      const above = h.self != null ? rows.filter(r => r.rank < h.self) : rows;
+      const nums = (k) => above.map(r => r[k]).filter(v => Number.isFinite(v));
+      const med = (a) => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+      const medRv = med(nums('reviews')), medRt = med(nums('rating'));
+      return {
+        keyword: h.keyword, date: h.date,
+        self: { rank: h.self, rating: h.selfRating ?? null, reviews: h.selfReviews ?? null },
+        above: above.length,
+        competitors: rows,
+        gap: {
+          // 自店より上に居る店の中央値との差。足りない分だけを出す（既に上回っていたら0）
+          reviews: (medRv != null && Number.isFinite(h.selfReviews)) ? Math.max(0, medRv - h.selfReviews) : null,
+          reviewsMedianAbove: medRv,
+          rating: (medRt != null && Number.isFinite(h.selfRating)) ? Number((medRt - h.selfRating).toFixed(2)) : null,
+          ratingMedianAbove: medRt,
+        },
+      };
+    }).sort((a, b) => (a.self.rank ?? 999) - (b.self.rank ?? 999));
+    return res.json({ storeId, competitors: comps.length, autoRegistered: comps.filter(c => c.source === 'auto').length, keywords: out });
+  }
+
+  // ── 店舗診断（cantik独自の採点・読み取りのみ） ──
+  // GET /api/admin?action=shindan&storeId=xxx       … 1店を採点
+  // GET /api/admin?action=shindan&all=1             … 管理下の全店を採点（点の低い順＝穴の大きい順）
+  // 採点の中身と根拠は api/_shindan.js。正本＝MEOシステム/ラクラクMEO_アルゴリズム.md。
+  // Googleにも設定にも一切書き込まない。
+  if (req.method === 'GET' && action === 'shindan') {
+    const masterToken = await getMasterToken();
+    if (!masterToken) return res.status(401).json({ error: 'GBP未連携' });
+    const managed = await kvGet('managed_locations') || [];
+    const tokenFor = async (m) => (m && m.storeId ? (await getAccessToken(m.storeId)) || masterToken : masterToken);
+
+    if (req.query.all === '1') {
+      // 全店。1店あたり数本のAPIを叩くので3店ずつ流す（GBP APIの流量制限に当てない）。
+      const out = [];
+      for (let i = 0; i < managed.length; i += 3) {
+        const chunk = managed.slice(i, i + 3);
+        const got = await Promise.all(chunk.map(async (m) => {
+          const name = m.locId || m.locationName || '';
+          try {
+            const r = await shindanOne(name, await tokenFor(m), { withPerf: true });
+            return r.error ? { title: m.title, locationName: name, error: r.error } : r;
+          } catch (e) { return { title: m.title, locationName: name, error: e.message }; }
+        }));
+        out.push(...got);
+      }
+      const ok = out.filter((x) => !x.error).sort((a, b) => a.score - b.score);
+      const ng = out.filter((x) => x.error);
+      // 全店に共通する穴＝半分以上の店で出ている指摘。ここが施策の優先順位になる。
+      const tally = {};
+      for (const r of ok) for (const it of r.items) tally[it.msg.replace(/（.*/, '')] = (tally[it.msg.replace(/（.*/, '')] || 0) + 1;
+      const common = Object.entries(tally).filter(([, n]) => n >= Math.ceil(ok.length / 2))
+        .sort((a, b) => b[1] - a[1]).map(([msg, n]) => ({ msg, stores: n }));
+      return res.json({ at: new Date().toISOString(), stores: ok.length, failed: ng, common, results: ok });
+    }
+
+    const storeId = req.query.storeId || '';
+    let m = managed.find((x) => String(x.locId || '').replace(/\//g, '_') === storeId || x.storeId === storeId);
+    const name = req.query.locationName || (m && (m.locId || m.locationName)) || '';
+    if (!name) return res.status(400).json({ error: 'storeId か locationName が必要' });
+    const r = await shindanOne(name, await tokenFor(m), { withPerf: req.query.perf !== '0' });
+    if (r.error) return res.status(502).json(r);
+    return res.json({ at: new Date().toISOString(), ...r });
+  }
+
   if (req.method === 'GET' && action === 'gbp-get') {
     const storeId = req.query.storeId;
     let locationName = req.query.locationName || '';
@@ -2055,11 +2965,22 @@ export default async function handler(req, res) {
       // ★重要: クチコミはリスティングが停止中・未公開でもAPIには残るため、「クチコミがある＝公開されている」ではない。
       //   公開されているかは metadata.hasVoiceOfMerchant（＝掲載資格あり）と openInfo.status で判定する。
       //   duplicateLocation が入っていれば重複として抑制されている。
-      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,categories,phoneNumbers,websiteUri,profile,metadata,openInfo,serviceArea,storefrontAddress,labels`, { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${locPart}?readMask=title,categories,phoneNumbers,websiteUri,profile,metadata,openInfo,serviceArea,storefrontAddress,labels,regularHours`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       if (d.error) return res.status(502).json({ error: d.error.message || 'GBP取得失敗', code: d.error.code });
       const pc = d.categories?.primaryCategory;
       const ac = d.categories?.additionalCategories || [];
+      // 営業時間を「MON 11:00-15:00,17:00-22:00」形式に整形（MEO投稿・素材まとめ用）
+      const _DAYJ = { MONDAY: '月', TUESDAY: '火', WEDNESDAY: '水', THURSDAY: '木', FRIDAY: '金', SATURDAY: '土', SUNDAY: '日' };
+      const _hm = (t) => t ? `${String(t.hours || 0).padStart(2, '0')}:${String(t.minutes || 0).padStart(2, '0')}` : '';
+      const _hoursByDay = {};
+      for (const p of (d.regularHours?.periods || [])) {
+        const dj = _DAYJ[p.openDay] || p.openDay;
+        (_hoursByDay[dj] = _hoursByDay[dj] || []).push(`${_hm(p.openTime)}-${_hm(p.closeTime)}`);
+      }
+      const hours = ['月', '火', '水', '木', '金', '土', '日'].map(dj => _hoursByDay[dj] ? `${dj} ${_hoursByDay[dj].join(',')}` : `${dj} 休`).join(' / ');
+      const addressLines = (d.storefrontAddress?.addressLines || []).join(' ');
+      const postalCode = d.storefrontAddress?.postalCode || '';
       // descriptionは本文も返す（登録済みの説明文を監査＝事実誤りや景表法NGの点検に必要。hasDescriptionだけでは中身を照合できない）
       return res.json({ title: d.title, websiteUri: d.websiteUri || '', phone: d.phoneNumbers?.primaryPhone || '', hasDescription: !!(d.profile && d.profile.description),
         description: (d.profile && d.profile.description) || '',
@@ -2077,6 +2998,7 @@ export default async function handler(req, res) {
         serviceAreaPlaces: ((d.serviceArea && d.serviceArea.places && d.serviceArea.places.placeInfos) || []).length,
         // 一覧も返す（絞り込みには placeId が必要。既存のIDをそのまま再利用するのが安全）
         serviceAreaList: ((d.serviceArea && d.serviceArea.places && d.serviceArea.places.placeInfos) || []).map(p => ({ placeName: p.placeName, placeId: p.placeId })),
+        hours, addressLines, postalCode,
         metadataRaw: d.metadata || null });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }

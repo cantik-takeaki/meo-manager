@@ -1,5 +1,7 @@
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
 import { kvGet } from './_kv.js';
+import { getMasterToken } from './_tokens.js';
+import { classifyReview, complaintTemplate, findAffirm, findUnsupported, findEffectClaims, findRebuttal } from './_review_safety.js';
 
 // 生成モデル（既定はllama-3.3-70b。GEMINI_API_KEYがあればGemini優先＝日本語の質が上がる）
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -7,34 +9,93 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // 生成の共通呼び出し。GEMINI_API_KEYがあればGemini（高品質）、無ければ/失敗時はGroq(llama-3.3-70b)にフォールバック。
 // 返り値は本文テキスト（トリム済み）。既存の呼び出し側はJSONを indexOf('{') 抽出しているのでプロバイダ差を吸収できる。
+// 失敗した理由を残す。以前は全部 catch で握りつぶしていたため、画面には
+// 「AI生成失敗」としか出ず、Geminiの枠切れなのかGroqのモデル廃止なのか分からなかった。
+// 2026-09-13に口コミ自動返信が全件空になった原因調査で、type別ではなく
+// 「同じtypeが成功したり失敗したりする」＝一時的な失敗と判明したので、再試行と多段フォールバックを入れる。
+// ※キーとURLは絶対にこの文字列へ入れない（レスポンスに出るため）。
+let LAST_LLM_ERROR = '';
+let GEMINI_DOWN_UNTIL = 0; // 枠切れを踏んだ時刻＋10分。この間はGeminiを飛ばす
+let LAST_LLM_VIA = '';   // 実際に answer を返したモデル名（どっちで動いているかを画面で確認できるように）
+function llmLastVia() { return LAST_LLM_VIA; }
+function llmLastError() { return LAST_LLM_ERROR; }
+
+const GEMINI_FALLBACKS = [GEMINI_MODEL, 'gemini-2.5-flash-lite'];
+// 2026-09-13実測：このGroqキーでは llama-3.3-70b-versatile も llama-3.1-8b-instant も
+// 「does not exist or you do not have access」。既定モデルが死んでいたので
+// フォールバックが一度も成立せず、Geminiの枠が切れた瞬間に全滅していた。
+const GROQ_FALLBACKS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'moonshotai/kimi-k2-instruct',
+  'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b', 'gemma2-9b-it', GROQ_MODEL];
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9 } = {}) {
+  LAST_LLM_ERROR = '';
+  LAST_LLM_VIA = '';
+  const reasons = [];
   const GEMINI = process.env.GEMINI_API_KEY;
-  if (GEMINI) {
+  // 枠切れ（quota exceeded）は引き直しても無駄。1回当たったらしばらくGeminiを飛ばす。
+  // 飛ばさないと1件あたり4回の無駄打ち＋待ちが入り、口コミ8件でcronの60秒上限を超えて
+  // 途中で切れる（2026-09-13実測：8件中3件しか本文が入らなかった）。
+  const geminiDown = Date.now() < GEMINI_DOWN_UNTIL;
+  if (geminiDown) reasons.push('gemini:枠切れのため一時停止中');
+  if (GEMINI && !geminiDown) {
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      // thinkingBudget:0 で思考トークン消費を止め、空応答と遅延を回避（flash/lite両対応）
+      generationConfig: { maxOutputTokens: maxTokens, temperature, topP, thinkingConfig: { thinkingBudget: 0 } },
+    };
+    outer:
+    for (const model of GEMINI_FALLBACKS) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          });
+          const d = await r.json();
+          const text = (d?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+          if (text) { LAST_LLM_VIA = 'gemini:' + model; return text; }
+          const why = String(d?.error?.message || d?.promptFeedback?.blockReason
+            || d?.candidates?.[0]?.finishReason || `empty(${r.status})`);
+          reasons.push(`gemini:${model}:${why.slice(0, 80)}`);
+          if (/quota|exceeded|billing/i.test(why)) { GEMINI_DOWN_UNTIL = Date.now() + 10 * 60 * 1000; break outer; }
+          if (r.status === 503) { await _sleep(800); continue; }
+          break; // 一時的でない理由なら次のモデルへ
+        } catch (e) {
+          reasons.push(`gemini:${model}:${String(e.message).slice(0, 60)}`);
+          await _sleep(400);
+        }
+      }
+    }
+  } else if (!GEMINI) {
+    reasons.push('gemini:キー未設定');
+  }
+
+  const GROQ = process.env.GROQ_API_KEY;
+  if (!GROQ) { reasons.push('groq:キー未設定'); LAST_LLM_ERROR = reasons.join(' / '); return ''; }
+  for (const model of GROQ_FALLBACKS) {
     try {
-      const body = {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        // thinkingBudget:0 で思考トークン消費を止め、空応答と遅延を回避（flash/lite両対応）
-        generationConfig: { maxOutputTokens: maxTokens, temperature, topP, thinkingConfig: { thinkingBudget: 0 } },
+      // gpt-oss系は思考トークンを先に使うので、max_tokensが小さいと本文が空のまま返る。
+      // reasoning_effort=low と上乗せした枠で本文を出させる。
+      const isOss = /gpt-oss/.test(model);
+      const payload = {
+        model, messages: [{ role: 'user', content: prompt }],
+        max_tokens: isOss ? Math.max(maxTokens, 1200) : maxTokens,
+        temperature, top_p: topP,
       };
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      if (isOss) payload.reasoning_effort = 'low';
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST', headers: { Authorization: `Bearer ${GROQ}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const d = await r.json();
-      const text = (d?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-      if (text) return text;
-      // Geminiが空/エラー時はGroqへフォールスルー
-    } catch (e) { /* Groqにフォールバック */ }
+      const text = (d.choices?.[0]?.message?.content || '').trim();
+      if (text) { LAST_LLM_VIA = 'groq:' + model; return text; }
+      const fin = d.choices?.[0]?.finish_reason || '';
+      reasons.push(`groq:${model}:${String(d?.error?.message || (r.status + (fin ? '/' + fin : '/empty'))).slice(0, 80)}`);
+    } catch (e) { reasons.push(`groq:${model}:${String(e.message).slice(0, 60)}`); }
   }
-  const GROQ = process.env.GROQ_API_KEY;
-  if (!GROQ) return '';
-  try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST', headers: { Authorization: `Bearer ${GROQ}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: GROQ_MODEL, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature, top_p: topP }),
-    });
-    const d = await r.json();
-    return (d.choices?.[0]?.message?.content || '').trim();
-  } catch (e) { return ''; }
+  LAST_LLM_ERROR = reasons.join(' / ');
+  return '';
 }
 
 // SEO記事のプレーンテキスト（区切り記号形式）を構造化。JSONより多行本文に強く壊れにくい。
@@ -104,10 +165,9 @@ export default async function handler(req, res) {
   const humanTone = pastReplies.length
     ? `過去の返信例${pastReplies.length}件の句読点・一文の長さ・語尾・言い回しのクセを最優先で真似る。読点「、」を1文に詰め込みすぎない。全部の文を同じ長さ・同じ形にしない。いかにもAIが書いた"整いすぎた模範解答"にせず、その店のスタッフが実際に手で打ったような、少し崩れた自然さ・体温のある文にする。`
     : '読点「、」を機械的に多用しない（1文に詰め込まない）。一文は短めに区切り、文の長さと語尾（です／ます／ました 等）に変化をつける。「この度は」「誠に」「〜させていただきます」などのテンプレ表現を並べない。教科書的な整いすぎた文でなく、実際のスタッフが手で打ったような自然な口調にする。';
-  // 絵文字・！などの記号は「その店の過去返信に合わせる」のが最も人間らしい（一律禁止だと逆に硬くAIっぽい）
-  const symbolRule = pastReplies.length
-    ? '絵文字や「！」などの記号は、過去の返信例で使われていれば同じくらいの頻度で使い、使われていなければ使わない。過去例に合わせる。'
-    : '絵文字・顔文字は使わない。「！」は多くても1つまで（多用しない）。';
+  // 絵文字は過去の返信に何があっても使わない（cantik全社ルール §1-1。社長叱責 2026-10-06「返信に絵文字入れるな」）。
+  //   旧版は「過去の返信で使われていれば同じくらい使う」と指示していた（最終ゲートで消してはいたが指示自体が違反）。
+  const symbolRule = '絵文字・顔文字は使わない（過去の返信に絵文字があっても真似しない）。「！」は多くても1つまで（多用しない）。';
   const replyTone = req.body.tone || 'polite';
   const toneGuide = ({
     polite: '丁寧でプロフェッショナルなトーン。落ち着いた敬語で、きちんとしつつ読みやすく。',
@@ -183,7 +243,7 @@ ${_geoHint ? `【この店の地域】${_geoHint}\n` : ''}→ 織り込みの狙
   // MEOで“評価される文章”にするための評価ルーブリック（公開コンテンツ系typeに付与）
   const _meoBoost = `\n\n【MEOで評価される文章にするための必須ルール（この基準で自己採点してから出力）】
 1. 検索意図に直答: 読み手が知りたいこと（何を・誰に・どんな時・どこで・いくら位）に具体的に答える。抽象的な美辞麗句・当たり障りのない一般論・「〜な方はぜひ」の連発は禁止。
-2. 地域×業種を前方に: 冒頭1〜2文（または見出し）に「地域名＋業種」を自然に置く。近接性シグナルとして市区町村・最寄り駅・対応エリアを本文に具体的に出す。
+2. 地域×業種は"文章の中"に自然に: 冒頭の1〜2文の中で、地域名＋業種が自然に出てくる形にする（近接性シグナル）。ただし「〇〇で△△をお探しの方へ」という定型の呼びかけで始めない。具体的な場面・メニュー・出来事から書き出し、その流れで地域名と業種が入るようにする。
 3. 実在感・E-E-A-T: 実際に営業している店だと伝わる“固有の具体”（提供内容・こだわり・対象者・利用シーン・実績の範囲）を最低1つ。固有名詞や具体で手触りを出す（ただし捏造・誇張は厳禁）。
 4. 独自性: 他店にも当てはまる汎用文にしない。この店だけの強み・違いを最低1点は明確に書く。
 5. 自然さと可読性: 対策語は意味が通る形で“結果的に含まれる”状態。羅列・詰め込み・不自然な反復は減点。1文を長くしすぎない。
@@ -212,7 +272,7 @@ ${_geoHint ? `【この店の地域】${_geoHint}\n` : ''}→ 織り込みの狙
       cta = 'ご来店・テイクアウト';
     }
     if (!g) return '';
-    return `\n\n【この業種で"上位が実際にやっている"投稿の型（これに沿って書く）】\n${g}\n・冒頭に「地域名＋業種（＋今回のテーマ語）」を置く。1投稿1テーマ。写真前提で、写真では伝わらない情報（価格/所要/期間/対象/場所）を文で補う。\n・この業種の自然な行動導線は「${cta}」。`;
+    return `\n\n【この業種で"上位が実際にやっている"投稿の型（これに沿って書く）】\n${g}\n・1投稿1テーマ。写真前提で、写真では伝わらない情報（価格/所要/期間/対象/場所）を文で補う。地域名と業種は書き出しの文章の流れの中で自然に出す（定型の呼びかけで始めない）。\n・この業種の自然な行動導線は「${cta}」。`;
   };
 
   // ★Googleコンテンツポリシー（成人向けの誤検知）回避：リラク/整体/マッサージ/エステ系や
@@ -485,6 +545,33 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
 
   // ナレッジ取得
   const knowledge = await kvGet(`knowledge_${locationId}`) || {};
+
+  // ★業種が空のまま生成すると、別業種の文面が出る（2026-10-27・中国家庭料理 春夏冬で
+  //   マッサージの口コミ下書きが生成された。原因は knowledge が丸ごと未登録で category が空だったこと）。
+  //   knowledge → 改ざん検知の正規情報 → GBPのカテゴリ の順で必ず業種を埋める。
+  //   GBPのカテゴリは必須項目なので、連携できていれば必ず取れる。
+  if (!knowledge.category) {
+    try {
+      const _st = await kvGet(`settings_${locationId}`);
+      if (_st && _st.info && _st.info.category) knowledge.category = _st.info.category;
+    } catch {}
+  }
+  if (!knowledge.category) {
+    try {
+      const _managed = await kvGet('managed_locations') || [];
+      const _m = _managed.find(x => String(x.locId || x.locationName || '').replace(/\//g, '_') === locationId);
+      const _loc = String((_m && (_m.locId || _m.locationName)) || '').match(/locations\/[^/]+/);
+      const _tok = _loc ? await getMasterToken() : null;
+      if (_loc && _tok) {
+        const _r = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${_loc[0]}?readMask=title,categories`,
+          { headers: { Authorization: `Bearer ${_tok}` } });
+        const _d = await _r.json();
+        const _c = _d && _d.categories && _d.categories.primaryCategory;
+        if (_c && _c.displayName) knowledge.category = _c.displayName;
+        if (!knowledge.storeName && _d && _d.title) knowledge.storeName = _d.title;
+      }
+    } catch {}
+  }
   const storeName = knowledge.storeName || '当店';
   const keywords = (knowledge.keywords || []).filter(Boolean);
   const strengths = knowledge.strengths || '';
@@ -514,9 +601,35 @@ JSON以外は一切出力しない。${seoWeave ? seoWeave + '\n※上記の対�
   const _foreignReplyPrompt = (sentiment) => `You are the owner/staff of "${storeName}"${knowledge.category ? ' (' + knowledge.category + ')' : ''}. A customer left the following review. Write a warm, polite reply.
 
 Review: ${reviewText}
-${sentiment === 'negative' ? 'This is a low rating. Sincerely apologize for the specific point the customer was unhappy about, explain how you will improve (only realistically), and invite them to give another chance. Do not make excuses or shift blame.' : 'This is a high rating. Thank them, mention the specific thing they praised, and warmly invite them back.'}
+${sentiment === 'negative' ? 'This is a low rating. Write EXACTLY these 4 sentences, each on its own line, translated naturally into the review language (this is the owner-approved template; do not add anything else): (1) "Thank you for visiting us." (2) "We are sorry that [the points the customer was unhappy about, summarized in neutral words] did not meet your expectations." (3) "We will share your feedback within our team and review [those points]." (4) "Thank you for taking the time to share your feedback." Never state or admit that their claims are true, never repeat insults, never mention store details, never promise specific changes.' : 'This is a high rating. Thank them for visiting and for the specific thing they praised, using their own words. If they also mentioned a concern, add one sentence that you will share their feedback within the team and review it, without admitting it is true. Do NOT mention store details (menu, prices, hours, access, adjustments), and do not assume whether they are a first-time or regular customer unless they said so.'}
 
-CRITICAL: Write the ENTIRE reply in ${_lang.en}. Do NOT use any Japanese. Match the customer's language exactly. 100-180 words. Only mention facts stated in the review; do not invent details. Output only the reply text (no labels, no explanations).`;
+CRITICAL rules:
+- Write the ENTIRE reply in ${_lang.en}. Do NOT use any Japanese. Match the customer's language exactly.
+- ${sentiment === 'negative' ? '25 to 80 words in total.' : '55 to 110 words in total. Shorter is better than padded.'}
+- ${sentiment === 'negative' ? 'Exactly 4 lines as specified above.' : 'Exactly 2 or 3 short paragraphs separated by a blank line.'}
+- ${sentiment === 'negative' ? 'Open with the template sentence (1).' : 'Do NOT open with "Thank you", "Thanks", "We are glad" or "Dear". Open by reacting to the specific thing the customer wrote.'}
+- Say "thank" at most twice in the whole reply.
+- No guarantees, no "cure", no "100%", no "No.1", no "best in Japan".
+- Only mention facts stated in the review; do not invent details.
+- Output only the reply text (no labels, no explanations).`;
+
+  // ── 口コミの判定（社長叱責 2026-10-06・麻辣王酒場／絶対遵守 §1-40）──
+  //   ★3以下と、★4-5でも強いクレームがあるものは needsHuman（cronは自動送信せず公式LINEで確認依頼）。
+  //   文面は社長が選んだB案（下の reply_negative）。
+  const _isReply = type === 'reply_positive' || type === 'reply_negative';
+  const _star = Number(rating) || (type === 'reply_positive' ? 5 : 1);
+  const _cls = _isReply ? classifyReview(reviewText, _star) : null;
+  // 星だけ（本文なし）の口コミはAIに書かせない（社長叱責 2026-10-07・§1-42）
+  //   本文が無いのに「お好み焼きにご満足いただけたとのこと」と、お客様が書いていない事を作った（本番の生成で確認）。
+  //   中身に触れない短い定型で返す。★3以下は「ご期待に沿えず」の安全な型。
+  if (_isReply && !String(reviewText || '').trim()) {
+    const { verb } = bizPhrasing(knowledge.category, storeName);
+    const content = _star <= 3
+      ? complaintTemplate(verb, 'Japanese')
+      : `この度は${verb}いただき、ありがとうございました。\n評価をお寄せいただき、嬉しく思います。\nまたのお越しをお待ちしております。`;
+    return res.json({ content, meta: { template: true, starOnly: true, needsHuman: true,
+      gate: { ok: true, failed: [], len: content.replace(/\s/g, '').length }, via: 'template' } });
+  }
 
   if (type === 'reply_positive' && !_reviewIsJa) { prompt = _foreignReplyPrompt('positive'); }
   else if (type === 'reply_positive') {
@@ -525,55 +638,98 @@ CRITICAL: Write the ENTIRE reply in ${_lang.en}. Do NOT use any Japanese. Match 
 
 【お店】${storeName}${knowledge.category ? '（' + knowledge.category + '）' : ''}
 【口コミ本文】${reviewText}
-【店舗の強み・特徴】${strengths}
-【提供サービス・商品】${services}
+（※店の情報はあえて渡していません。返信は口コミに書かれた事にだけ応えます。社長指示 2026-10-07）
 
 【トーン】${toneGuide}
 【来店時期の扱い】${timeGuide}
 
 【返信の構成（この3ブロックを必ず守る・ブロック間は空行で区切る）】
-1行目（1ブロック目）：「お世話になっております。」だけ。
-2ブロック目：この度は${verb}いただき、誠にありがとうございました。＋口コミを投稿してくれたことへのお礼（例：また、嬉しいお言葉／温かい口コミをご投稿いただきありがとうございます）。
-3ブロック目：口コミ本文で実際に褒められた具体的な点を1つ拾ってそれに触れ「〜についてお褒めいただき（／ご満足いただけたとのことで）、大変嬉しく思います」と受ける → 今後の姿勢を一言（例：今後も〜できるよう努めてまいります）→ 締めの一文「${close}」。
+1ブロック目：**口コミに書かれた具体的な一点への反応を1文**（例「足が軽くなったと感じていただけて何よりでした。」）。
+  定型の挨拶で始めない。「お世話になっております」「ありがとうございます」で書き出さない。
+2ブロック目：相手が書いた体験に、もう一言だけ触れる（1文）。
+  口コミに書かれていない事（店のメニュー・価格・営業時間・アクセス・ランチやコース・できる事や対応・今後の約束）は書かない。
+3ブロック目：お礼と次回への一言（1〜2文）。
+  **締めは毎回変える。** 「またのご来店を心よりお待ちしております」を毎回使わない
+  （実測：3回生成して3回とも同じ締めになった。並べると同じ終わり方が続いて機械的に見える）。
+  口コミの内容に合わせて選ぶ。例＝またお立ち寄りください／${storeName.length < 12 ? storeName : '当店'}でお待ちしています／
+  お時間ができたときにどうぞ。
 
 【厳守】
-- 上記の「お世話になっております。」で必ず始め、3ブロックを空行で区切る。全体で150〜240文字程度。です・ます調。
+- 3ブロックを空行で区切る。**全体は必ず130文字以内**（実測：指示が緩いと156字になった）。
+  各ブロックは1〜2文まで。3文以上にしない。
+- **冗長な敬語を使わない。** 「大変嬉しく思います」「何よりでございました」「〜であれば幸いです」
+  「心よりお待ちしております」のような重ねた敬語は1つの返信に1回まで。短い言い方に置き換える。
+- **店名を鍵括弧や引用符で囲まない**（「〇〇」を思い出して…のような書き方はしない）。
+- **ブロックの間には必ず空行を1つ入れる。空行が1つも無い返信は不可**（実測：指示だけでは守られず1段落で出た）。
+- **常体にしない。** 「光栄だ」「揉みほぐした」「来店を待つ」のような言い切りは不可。必ず です・ます で終える。
+
+【出力の見本（この形と長さに寄せる。内容は口コミに合わせて変える）】
+口コミ「足裏マッサージは心地よい刺激でクセになりそうです。終わった後は足が軽くなり」に対して：
+
+足裏の刺激を心地よく感じていただけたようで安心しました。
+
+足裏は強すぎても弱すぎても物足りなくなる場所です。
+帰り道に足が軽いと感じていただけたのが何よりです。
+
+嬉しいお言葉をありがとうございました。
+またお立ち寄りください。
+
+（↑ 空行で3ブロック・全体109字・文末が「しました／です／何よりです／ございました／ください」と揃っていない）
+- **改行は句点「。」の後だけ。読点「、」で行を折らない**（読点で改行するとAIが書いた文に見える。社長指摘 2026-09-04）
+- **文末を「です」で揃えない**。〜しました／〜ます／〜でした／〜ください を混ぜる。「です。」が3回続いたら書き直す
+- 読点は1文に多くて1個。長くなるなら読点でつなげず文を切る
+- 全角スペースや見た目調整の半角スペースを入れない
+- **口コミ本文に出てくる言葉を1つ以上そのまま使う**（言い換えずに拾う）
+- です・ます調。
 - 業種に合った言い回しにする：この店は${verb}が自然（${knowledge.category || '該当業種'}）。飲食/美容/整体などは来院・来店系、制作/士業/EC等は依頼・購入系。不自然な語は使わない。
 - 口コミ本文に実際に書かれた点だけを拾う。本文に無い事実（来店回数・注文内容など）は作らない。
+- **来店の状況は口コミ本文から読み取る（社長指示 2026-10-07）**。「久しぶり」「何度も」「いつも」「初めて」等が書かれていればそれに合わせて応える（久しぶりと書いた人には「久しぶりにお越しいただき」）。書かれていなければ決めつけない＝「いつも」「常連」「初めて」「また来てくださり」を使わない。
+- **店の情報を足さない**：メニュー紹介・価格・営業時間・アクセス（駅から徒歩◯分）・ランチ/コース/飲み放題・「調整できます」「お申し付けください」・今後の対応の約束は書かない。口コミに出てきた料理名をそのまま拾うのはよい。地域名や業種などMEOの語を返信に詰めない。
 - ${humanTone}
 - ${symbolRule}
 - ${_replyCompliance}
 - 返信文のみを出力（説明・見出し・番号・「1ブロック目」等のラベルは書かない）。${styleBlock ? '\n- 過去返信の語彙や温度感は参考にしてよいが、上記の構成と挨拶は必ず守る。' + styleBlock : ''}`;
   }
 
-  // ★1〜3：謝罪・改善の返信（お世話になっております〜の3ブロック定型・業種別・トーン別）
+  // ★1〜3：改善の姿勢は残し、事実は断定しない返信（社長指示 2026-10-06「今後はBの内容」・見本は社長作成）
+  //   旧版は「店が変えられる事柄ははっきり認める。曖昧にすると誠実に見えない」と指示しており、
+  //   麻辣王酒場の★1に「服装と接客の姿勢はご指摘のとおりです。店として改めます。」を書かせた（撤去）。
+  //   過去の返信には「ご不快な思いをさせてしまい」等が多いので、文体見本（styleBlock）は渡さない。
   if (type === 'reply_negative' && !_reviewIsJa) { prompt = _foreignReplyPrompt('negative'); }
   else if (type === 'reply_negative') {
     const { verb } = bizPhrasing(knowledge.category, storeName);
-    prompt = `あなたは${storeName}のオーナー/スタッフです。低評価の口コミに、下記の"型"に沿って誠実な返信を書いてください。
+    prompt = `あなたは${storeName}のオーナー/スタッフです。★${_star}の口コミに返信を書いてください。
 
 【お店】${storeName}${knowledge.category ? '（' + knowledge.category + '）' : ''}
-【口コミ本文】${reviewText}
-【店舗の強み・特徴】${strengths}
-【提供サービス・商品】${services}
+【口コミ本文】${reviewText || '（本文なし・星のみ）'}
 
-【トーン】${toneGuide}
-【来店時期の扱い】${timeGuide}
+【返信の型（この順で4文。1文ごとに改行し、空行は入れない）】
+1. 「この度は${verb}いただき、ありがとうございました。」
+2. 口コミの不満を角の立たない言葉でまとめ、「〜について、ご期待に沿えず申し訳ございません。」
+   相手の悪口や決めつけの言葉はそのまま使わず言い換える
+   （例：ジャージ・髪ボサボサ→身だしなみ／ダルそうな接客・態度が悪い→対応／まずい・にんにくが多い→味付け／待たされた→ご提供までのお時間／汚い→店内の環境）。
+3. 「いただいたご意見を店内で共有し、〜を見直してまいります。」（〜は2でまとめた点）
+4. 「貴重なご意見をお寄せいただき、ありがとうございました。」
+※本文が無い（星のみ）か、不満が具体的に書かれていない場合は、2を「ご期待に沿えず申し訳ございません。」、3を「いただいたご意見を店内で共有し、見直してまいります。」とする。
+※不満が書かれていない★3で良かった点だけが書かれている場合は、2・3の代わりに良かった点へのお礼を1文書く。
 
-【返信の構成（この3ブロックを必ず守る・ブロック間は空行で区切る）】
-1行目（1ブロック目）：「お世話になっております。」だけ。
-2ブロック目：この度は${verb}いただき、誠にありがとうございました。＋貴重なご意見をいただいたことへのお礼。続けて、お客様が不満に感じた点を本文から特定し、それに対して何に対するお詫びかを明記して誠実に謝罪する。
-3ブロック目：指摘点をどう受け止め・どう改善するかを可能な範囲で具体的に伝える（実在の範囲で。言い訳・責任転嫁はしない）→ もう一度機会をいただきたい気持ちを丁寧に添えて締める。
+【見本（麻辣王酒場の★1への返信・社長作成）】
+口コミ：店員のおっさんはジャージで髪ボサボサでダルそうに接客。にんにくが山ほど入っていて味がわからない。2度と行かない。
+返信：
+この度はご来店いただき、ありがとうございました。
+接客時の身だしなみや対応、麻辣王麺の味付けについて、ご期待に沿えず申し訳ございません。
+いただいたご意見を店内で共有し、接客時の身だしなみや対応を見直してまいります。
+貴重なご意見をお寄せいただき、ありがとうございました。
 
-【厳守】
-- 「お世話になっております。」で必ず始め、3ブロックを空行で区切る。全体で170〜260文字程度。です・ます調。誠実で温かみのある文体。
-- 業種に合った言い回し（この店は${verb}が自然・${knowledge.category || '該当業種'}）。
-- ${humanTone}
-- 口コミ本文に無い事実や言い訳を作らない。責任転嫁しない。
-- ${timeGuide.includes('以前') || timeGuide.includes('ヶ月') ? '時間が経っている口コミなので「先日」など直近を示す語は使わない。返信が遅くなったことへのお詫びを添えてよい。' : ''}
+【厳守（社長指示 2026-10-06・最優先）】
+- 事実を断定しない・認めない：「ご指摘のとおり」「おっしゃるとおり」「〜させてしまい」「ご不快な思い」「ご迷惑をおかけ」「不手際」「至らず」「改めます」「スタッフの教育・指導」「徹底いたします」は使わない。
+- 店の細かい内容・設定・対応可否は書かない（分からないため）：量や辛さの調整ができる、メニューや価格、設備、席や予約の運用、スタッフの名前、今後の具体的な施策など。「見直してまいります」までにとどめる。
+- 反論しない。言い訳しない。味や価格の正当化をしない。口コミ本文に無い事実を作らない。
+- 全体で80〜170字。改行は句点「。」の後だけ。読点「、」で行を折らない。店名を鍵括弧で囲まない。
+- ${timeGuide.includes('以前') || timeGuide.includes('ヶ月') ? '時間が経っている口コミなので「先日」など直近を示す語は使わない。1の前に「ご返信が遅くなり申し訳ありません。」を添えてよい。' : '「先日」など来店日を決めつける語は使わない。'}
 - ${symbolRule}
 - ${_replyCompliance}
-- 返信文のみを出力（説明・見出し・ラベルは書かない）。${styleBlock ? '\n- 過去返信の語彙や温度感は参考にしてよいが、上記の構成と挨拶は必ず守る。' + styleBlock : ''}`;
+- 返信文のみを出力（説明・見出し・番号・ラベルは書かない）。`;
   }
 
   // Googleポスト生成
@@ -620,8 +776,16 @@ ${_hasTheme ? '※このテーマ欄に書かれた内容は、利用者が指�
 - テーマ欄以外で、店舗情報に無い事実（架空のメニュー・価格・イベント等）は創作しない。
 - 指示の言葉自体を店名やお店のコンセプトとして誤用しない。
 - 「店名:」「業種:」等のラベルは投稿文に書かない。自然な文章に溶け込ませる。地域名・サービス名を自然に含める。
-- 180〜280文字程度・読みやすい改行・効果や順位の断定・誇大表現はしない。
+- **本文は必ず300文字以上（300〜400文字が目安・上限1,500文字）**。社長指示 2026-08-29。150〜200字で終わらせない。字数を埋めるための同じ内容の言い換えではなく、**具体（メニュー名や施術名＋価格、利用シーン、併せて頼める/受けられるもの、アクセス、営業時間、決済、予約方法）を足して**300字以上にする。
+- **対策キーワードを1〜2個、本文に自然に入れる**（下の【MEO対策キーワード】欄がある場合は必ずそこから使う）。2文目までに「エリア名＋業種・カテゴリ」の形で1つ出す（例「新宿東口の四川料理店」「大塚の整体」）。キーワードの羅列・不自然な繰り返しはしない。
+- 読みやすい改行・効果や順位の断定・誇大表現はしない。順位や効果を保証する書き方はしない。
 - **絵文字は絶対に使わない（cantik全社ルール・禁止）**。記号の多用もしない。
+- **【書いてはいけない"AIっぽい型"（厳守・社長指示 2026-10-06）】**
+  (1)冒頭に【〇〇】のような鉤括弧の見出し・キャッチを置かない（いきなり本文から書く）。
+  (2)「〇〇で△△をお探しの方へ／お探しなら」で始めない。具体的な場面・メニュー・出来事から書き出す。
+  (3)末尾に「📍店名／住所」のような住所の貼り付けをしない（住所・ピン記号を本文末に並べない）。
+  (4)「ぜひお気軽に」「特別なひととき」「至福の」「心も体も」等の量産テンプレ語を使わない。
+  (5)全店で同じ構成（見出し→地域＋業種→本文→住所）にしない。その店の写真・具体の話から、毎回ちがう入り方で書く。
 - 予約・問い合わせを促す一言を1つ入れる。来店型の業種（飲食・カフェ・整体・整骨・エステ・美容・レンタカー等）は「ご予約・ご来店」を自然に促す。非来店型（Web制作・士業・BtoB等）は ZOOM・電話・メール を案内する（店舗情報に従う）。
 - 【Google掲載ポリシー厳守】電話番号を本文に書かない／酒類・タバコ等の規制商品の販促をしない。
 - 投稿文のみ出力（前置き・説明は書かない）。${seoWeave}${_meoBoost}${_industryGuide(knowledge.category)}${_gbpAdultSafety(knowledge.category, knowledge)}`;
@@ -638,6 +802,15 @@ ${reviewText || ''}`;
   // お客さん向け：単語から口コミの「下書き」を作る
   if (type === 'review_draft') {
     const cat = knowledge.category || '';
+    // ★業種が分からないまま書かせない（2026-10-27）。
+    //   上のフォールバックでGBPのカテゴリまで見ても空なら、別業種の文面が出る危険があるので止める。
+    //   お客様には「お店の設定が未完了」と伝え、店舗側で業種を登録してもらう。
+    if (!cat) {
+      return res.status(400).json({
+        error: 'お店の業種が登録されていないため、下書きを作成できません。お手数ですが店舗スタッフにお知らせください。',
+        reason: 'category_missing', locationId,
+      });
+    }
     const ctx = [strengths, services].filter(Boolean).join(' / ');
     prompt = `あなたは、お店やサービスを利用したお客様が口コミを書くのを手伝うアシスタントです。
 お客様が選んだ「良かった点」をヒントに、そのお客様が"自分の実体験"を語るような、自然で具体的な口コミ下書きを1つ作ってください。
@@ -705,6 +878,9 @@ ${reviewText || ''}`;
 【ルール】
 - 全体で200〜350文字程度＋ハッシュタグ
 - 1行目で思わず読みたくなる自然なフックを作る（「〜しませんか？」の連発や、いかにも広告な煽りは避ける）
+- **保存したくなる／誰かに送りたくなる情報**にする（Instagramは保存とDM共有が配信の最重要シグナル）。
+  役に立つ具体（値段・所要時間・混む時間帯・持ち物・行き方）を1つ入れる
+- お客さんが実際に検索しそうな言葉をキャプション本文に自然に含める（Instagram内検索で拾われるため）
 - 実際の人が話すような、等身大で具体的な言葉づかい。きれいごとや抽象的な美辞麗句を避ける
 - 写真の内容に自然に触れる
 - 押し売り感を出さず、最後にさりげない来店・問い合わせの一言を添える
@@ -749,7 +925,9 @@ ${reviewText || ''}`;
 【ルール】
 - 内容は元の投稿と同じ趣旨を保つ
 - Instagram向けに、改行を使った読みやすいレイアウトにする
-- 最後にハッシュタグを5〜8個（地域名・業種・サービス・関連語）改行して付ける
+- 最後にハッシュタグを**ちょうど5個**（地域名・業種・サービス・関連語）改行して付ける
+  ※Instagramのハッシュタグは最大5個でプラットフォーム側の強制。6個以上は投稿が弾かれるか超過分が削除される（2026-09-03調査）
+- 地域名＋業態のスモールタグを優先する（#カフェ のような超大型の汎用タグ単体は避ける）
 - 絵文字は使わず、親しみやすく自然なトーンにする
 - 過度な宣伝・誇大表現は避ける
 - キャプション本文＋ハッシュタグのみ出力`;
@@ -1531,7 +1709,18 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
   }
   // 口コミ返信（Googleに掲載される）: 返信内の宣伝・連絡先はガイドライン違反で削除対象になり得る
   if (type === 'reply_positive' || type === 'reply_negative') {
-    prompt += `\n\n【返信ポリシー（厳守）】返信の中に電話番号・URL・宣伝文（割引・キャンペーン・新商品の告知等）を入れない。感謝・お詫び・具体的な言及と、また来てほしい気持ちに集中する。`;
+    prompt += `\n\n【返信ポリシー（厳守）】返信の中に電話番号・URL・宣伝文（割引・キャンペーン・新商品の告知等）を入れない。感謝・具体的な言及と、また来てほしい気持ちに集中する。`;
+    // 社長叱責 2026-10-06（麻辣王酒場）。返信は店の公式の発言として全世界に残る。
+    prompt += `\n\n【事実を断定しない（社長指示 2026-10-06・最優先。過去の返信の文体よりも優先する）】
+- 口コミの中の不満・指摘・悪口（接客・態度・服装・味・量・衛生・待ち時間・価格・設備など）を、店側が事実として認めたように書かない。
+- 次の言葉は使わない：ご指摘のとおり／おっしゃるとおり／〜させてしまい／ご不快な思い／ご迷惑をおかけ／改めます／至らず／不手際／スタッフの教育・指導／徹底いたします。
+- 相手の悪口や決めつけの言葉は繰り返さず、「身だしなみ」「対応」「味付け」のように角の立たない言葉にまとめる。
+- 改善の姿勢は「〜について、ご期待に沿えず申し訳ございません。」「いただいたご意見を店内で共有し、〜を見直してまいります。」の形で示す。
+- 店の細かい内容・設定・対応可否（量や辛さの調整、メニュー、価格、設備、具体的な新しい取り組み等）は、分からないので書かない。
+- 過去の返信に「ご不快な思いをさせてしまい」「改めます」があっても真似しない。`;
+    if (_cls && _cls.needsHuman && type === 'reply_positive') {
+      prompt += `\n- この口コミには不満の表明も含まれている（${_cls.hits.slice(0, 3).join('・')}）。良かった点へのお礼のあとに、上の形で1〜2文だけ添える。悪口の言葉は繰り返さない。`;
+    }
   }
 
   // 運用者が設定ページで登録した「AIへの追加指示」（typeごと・KV）。文体調整・禁止事項の追加に使う
@@ -1546,7 +1735,12 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
     const _maxTok = type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500;
     const _temp = type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85;
     let content = (await llmComplete(prompt, { maxTokens: _maxTok, temperature: _temp }))?.trim();
-    if (!content) return res.status(500).json({ error: 'AI生成失敗' });
+    // ★3以下はAIが落ちても空にしない（見本の型だけの安全な返信。送信は人が確認してから）
+    if (!content && _isReply && _star <= 3) {
+      const { verb } = bizPhrasing(knowledge.category, storeName);
+      content = complaintTemplate(verb, _reviewIsJa || !String(reviewText || '').trim() ? 'Japanese' : _lang.en);
+    }
+    if (!content) return res.status(500).json({ error: 'AI生成失敗', reason: llmLastError() });
     // 弱点カテゴリ（キャッチコピー・長文ブログ）は2パス目でルーブリックに沿って推敲し品質を底上げ
     if (type === 'catchcopy' || type === 'blog_article') {
       const refinePrompt = type === 'catchcopy'
@@ -1610,6 +1804,37 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
         .replace(/\n{3,}/g, '\n\n')
         .trim();
     }
+    // ★AI感の最終ゲート（社長指示 2026-10-28「AI感あってわかる／スペースが入ってたりする」）。
+    //   プロンプトには既に「！は1つまで」「スペースを使わない」と書いてあるが、実測2026-10-28で
+    //   送信済み955件のうちスペース43件・感嘆符2個以上45件が残っていた（2026-10にも出ている）。
+    //   指示では止まらないので、絵文字と同じく機械で落とす。
+    if (content) {
+      content = String(content)
+        // 日本語の字と字の間のスペース。英数字どうしの間（Body Innovation 等）は残す。
+        .replace(/([ぁ-んァ-ヴ一-龥。、ー々])[ 　]+(?=[ぁ-んァ-ヴ一-龥])/g, '$1')
+        // 「！」は文章全体で1つまで。2つ目以降は句点にする。
+        .replace(/[!！]/g, (m, i, str) => (str.slice(0, i).match(/[!！]/g) || []).length ? '。' : m)
+        .replace(/。{2,}/g, '。')
+        .trim();
+    }
+    // ★AIっぽい型の最終除去（社長指示 2026-10-06）。プロンプトで禁止しても出たときの保険。
+    //   (1)冒頭の【…】見出し行を外す (2)末尾の「店名/住所だけの貼り付け」行を外す。
+    if (content && type === 'post') {
+      let lines = content.split('\n');
+      // 先頭の【…】だけの見出し行（または ■◆ で始まる見出し）を落とす
+      while (lines.length && /^[\s　]*[【［\[■◆●▶].{0,40}$/.test(lines[0]) && !/[。．！？]/.test(lines[0])) lines.shift();
+      // 末尾の、住所・店名・アクセスだけの行を落とす（本文ではない貼り付け）
+      const sName = String(knowledge.storeName || storeName || '').trim();
+      const isFooter = (l) => {
+        const t = l.trim();
+        if (!t) return true;
+        if (sName && (t === sName || t === '店名：' + sName || t.replace(/[（(].*$/, '') === sName)) return true;  // 店名だけの行
+        if (/^〒?\s*[都道府県]/.test(t) && !/[。！？]/.test(t)) return true;                                        // 住所行
+        return /(丁目|番地|[0-9]-[0-9]|ビル|階|駅(から)?徒歩)/.test(t) && t.length < 40 && !/[。！？]/.test(t);
+      };
+      while (lines.length && isFooter(lines[lines.length - 1])) lines.pop();
+      content = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
     // ★Googleコンテンツポリシー・バックストップ：投稿/説明文で「男性専用×時間帯×マッサージ」の
     //   成人向け誤検知クラスタが残っていたら機械的に安全化（明洞整体院の投稿削除事例の再発防止）。
     if (content && (type === 'post' || type === 'gbp_description')) {
@@ -1626,6 +1851,36 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
           .trim();
       }
     }
+    // ★社長指示 2026-08-29「MEOの投稿は全て300文字以上・キーワードも入れる」
+    //   モデル任せにせず機械ゲートを置く。300字未満なら1回だけ延長パスを回す（事実の創作は禁止）。
+    //   上限はGBP仕様の1,500字。延長しても届かない場合はそのまま返し、UIに実測字数を出して人が判断する。
+    const POST_MIN_LEN = 300;
+    if (type === 'post' && content && content.replace(/\s/g, '').length < POST_MIN_LEN) {
+      try {
+        const _kwLine = _targetedKws && _targetedKws.length
+          ? `\n【必ず自然に含める対策キーワード】${_targetedKws.slice(0, 2).join('、')}` : '';
+        const _extended = await llmComplete(
+          `次のGoogleビジネスプロフィール投稿を、**${POST_MIN_LEN}文字以上**になるまで書き足してください。\n` +
+          `【厳守】\n` +
+          `- 元の文に無い事実（メニュー・価格・イベント・実績・営業時間等）を新しく作らない。既に書かれている事実の説明を具体的にするだけ。\n` +
+          `- 同じ内容の言い換えで字数を埋めない。利用シーン・誰に向くか・どう使えるか、を足す。\n` +
+          `- 絵文字は使わない。効果や順位の断定・誇大表現・保証はしない。電話番号は書かない。\n` +
+          `- 「。」ごとに改行する。投稿文のみ出力し、前置きや説明は書かない。${_kwLine}\n\n` +
+          `【元の投稿文】\n${content}`,
+          { maxTokens: 900, temperature: 0.6 }
+        );
+        const _cand = String(_extended || '').trim();
+        // 延長版が「元より長く」「上限内」のときだけ採用（短くなったら元を残す）
+        if (_cand && _cand.replace(/\s/g, '').length > content.replace(/\s/g, '').length && _cand.length <= 1500) {
+          content = _cand
+            .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}]/gu, '')
+            .replace(/。[ \t　]*(?=[^\n」』）)】\]])/g, '。\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        }
+      } catch (_) { /* 延長に失敗しても元の投稿文はそのまま返す */ }
+    }
+
     // 対策キーワードの織り込み達成度を返す（UIで可視化・再生成の判断材料に）
     // キーワードを空白で分割し、全トークンが本文に含まれれば「織り込み済み」と判定（語順・助詞の差を許容）
     let kw;
@@ -1635,7 +1890,82 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       const used = _targetedKws.filter(_hit);
       kw = { targeted: _targetedKws, used, missing: _targetedKws.filter(k => !used.includes(k)) };
     }
-    res.json({ content, kw });
+    // ── 口コミ返信の書式ゲート（社長指摘 2026-09-04）──
+    //   プロンプトに書くだけでは守られないので、生成物を機械で判定して1回だけ書き直させる。
+    //   落ちる代表例＝読点で改行している／文末が「です」ばかり／長すぎる。
+    //   詳細な判定は api/_review_gate.js（承認済み19件で検証済み）。
+    let gate;
+    if ((type === 'reply_positive' || type === 'reply_negative') && content) {
+      const { sanitize, checkReply } = await import('./_review_gate.js');
+      const negative = type === 'reply_negative';
+      content = sanitize(content);
+      gate = checkReply(content, { reviewText, recentReplies: pastReplies, negative });
+      if (!gate.ok && gate.action === 'regenerate') {
+        try {
+          // 口コミが日本語でなければ英語の直し指示を出す。日本語の指示で英語文を直させると
+          // 日本語が混ざって二重に落ちる（2026-09-13）。
+          const noAffirmJa = `事実を断定しない（ご指摘のとおり／おっしゃるとおり／〜させてしまい／ご不快な思い／改めます／不手際／至らず／教育・指導／徹底 は使わない）。` +
+            `悪口の言葉は繰り返さない。店の細かい内容（調整できる・メニュー・価格・設備・新しい取り組み）は書かない。`;
+          const refinePrompt = !_reviewIsJa
+            ? `Rewrite the following review reply.\n` +
+              `Problems to fix: ${gate.failed.join(' / ')}\n` +
+              `Rules: write entirely in ${_lang.en}, no Japanese. 55-110 words. ` +
+              `Exactly 2-3 short paragraphs separated by a blank line. ` +
+              `Do not open with "Thank you"/"Thanks"/"We are glad"/"Dear" — react to a specific point first. ` +
+              `Say "thank" at most twice. Reuse at least one positive word the customer wrote. No emoji, no phone number, no URL. ` +
+              `Do NOT apologize for, admit, repeat or argue with any criticism.\n\n` +
+              `Review: ${reviewText}\n\nReply:\n${content}`
+            : negative
+            ? `次の口コミ返信を書き直してください。\n` +
+              `【直すべき点】${gate.failed.join(' / ')}\n` +
+              `【型】4文を1文ごとに改行：①この度はご来店いただき、ありがとうございました。` +
+              `②〜について、ご期待に沿えず申し訳ございません。③いただいたご意見を店内で共有し、〜を見直してまいります。` +
+              `④貴重なご意見をお寄せいただき、ありがとうございました。\n` +
+              `【厳守】80〜170字。改行は句点「。」の後だけ。${noAffirmJa}\n\n` +
+              `【口コミ本文】${reviewText}\n\n【返信文】\n${content}`
+            : `次の口コミ返信を、意味を変えずに書き直してください。\n` +
+              `【直すべき点】${gate.failed.join(' / ')}\n` +
+              `【厳守】改行は句点「。」の後だけ。読点「、」で行を折らない。` +
+              `文末を「です」で揃えない。空行で3ブロックに分ける。**必ず130字以内に短くする**。` +
+              `冗長な敬語を削る。各ブロックは1〜2文まで。` +
+              `口コミ本文の良かった点の言葉を1つ以上そのまま使う。絵文字とスペースを使わない。${noAffirmJa}\n\n` +
+              `【口コミ本文】${reviewText}\n\n【返信文】\n${content}`;
+          const fixed = await llmComplete(refinePrompt, { maxTokens: 600, temperature: 0.5 });
+          const cand = sanitize(String(fixed || '').trim());
+          const re = cand ? checkReply(cand, { reviewText, recentReplies: pastReplies, negative }) : null;
+          if (re && re.ok) { content = cand; gate = re; }
+        } catch (e) { /* 書き直しに失敗しても元の文は返す（判定結果は meta で伝える）*/ }
+      }
+
+      // 書き直しても「事実を認める表現」「悪口の言い直し」（★3以下は店の細かい内容も）が残ったら、
+      // そのまま人に見せない（社長叱責 2026-10-06）
+      //   ★3以下 → 見本の型だけを残した安全な返信に差し替える（中身に触れない版）
+      //   ★4-5 → 該当する文を削る（cronはゲート不通過・needsHumanで送らない）
+      const _af = findAffirm(content, reviewText);
+      const _un = findUnsupported(content, reviewText);
+      const _bad = _af.affirm.length || _af.restated.length || ((negative || _star <= 3) && _af.specific.length)
+        || _un.storeInfo.length || _un.visit.length || findEffectClaims(content).length || findRebuttal(content).length;
+      if (_bad) {
+        const { verb } = bizPhrasing(knowledge.category, storeName);
+        if (negative || _star <= 3) {
+          content = complaintTemplate(verb, _reviewIsJa || !String(reviewText || '').trim() ? 'Japanese' : _lang.en);
+          gate = { ok: true, failed: [], detail: { len: content.replace(/\s/g, '').length }, template: true };
+        } else {
+          const kept = content.split(/(?<=[。.!?！？])/)
+            .filter(s => { const f = findAffirm(s, reviewText); const u = findUnsupported(s, reviewText);
+                           return !f.affirm.length && !f.restated.length && !u.storeInfo.length && !u.visit.length && !findEffectClaims(s).length && !findRebuttal(s).length; });
+          content = kept.join('').replace(/\n{3,}/g, '\n\n').trim();
+          gate = { ...gate, ok: false, failed: [...(gate.failed || []), '事実を認める表現を削除した（人が確認してから送る）'] };
+        }
+      }
+    }
+
+    // 投稿は実測字数を返す（300字未満のまま出たら人が気づけるように）
+    const meta = type === 'post' && content
+      ? { len: content.replace(/\s/g, '').length, minLen: 300 }
+      : gate ? { gate: { ok: gate.ok, failed: gate.failed, len: gate.detail?.len }, template: !!gate.template,
+                 needsHuman: !!(_cls && _cls.needsHuman), hits: _cls ? _cls.hits : [] } : undefined;
+    res.json({ content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

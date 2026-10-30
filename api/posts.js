@@ -1,6 +1,6 @@
 // api/posts.js — Googleポスト管理（＋予約下書き／Instagram連携／クライアント別写真ライブラリ）
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
-import { kvGet, kvSet } from './_kv.js';
+import { kvGet, kvSet, kvDel } from './_kv.js';
 import crypto from 'crypto';
 
 function parseCookies(req) {
@@ -330,6 +330,14 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.sub === 'conn-status') {
       return res.json({ connected: !!(igConn?.token), username: igConn?.username || '', userId: igConn?.userId || '', permissions: igConn?.permissions || '' });
     }
+    // 連携の解除（この店の保存トークンを消すだけ。Instagram側の許可は instagram.com で外す）
+    //   Instagram側で「アプリとウェブサイト」から削除しても、ここに保存したトークンは残るため
+    //   画面が「連携済み」のままになる。App Review の録画で「未連携」から始めるのに必要。
+    if (req.method === 'POST' && req.query.sub === 'disconnect') {
+      if (!storeId) return res.status(400).json({ error: 'storeId必須' });
+      await kvDel(`ig_conn_${storeId}`);
+      return res.json({ success: true, storeId, connected: false });
+    }
     if (!IG_TOKEN || !IG_USER) {
       return res.status(500).json({ error: 'IG_ACCESS_TOKEN / IG_USER_ID が未設定です（Vercel環境変数）' });
     }
@@ -652,7 +660,47 @@ export default async function handler(req, res) {
       const items = data.mediaItems || [];
       let latest = null;
       for (const m of items) { const t = m.createTime; if (t && (!latest || t > latest)) latest = t; }
+      // sub=list で一覧の生データ（バックアップ・削除用）。既定は件数だけ（従来互換）。
+      if (req.query.sub === 'list') {
+        return res.json({ count: data.totalMediaItemCount ?? items.length,
+          items: items.map(m => ({ name: m.name, googleUrl: m.googleUrl || '', sourceUrl: m.sourceUrl || '',
+            createTime: m.createTime || '', category: m.locationAssociation?.category || '', format: m.mediaFormat || '' })) });
+      }
       return res.json({ count: data.totalMediaItemCount ?? items.length, latest });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // GBP写真の削除（社外・不可逆。バックアップ後に社長承認で実行）
+  //   DELETE /api/posts?action=gbp-photo&mediaName=accounts/../locations/../media/..
+  if (action === 'gbp-photo' && req.method === 'DELETE') {
+    const mediaName = req.query.mediaName || (req.body || {}).mediaName;
+    if (!mediaName) return res.status(400).json({ error: 'mediaName必須' });
+    try {
+      const r = await fetch(`https://mybusiness.googleapis.com/v4/${mediaName}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${access_token}` },
+      });
+      if (r.status === 200 || r.status === 204) return res.json({ success: true, deleted: mediaName });
+      const data = await r.json().catch(() => ({}));
+      return res.status(r.status).json({ error: (data.error && data.error.message) || ('削除失敗 ' + r.status) });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // GBP投稿(localPost)の削除（社外・不可逆。バックアップ後に社長承認で実行）
+  //   DELETE /api/posts?action=gbp-localpost&postName=accounts/../locations/../localPosts/..
+  if (action === 'gbp-localpost' && req.method === 'DELETE') {
+    const postName = req.query.postName || (req.body || {}).postName;
+    if (!postName) return res.status(400).json({ error: 'postName必須' });
+    try {
+      const r = await fetch(`https://mybusiness.googleapis.com/v4/${postName}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${access_token}` },
+      });
+      if (r.status === 200 || r.status === 204) return res.json({ success: true, deleted: postName });
+      const data = await r.json().catch(() => ({}));
+      return res.status(r.status).json({ error: (data.error && data.error.message) || ('削除失敗 ' + r.status) });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

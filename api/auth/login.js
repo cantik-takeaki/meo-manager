@@ -20,6 +20,10 @@ export default function handler(req, res) {
     igUrl.searchParams.set('response_type', 'code');
     igUrl.searchParams.set('scope', igScopes);
     igUrl.searchParams.set('state', `ig:${store || 'cantik'}`);
+    // App Reviewの録画用：?lang=en を付けたときだけ認可画面を英語で出す。
+    //   レビュアーが権限名を読めないと「E2Eを実証していない」と判定されるため
+    //   （2026-09-02の却下理由4）。通常運用（パラメータ無し）には影響しない。
+    if (req.query.lang === 'en') igUrl.searchParams.set('locale', 'en_US');
     return res.redirect(igUrl.toString());
   }
 

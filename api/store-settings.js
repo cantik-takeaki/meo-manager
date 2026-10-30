@@ -21,7 +21,14 @@ const hoursTokens = (s) => {
   const z = String(s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/：/g, ':');
   return [...z.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => `${parseInt(m[1], 10)}:${m[2]}`);
 };
-const fmtGbpTime = (t) => typeof t === 'string' ? (t.length === 4 ? `${parseInt(t.slice(0, 2), 10)}:${t.slice(2)}` : t) : (t && t.hours != null ? `${t.hours}:${String(t.minutes || 0).padStart(2, '0')}` : '');
+const fmtGbpTime = (t) => {
+  // Google の TimeOfDay は protobuf の既定値を省略するため、0時は {} で返る。
+  // 旧実装は `t.hours != null` で弾いて空文字にしていた＝「0:00-3:00」が「-3:00」になり
+  // 改ざん検知が毎回この差分を報告していた（実データは変わっていない）。2026-08-30 修正。
+  if (typeof t === 'string') return t.length === 4 ? `${parseInt(t.slice(0, 2), 10)}:${t.slice(2)}` : t;
+  if (t && typeof t === 'object') return `${t.hours || 0}:${String(t.minutes || 0).padStart(2, '0')}`;
+  return '';
+};
 
 // 現在のGBP店舗情報を取得（Business Information API）
 async function fetchCurrentGbp(locationName, token) {
