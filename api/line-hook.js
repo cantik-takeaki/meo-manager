@@ -3,13 +3,13 @@
 // 社長指示 2026-10-06「グループでokと連絡したらクチコミするように／2人しかいないからどちらかがokしたらいい」
 // cantik.co.jp/line/webhook.php（月次レポート）を置き換えるのではなく、その前に立つ中継：
 //   ・署名（X-Line-Signature）を検証する
-//   ・グループのIDを記録し、名前に「ラクラクMEO」が入るグループを口コミの確認先に設定する
+//   ・グループのIDを記録する（確認先の指定は管理画面から行う。名前での自動設定はしない）
 //   ・口コミのボタン（rv=ok/ng）は、ここで受けて admin.js の review-approve に渡し、結果をグループに返信する
 //   ・それ以外のイベントは、届いた本文と署名をそのまま webhook.php に中継する（月次レポートの動きは変えない）
 // LINE Developers の Webhook URL をここに向けたときだけ動く（向ける前は何も起きない）。
 import crypto from 'node:crypto';
 import { kvGet, kvSet } from './_kv.js';
-import { LINE_TOKEN_KEY, LINE_TO_KEY } from './_review_line.js';
+import { LINE_TOKEN_KEY } from './_review_line.js';
 
 export const config = { api: { bodyParser: false } };   // 署名検証と中継に「届いたままの本文」が要る
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   const conn = await kvGet(LINE_TOKEN_KEY);
   const token = conn && conn.token;
 
-  // 1) グループのIDを記録（名前に「ラクラクMEO」が入るグループを、まだ未設定なら確認先にする）
+  // 1) グループのIDを記録する（管理画面の一覧に出すため。送り先の設定はここではしない）
   const seen = (await kvGet('line_seen_groups')) || {};
   let seenChanged = false;
   for (const e of events) {
@@ -57,15 +57,12 @@ export default async function handler(req, res) {
       seenChanged = true;
     }
     if (seen[gid]) { seen[gid].lastAt = new Date().toISOString(); seenChanged = true; }
-    const conf = (await kvGet(LINE_TO_KEY)) || {};
-    if (!conf.group && /ラクラクMEO/.test(seen[gid].name || '')) {
-      await kvSet(LINE_TO_KEY, { ...conf, group: gid, at: new Date().toISOString() });
-      if (e.replyToken && token && e.type !== 'postback') {
-        await lineApi(token, 'POST', '/v2/bot/message/reply', { replyToken: e.replyToken, messages: [{ type: 'text',
-          text: 'このグループを、ラクラクMEOの口コミ確認の送り先に設定しました。\n★3以下の口コミと、クレームを含む口コミが来たら、口コミと返信案をボタン付きでお送りします。\n「この返信で送る」をどちらかが押すと、Googleに返信します。' }] });
-        e._replied = true;
-      }
-    }
+    // ★グループ名で送り先を自動設定しない（2026-10-30）。
+    //   LINEのグループ名は誰でも自由に付けられるので、「ラクラクMEO」を含む名前の
+    //   グループにこのボットを招待するだけで、口コミ本文と返信案がそこへ流れ、
+    //   「この返信で送る」まで外部に押させることになっていた。
+    //   送り先は管理画面から明示的に選ぶ（一覧＝line-seen-groups / 設定＝review-alert-line）。
+    //   ここは「見かけたグループを記録する」だけに留める。
   }
   if (seenChanged) await kvSet('line_seen_groups', seen);
 
