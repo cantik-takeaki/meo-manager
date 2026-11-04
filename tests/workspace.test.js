@@ -104,3 +104,11 @@ test('同時保存と競合してもログアウトは再読込してセッシ�
  await handler({method:'POST',query:{action:'logout'},headers:{cookie:'workspace_session='+session},body:{}},res);
  assert.equal(res.statusCode,200);assert.equal(data.sessions.length,0);assert.equal(attempts,2);assert.equal(revoked,1);
 });
+
+test('代理店が指定外の店舗IDを送っても契約範囲だけ取り込む',async()=>{
+ const h=harness({google:{locations:async()=>[{name:'locations/11',title:'自社'},{name:'locations/12',title:'別契約'}]}}),pass=crypto.randomBytes(18).toString('hex');
+ const c=await h.call('tenant-create',{name:'試験',kind:'agency',ownerName:'責任者',email:actor.email,password:pass,googleLocations:['locations/11'],storeLimit:1,endsAt:expiry()},{testoperator:'yes'});
+ const t=h.data.tenants[0];t.googleConnection={encrypted:{}};const login=await h.call('login',{email:actor.email,password:pass});
+ const r=await h.call('google-import',{tenant:c.body.tenantId,version:t.version,googleLocations:['locations/12']},{cookie:login.headers['Set-Cookie'].split(';')[0]});
+ assert.equal(r.statusCode,200);assert.deepEqual(r.body.workspace.stores.map(x=>x.name),['自社']);assert.ok(!JSON.stringify(r.body).includes('別契約'));
+});
