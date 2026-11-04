@@ -28,6 +28,9 @@ function render(){
  document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false'));
  if(!w){$('#panel').innerHTML=state.actor.primary?'<section class="block"><h2>既存の管理店舗を引き継ぐ</h2><button id="import-managed">管理店舗を取り込む</button></section>'+tenantForm():'<p>利用できる契約がありません。運営担当へお問い合わせください。</p>';return;}
  $('#panel').innerHTML=tab==='diagnosis'?diagnosis(w):tab==='issues'?issues(w):tab==='contents'?contents(w):tab==='metrics'?metrics(w):settings(w);
+ if(state.actor.portal){
+  for(const form of $('#panel').querySelectorAll('form[data-action]'))form.hidden=true;
+ }
 }
 
 function diagnosis(w){
@@ -38,7 +41,7 @@ function diagnosis(w){
  for(const [key,names]of Object.entries(fields)){const fact=facts.filter(i=>names.includes(i.field)).at(-1);if(fact)k[key]=fact.canonical;}
  const gd=store.googleDiagnostic;
  const result=globalThis.meoDiagnostic(k,{}, gd?.facts?.reviews!=null?{totalCount:gd.facts.reviews,unrepliedCount:gd.facts.unreplied}: {},Boolean(w.googleConnection || (gd?.observedAt && !gd.error)),g?{...g,_type:'gbp'}:null,gd?.facts?.media!=null?{photoCount:gd.facts.media}:null);
- const values=g?[['Googleの店舗名',g.title],['住所',(g.storefrontAddress?.addressLines||[]).join(' ')],['メインカテゴリ',g.categories?.primaryCategory?.displayName],['電話番号',g.phoneNumbers?.primaryPhone],['ウェブサイト',g.websiteUri]]:[];
+ const values=g?[['Googleの店舗名',g.title],['住所',(g.storefrontAddress?.addressLines||[]).join(' ')],['メインカテゴリ',g.categories?.primaryCategory?.displayName],['電話番号',g.phoneNumbers?.primaryPhone],['ウェブサイト',g.websiteUri],['Googleの紹介文',g.description||g.profile?.description]]:[];
  return `<section class="block"><h2>掲載情報の確認状況</h2><p>Googleから取得した情報と、店舗の回答で確認できた情報を分けて表示します。</p><p class="value">対応が残っている項目 ${open.length}件 ／ 修正先の公開確認 ${issues.length-open.length}件</p><p>準備スコア ${result.score===null?'判定保留':result.score+' / 100'} ／ 確認率 ${result.coverage}%</p><p class="muted">Google公式の採点や順位予測ではありません。未取得を減点せず、確認率70%未満では点数を出しません。点数が高くても、掲載内容の正しさや集客効果が確定したことにはなりません。</p><a href="https://support.google.com/business/answer/7091?hl=ja" target="_blank" rel="noopener noreferrer">Google公式の改善方針を確認</a></section>
  <section class="block"><h2>先に確認する項目</h2>${open.length?'<table><thead><tr><th>項目</th><th>違い</th><th>現在地</th><th>次の対応</th></tr></thead><tbody>'+open.map(i=>`<tr><td data-label="項目">${esc(i.field)}</td><td data-label="違い">${esc(i.comparison)}</td><td data-label="現在地">${esc(i.status)}</td><td data-label="次の対応">${esc(({'未確認':'出典を確認し、店舗へ質問','回答待ち':'返信の確認','修正案作成済み':'店舗の承認を確認','承認済み':'承認された修正を申請','審査待ち':'公開先の値を確認'})[i.status]||'掲載情報から対応を確認')}</td></tr>`).join('')+'</tbody></table>':'<p>登録済みの未対応項目はありません。未調査の媒体まで一致を確認したという意味ではありません。</p>'}<button data-tab="issues">掲載情報を照合する</button></section>
  <section class="block"><h2>Googleから取得した内容</h2>${g?`<p class="muted">取得日時 ${esc(displayDate(g.observedAt))} ／ GoogleビジネスプロフィールAPI</p><dl>${values.map(([label,value])=>`<dt>${label}</dt><dd>${esc(value||'値なし・適用対象か要確認')}</dd>`).join('')}</dl>`:gd?.observedAt&&!gd.error?'<p>Google実データの診断は取得済みです。登録情報の詳細は次回の診断で更新します。</p>':'<p>Googleの最新情報は未取得です。契約管理者が「利用者・契約」から連携・取得してください。</p>'}</section>
