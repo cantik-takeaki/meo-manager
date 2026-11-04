@@ -169,7 +169,7 @@ export function scoreLocation(info, activity, perf, availAttrs = null) {
   if (recent.length) {
     const nomedia = recent.filter((x) => !x.media).length;
     if (nomedia / recent.length > 0.5)
-      ng(4, '投稿', `直近の投稿${recent.length}本中${nomedia}本に写真がない`, '内容が伝わる実際の写真を検討する。効果の倍率は保証しない');
+      ng(4, '投稿', `過去120日の投稿${recent.length}本中${nomedia}本はAPIで画像を確認できない`, '内容が伝わる実際の写真を検討する。効果の倍率は保証しない');
     const nocta = recent.filter((x) => !x.cta).length;
     if (nocta / recent.length > 0.5)
       ng(3, '投稿', `直近の投稿${recent.length}本中${nocta}本にボタンがない`, '予約・電話・経路のボタンを1つ付ける');
@@ -282,10 +282,12 @@ export async function shindanOne(locationName, token, { withPerf = true } = {}) 
   try { const r=await request(`${BI}/${locPart}/attributes`,{headers:H,signal:AbortSignal.timeout(15000)}); at=await r.json(); if(!r.ok||at.error) throw new Error(); info.attributes=at.attributes||[]; }
   catch { info.attributes=null; info.attributesError='属性取得失敗'; }
 
-  const [posts, media, reviews] = await Promise.all([
+  const [posts, media, reviews, perf, availAttrs] = await Promise.all([
     fetchAll(`${V4}/${v4Path}/localPosts`, 'localPosts', token,20,request),
     fetchAll(`${V4}/${v4Path}/media`, 'mediaItems', token,20,request),
     fetchAll(`${V4}/${v4Path}/reviews`, 'reviews', token,20,request),
+    withPerf?fetchPerf(lid,token,new Date(),request):null,
+    fetchAvailableAttributes(info.categories?.primaryCategory?.name, token, request),
   ]);
   const activity = {
     posts: posts.items.map((p) => ({ at: p.createTime, type: p.topicType, media: (p.media || []).length, cta: p.callToAction?.actionType || '' })),
@@ -295,10 +297,6 @@ export async function shindanOne(locationName, token, { withPerf = true } = {}) 
     complete: { posts:posts.complete,media:media.complete,reviews:reviews.complete },
   };
 
-  let perf = null;
-  if (withPerf) perf = await fetchPerf(lid, token, new Date(), request);
-  // その業種で設定できる属性の一覧（カテゴリごとに違う）。取れなくても採点は続ける。
-  const availAttrs = await fetchAvailableAttributes(info.categories?.primaryCategory?.name, token, request);
   const out = scoreLocation(info, activity, perf, availAttrs);
   out.locationName = locPart;
   out.fetchErrors = Object.fromEntries(Object.entries({...activity.errors,attributes:info.attributesError}).filter(([, v]) => v));
