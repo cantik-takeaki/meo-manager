@@ -112,7 +112,7 @@ async function handleInstagram(req, res, code, igStoreId) {
 export default async function handler(req, res) {
   if(typeof req.query.state==='string' && /^workspace_[a-f0-9]{64}$/.test(req.query.state)){
     const {default:workspace}=await import('../../lib/http-workspace.js');
-    return workspace({...req,query:{...req.query,action:'google-callback'}},res);
+    return workspace({method:req.method,headers:req.headers,query:{...req.query,action:'google-callback'}},res);
   }
   const actor=await requireStaff(req,res,{admin:true}); if(!actor) return;
   const { code, error } = req.query;
