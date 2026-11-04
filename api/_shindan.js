@@ -302,6 +302,7 @@ export async function shindanOne(locationName, token, { withPerf = true } = {}) 
   const out = scoreLocation(info, activity, perf, availAttrs);
   out.locationName = locPart;
   out.fetchErrors = Object.fromEntries(Object.entries({...activity.errors,attributes:info.attributesError}).filter(([, v]) => v));
+  out.profileSnapshot={title:info.title,categories:info.categories,storefrontAddress:info.storefrontAddress,phoneNumbers:info.phoneNumbers,websiteUri:info.websiteUri,observedAt:new Date().toISOString()};
   return out;
 }
 
