@@ -112,3 +112,11 @@ test('代理店が指定外の店舗IDを送っても契約範囲だけ取り込
  const r=await h.call('google-import',{tenant:c.body.tenantId,version:t.version,googleLocations:['locations/12']},{cookie:login.headers['Set-Cookie'].split(';')[0]});
  assert.equal(r.statusCode,200);assert.deepEqual(r.body.workspace.stores.map(x=>x.name),['自社']);assert.ok(!JSON.stringify(r.body).includes('別契約'));
 });
+
+test('運営ログインの残ったブラウザでも代理店ログインが運営権限を引き継がない',async()=>{
+ const h=harness(),pass=crypto.randomBytes(18).toString('hex');for(let i=0;i<2;i++)await h.call('tenant-create',{name:'契約'+i,ownerName:'担当',email:i?'b@example.com':actor.email,password:pass,endsAt:expiry()},{testoperator:'yes'});
+ const login=await h.call('login',{email:actor.email,password:pass},{cookie:'pw_session=previous'});
+ assert.ok(login.headers['Set-Cookie'].some(x=>x.startsWith('pw_session=;')));const cookie=login.headers['Set-Cookie'][0].split(';')[0]+'; pw_session=previous';
+ const st=await h.call('state',{},{cookie,testoperator:'yes'},'GET');assert.equal(st.body.actor.operator,false);assert.equal(st.body.tenants.length,1);
+ const other=await h.call('state',{},{cookie,testoperator:'yes'},'GET',null,{tenant:h.data.tenants[1].id});assert.equal(other.statusCode,403);
+});
