@@ -1,0 +1,7 @@
+.git
+.github
+tests
+measurement
+wordpress
+*.bak*
+.env*

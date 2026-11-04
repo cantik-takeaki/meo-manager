@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {makeTenant,mutate} from '../lib/workspace.js';
+const actor={email:'owner@example.com'};
+function fixture(){let t=makeTenant({name:'試験契約',owner:actor,endsAt:'2099-12-31'});return mutate(t,actor,'store-add',{version:t.version,name:'試験店舗',website:'https://example.com/'});}
+const report=()=>({schema:'rakuraku-meo-wordpress/v1',siteUrl:'https://example.com/',observedAt:new Date().toISOString(),profile:{name:'正式店舗',address:'住所',telephone:'03-1234-5678',hours:'10:00〜22:00',reservationUrl:'https://example.com/reserve'},published:true});
+test('WordPress取込は未確認資料として保存し未取得を一致にしない',()=>{const t=fixture();const updated=mutate(t,actor,'wordpress-import',{version:t.version,storeId:t.stores[0].id,report:report()});assert.equal(updated.issues.length,5);assert.ok(updated.issues.every(x=>x.status==='未確認'&&x.comparison==='未取得'));assert.equal(t.issues.length,0);assert.equal(updated.stores[0].wordpressSnapshot.profile.name,'正式店舗');assert.throws(()=>mutate(updated,actor,'wordpress-import',{version:updated.version,storeId:t.stores[0].id,report:report()}),e=>e.status===409);});
+test('別サイト・未来日・閲覧者・未登録店舗の取込を拒否',()=>{const t=fixture(),b={version:t.version,storeId:t.stores[0].id,report:report()};for(const bad of [{...report(),siteUrl:'https://other.example/'},{...report(),observedAt:'2099-01-01'}, {...report(),profile:{name:12}}])assert.throws(()=>mutate(t,actor,'wordpress-import',{...b,report:bad}));t.members.push({email:'viewer@example.com',role:'viewer',storeIds:[b.storeId],active:true});assert.throws(()=>mutate(t,{email:'viewer@example.com'},'wordpress-import',b),e=>e.status===403);assert.throws(()=>mutate(t,actor,'wordpress-import',{...b,storeId:'unknown'}),e=>e.status===404);});

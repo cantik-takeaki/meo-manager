@@ -1,9 +1,27 @@
 {
   "functions": {
-    "api/**/*.js": { "maxDuration": 60 }
+    "api/**/*.js": {
+      "maxDuration": 60
+    }
   },
+  "rewrites": [
+    {
+      "source": "/api/workspace",
+      "destination": "/api/services?__route=workspace"
+    },
+    {
+      "source": "/api/client",
+      "destination": "/api/services?__route=client"
+    }
+  ],
   "crons": [
-    { "path": "/api/admin?action=cron-rank", "schedule": "0 18 * * *" },
-    { "path": "/api/admin?action=cron-tamper", "schedule": "0 18 * * *" }
+    {
+      "path": "/api/admin?action=cron-rank",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-tamper",
+      "schedule": "0 18 * * *"
+    }
   ]
 }

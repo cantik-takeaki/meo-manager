@@ -1,3 +1,4 @@
+import { requireStaff } from './_auth.js';
 // api/locations.js — 店舗一覧取得
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
 import { kvGet } from './_kv.js';
@@ -129,6 +130,7 @@ async function fetchInsights(access_token, locationName, months = 3, yoy = false
 }
 
 export default async function handler(req, res) {
+  if (!await requireStaff(req,res)) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { storeId, action, locationName } = req.query;
   const access_token = storeId ? await getAccessToken(storeId) : await getValidCookieToken(req, res);

@@ -1,3 +1,6 @@
+import { requireStaff, sameSecret } from '../_auth.js';
+import { parseCookies } from '../_session.js';
+import { redis } from '../../lib/workspace-store.js';
 // api/auth/callback.js — Google OAuthコールバック
 import { kvGet, kvSet } from '../_kv.js';
 import { saveMasterToken } from '../_tokens.js';
@@ -107,7 +110,19 @@ async function handleInstagram(req, res, code, igStoreId) {
 }
 
 export default async function handler(req, res) {
-  const { code, error, state } = req.query;
+  if(typeof req.query.state==='string' && /^workspace_[a-f0-9]{64}$/.test(req.query.state)){
+    const {default:workspace}=await import('../../lib/http-workspace.js');
+    return workspace({...req,query:{...req.query,action:'google-callback'}},res);
+  }
+  const actor=await requireStaff(req,res,{admin:true}); if(!actor) return;
+  const { code, error } = req.query;
+  const nonce=req.query.state;
+  if(typeof nonce!=='string'||!/^[a-f0-9]{64}$/.test(nonce)||!sameSecret(nonce,parseCookies(req).oauth_state)) return res.status(403).json({error:'連携を最初からやり直してください'});
+  const raw=await redis(['GETDEL','oauth_pending_'+nonce]);
+  const pending=raw?JSON.parse(raw):null;
+  if(!pending||pending.email!==actor.email) return res.status(403).json({error:'連携の有効期限が切れています'});
+  const state=pending.target;
+  res.setHeader('Set-Cookie','oauth_state=; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
   if (error) return res.redirect('/?error=' + encodeURIComponent(error));
   if (!code) return res.redirect('/?error=no_code&got=' + encodeURIComponent(Object.keys(req.query).join(',') || 'none'));
 

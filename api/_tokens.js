@@ -1,3 +1,4 @@
+import { sessionUser } from './_session.js';
 // api/_tokens.js — GBPトークン管理（取得・自動更新）
 import { kvGet, kvSet } from './_kv.js';
 
@@ -75,7 +76,7 @@ export async function getValidCookieToken(req, res) {
   if (!c.access_token) {
     const machine = !!process.env.CRON_SECRET
       && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
-    if (!c.pw_session && !machine) return null;
+    if (!machine && !await sessionUser(req)) return null;
     return await getMasterToken();
   }
   const expiresAt = parseInt(c.token_expires_at || '0', 10);

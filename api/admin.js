@@ -1,3 +1,5 @@
+import { requireStaff } from './_auth.js';
+import { rankSummary, compareRanks, compareRankEntries, isDemo, jstMonth, previousMonth } from './_metric_integrity.js';
 // api/admin.js — 店舗登録・順位入力（統合）
 import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
@@ -9,7 +11,7 @@ function parseCookies(req) {
   const c = {};
   (req.headers.cookie || '').split(';').forEach(s => {
     const [k, ...v] = s.trim().split('=');
-    if (k) c[k.trim()] = decodeURIComponent(v.join('='));
+    if(k){try{c[k.trim()]=decodeURIComponent(v.join('='));}catch{}}
   });
   return c;
 }
@@ -447,8 +449,8 @@ export default async function handler(req, res) {
     _approveAuthOk = !!sec && (req.headers.authorization || '') === `Bearer ${sec}`;
     if (!_approveAuthOk) return res.status(401).json({ text: '認証に失敗しました。' });
   }
-  if (!(_isCronAction && _cronAuthOk) && !_approveAuthOk && !access_token && !_c.pw_session) {
-    return res.status(401).json({ error: '管理者ログインが必要です' });
+  if (!(_isCronAction && _cronAuthOk) && !_approveAuthOk) {
+    if(!await requireStaff(req,res,{admin:req.method!=='GET'||!['dashboard','knowledge','rankings','shindan','kpi'].includes(action)}))return;
   }
 
   // ── 店舗ごとの更新停止（社長指示 2026-10-06：麻辣王酒場は投稿・返信を含む自動のMEO対策を一旦止める） ──
@@ -2022,7 +2024,7 @@ export default async function handler(req, res) {
         avgRank: num(b.avgRank), top3: Number(b.top3) || 0, top10: Number(b.top10) || 0, out: Number(b.out) || 0, measured: Number(b.measured) || 0,
         reviewCount: num(b.reviewCount), rating: num(b.rating),
         insights: (b.insights && typeof b.insights === 'object') ? { impressions: Number(b.insights.impressions) || 0, calls: Number(b.insights.calls) || 0, directionRequests: Number(b.insights.directionRequests) || 0, websiteClicks: Number(b.insights.websiteClicks) || 0 } : null,
-        ranksByKw: (b.ranksByKw && typeof b.ranksByKw === 'object') ? Object.fromEntries(Object.entries(b.ranksByKw).slice(0, 60).map(([k, v]) => [String(k).slice(0, 80), num(v)])) : {},
+        ranksByKw: (b.ranksByKw && typeof b.ranksByKw === 'object') ? Object.fromEntries(Object.entries(b.ranksByKw).slice(0, 1000).map(([k, v]) => [String(k).slice(0, 80), num(v)])) : {},
         note: String(b.note || '').slice(0, 500),
       };
       await kvSet(key, baseline);
@@ -2355,7 +2357,7 @@ export default async function handler(req, res) {
   // ── ダッシュボード全社集計（順位ロールアップ＋口コミ獲得KPI合計＋店舗別サマリー） ──
   // 競合ぐるっとMEOのダッシュボード相当。managed_locations＋手動store を横断集計。既存データのみ使用。
   if (req.method === 'GET' && action === 'dashboard') {
-    const ym = new Date().toISOString().slice(0, 7);
+    const ym = jstMonth();
     const managed = await kvGet('managed_locations') || [];
     const manual = await kvGet('admin_stores') || [];
     // 集計対象の店舗リスト（managed GBP ＋ 手動登録）。storeIdはrankings/kpiのキーに合わせる。
@@ -2363,12 +2365,12 @@ export default async function handler(req, res) {
     const seen = new Set();
     for (const m of managed) {
       const sid = String(m.locId || '').replace(/\//g, '_');
-      if (!sid || seen.has(sid)) continue; seen.add(sid);
+      if (!sid || seen.has(sid) || isDemo(m)) continue; seen.add(sid);
       stores.push({ storeId: sid, name: m.title || '店舗', company: m.company || m.title || m.clientName || '未分類' });
     }
     for (const s of manual) {
       const sid = s.storeId;
-      if (!sid || seen.has(sid)) continue; seen.add(sid);
+      if (!sid || seen.has(sid) || isDemo(s)) continue; seen.add(sid);
       stores.push({ storeId: sid, name: s.storeName || '店舗', company: s.storeName || '手動登録' });
     }
 
@@ -2379,28 +2381,21 @@ export default async function handler(req, res) {
     const clients = new Set();
 
     // 店舗ごとのKV読み(rankings/kpi/leads)を並列化（直列N+1→並列でダッシュボード高速化）。集約は結果順で行い出力shapeは不変
-    const prevYm = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7);
+    const prevYm = previousMonth(ym);
     const _storeResults = await Promise.all(stores.map(async (st) => {
       const rk = await kvGet(`rankings_${st.storeId}`) || { history: [], keywords: [] };
       const kws = (rk.keywords || []).filter(Boolean);
-      const hist = rk.history || [];
+      const hist = [...(rk.history || [])].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
       const last = hist[hist.length - 1] || null;
       const ranksArr = last ? (last.rankings || []) : [];
-      let s3 = 0, s10 = 0, sOut = 0, sum = 0, cnt = 0;
-      kws.forEach((_, i) => {
-        const r = parseInt(ranksArr[i], 10);
-        if (Number.isFinite(r) && r >= 1) {
-          if (r <= 3) s3++;
-          if (r <= 10) s10++;
-          if (r > 20) sOut++;
-          sum += r; cnt++;
-        } else if (last) { sOut++; }
-      });
-      const avg = cnt ? Math.round((sum / cnt) * 10) / 10 : null;
-      const monthLast = (m) => { const hs = hist.filter(h => (h.date || '').slice(0, 7) === m); return hs[hs.length - 1] || null; };
-      const avgOf = (entry) => { if (!entry) return null; const rs = (entry.rankings || []).map(x => parseInt(x, 10)).filter(x => Number.isFinite(x) && x >= 1); return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null; };
-      const curAvg = avgOf(monthLast(ym)), prevAvg = avgOf(monthLast(prevYm));
-      const mom = (curAvg != null && prevAvg != null) ? Math.round((prevAvg - curAvg) * 10) / 10 : null;
+      const summary=rankSummary(kws,ranksArr);
+      const {top3:s3,top10:s10,out:sOut,avgRank:avg,unknown,measured}=summary;
+      const monthLast=m=>hist.filter(h=>(h.date||'').slice(0,7)===m).sort((a,b)=>String(a.date).localeCompare(String(b.date))).at(-1);
+      const curEntry=monthLast(ym),prevEntry=monthLast(prevYm);
+      // 新形式は観測時の語を保持。旧履歴は語集合を証明できないため比較を保留。
+      const mapping=e=>e?.ranksByKw || (Array.isArray(e?.keywords)?Object.fromEntries(e.keywords.map((k,i)=>[k,e.rankings?.[i]])):{});
+      const comparison=compareRankEntries(kws,prevEntry,curEntry);
+      const mom=comparison.comparable?Math.round((comparison.base.avgRank-comparison.cur.avgRank)*10)/10:null;
       const inputThisMonth = hist.some(h => (h.date || '').slice(0, 7) === ym);
       let status = 'KW未登録';
       if (kws.length > 0) status = hist.length === 0 ? 'データなし' : (inputThisMonth ? '入力済み' : '未入力');
@@ -2409,7 +2404,7 @@ export default async function handler(req, res) {
       const leads = await kvGet(`leads_${st.storeId}`) || [];
       const mailCount = leads.filter(l => String(l.at || '').slice(0, 7) === ym).length;
       const mailPrev = leads.filter(l => String(l.at || '').slice(0, 7) === prevYm).length;
-      return { st, kwCount: kws.length, s3, s10, sOut, avg, mom, inputThisMonth, status, kpi, kpiPrev, mailCount, mailPrev, lastInput: last ? last.date : null };
+      return { st, kwCount: kws.length, s3, s10, sOut, avg, mom, unknown, measured, inputThisMonth, status, kpi, kpiPrev, mailCount, mailPrev, lastInput: last ? last.date : null };
     }));
     for (const r of _storeResults) {
       clients.add(r.st.company);
@@ -2425,15 +2420,16 @@ export default async function handler(req, res) {
       perStore.push({
         storeId: r.st.storeId, name: r.st.name, company: r.st.company, status: r.status,
         kwCount: r.kwCount, top3: r.s3, top10: r.s10, out: r.sOut, avgRank: r.avg,
-        mom: r.mom, lastInput: r.lastInput,
+        mom: r.mom, lastInput: r.lastInput, unknown:r.unknown, measured:r.measured,
       });
     }
 
     return res.json({
       month: ym,
+      rankNotice:'店舗ごとに異なる最終計測日時の参考値です。平均は順位が確認できた語のみ。欠測を圏外や改善として扱いません。',
       totals: {
         clients: clients.size, stores: stores.length, keywords: totalKw,
-        top3, top10, outRange, upCount, downCount,
+        top3, top10, outRange, upCount, downCount, unknown:perStore.reduce((n,s)=>n+s.unknown,0), measured:perStore.reduce((n,s)=>n+s.measured,0),
         filled, unfilled: stores.length - filled,
         top3Pct: totalKw ? Math.round((top3 / totalKw) * 100) : 0,
         top10Pct: totalKw ? Math.round((top10 / totalKw) * 100) : 0,
@@ -2460,7 +2456,8 @@ export default async function handler(req, res) {
     const existing = await kvGet(`rankings_${storeId}`) || { history: [], keywords: [] };
     // 計測日は指定があればそれを使う（一括順位入力）。無ければ本日。
     const useDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? date : new Date().toISOString().split('T')[0];
-    const entry = { date: useDate, rankings, recordedAt: new Date().toISOString() };
+    if (!Array.isArray(keywords) || !Array.isArray(rankings) || keywords.length!==rankings.length || keywords.length>1000 || new Set(keywords).size!==keywords.length || keywords.some(k=>typeof k!=='string'||!k.trim()||k.length>200) || rankings.some(v=>v!==null && !(Number.isInteger(v)&&v>0))) return res.status(400).json({error:'キーワードと順位の形式を確認してください'});
+    const entry = { date: useDate, keywords:[...keywords], rankings, ranksByKw:Object.fromEntries(keywords.map((k,i)=>[k,rankings[i]])), recordedAt: new Date().toISOString() };
     const idx = existing.history.findIndex(h => h.date === entry.date);
     if (idx >= 0) existing.history[idx] = entry;
     else existing.history.push(entry);
@@ -2929,7 +2926,7 @@ export default async function handler(req, res) {
         }));
         out.push(...got);
       }
-      const ok = out.filter((x) => !x.error).sort((a, b) => a.score - b.score);
+      const ok = out.filter((x) => !x.error).sort((a, b) => (a.score??101) - (b.score??101));
       const ng = out.filter((x) => x.error);
       // 全店に共通する穴＝半分以上の店で出ている指摘。ここが施策の優先順位になる。
       const tally = {};

@@ -52,6 +52,11 @@
 
   // 完全一致の辞書。キーは trim 済みの日本語。
   var T = {
+    '順位未確認': 'Rank not verified',
+    '順位確認分の平均': 'Average of verified ranks',
+    '比較保留': 'Comparison pending',
+    '運用準備スコア': 'Operational readiness score',
+    '情報照合・運用管理': 'Listing verification and operations',
     // ── ブランド・ログイン ─────────────────────────────
     'ラクラクMEO': 'Rakuraku MEO',
     'はじめてでも、カンタンに始められる！': 'Local marketing made simple.',

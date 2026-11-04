@@ -1,3 +1,4 @@
+import { requireStaff } from './_auth.js';
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
 import { kvGet } from './_kv.js';
 import { getMasterToken } from './_tokens.js';
@@ -28,7 +29,7 @@ const GROQ_FALLBACKS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'moonshotai
   'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b', 'gemma2-9b-it', GROQ_MODEL];
 const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9 } = {}) {
+export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9 } = {}) {
   LAST_LLM_ERROR = '';
   LAST_LLM_VIA = '';
   const reasons = [];
@@ -137,6 +138,7 @@ function bizPhrasing(category, storeName) {
 }
 
 export default async function handler(req, res) {
+  if (!await requireStaff(req,res)) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -962,16 +964,18 @@ ${userWords.join('\n')}
       ? `平均★${rv.averageRating || 0} / ${rv.totalCount || 0}件 / 未返信${rv.unrepliedCount || 0}件`
       : '未連携（口コミ未取得）';
     const rankLine = (d.rankings && d.rankings.length)
-      ? d.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '圏外'}`).join('、')
+      ? d.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '順位未確認'}`).join('、')
       : '未計測';
     prompt = `あなたはMEO（Googleマップ集客）の専門コンサルタントです。
 以下の店舗の現状を見て、改善アドバイスを簡潔に書いてください。
 
 【店舗名】${storeName}
 【業種】${knowledge.category || '不明'}
-【MEOスコア】${d.score != null ? d.score : '?'}/100
+【運用準備スコア（順位予測ではない）】${d.score != null ? d.score : '?'}/100
 【できている項目】${filled}
-【未対応・弱い項目】${missing}
+【確認済みの未対応項目】${missing}
+【未取得の項目】${(d.unknown||[]).join("、")||"別途確認"}
+未取得を不備と判断せず、スコアを検索順位の予測に使わない。
 【口コミ】${reviewLine}
 【キーワード順位】${rankLine}
 
@@ -1018,14 +1022,14 @@ ${knowledge.targetCustomer ? `- ターゲット: ${knowledge.targetCustomer}` : 
       ? `平均★${rv.averageRating || 0} / 累計${rv.totalCount || 0}件 / 未返信${rv.unrepliedCount || 0}件`
       : '未連携（口コミ未取得）';
     const rankLine = (c.rankings && c.rankings.length)
-      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '圏外'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前回比${r.diff > 0 ? '+' : ''}${r.diff}）` : ''}`).join('、')
+      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '順位未確認'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前回比${r.diff > 0 ? '+' : ''}${r.diff}）` : ''}`).join('、')
       : '未計測';
     prompt = `あなたはMEO（Googleマップ集客）の専門コンサルタントです。
 以下の店舗データを分析し、「今週やるべき具体的なタスク」と「来月の見通し」をJSONで出力してください。
 
 【店舗名】${storeName}
 【業種】${knowledge.category || '不明'}
-【MEOグレード】${c.grade || '?'}（スコア${c.score != null ? c.score : '?'}/100）
+【運用準備区分（順位予測ではない）】${c.grade || '?'}（スコア${c.score != null ? c.score : '?'}/100）
 【未対応・弱い項目】${(c.missing || []).join('、') || 'なし'}
 【口コミ】${reviewLine}
 【キーワード順位】${rankLine}
@@ -1051,7 +1055,7 @@ ${knowledge.targetCustomer ? `- ターゲット: ${knowledge.targetCustomer}` : 
       ? `累計${rv.totalCount || 0}件・平均★${rv.averageRating || 0}・未返信${rv.unrepliedCount || 0}件`
       : '未取得';
     const rankLine = (c.rankings && c.rankings.length)
-      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '圏外'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前月比${r.diff > 0 ? '+' + r.diff : r.diff}）` : ''}`).join('、')
+      ? c.rankings.map(r => `「${r.keyword}」${r.rank ? r.rank + '位' : '順位未確認'}${Number.isFinite(r.diff) && r.diff !== 0 ? `（前月比${r.diff > 0 ? '+' + r.diff : r.diff}）` : ''}`).join('、')
       : '未計測';
     const insLine = c.insights
       ? `表示${c.insights.impressions || 0}・電話${c.insights.calls || 0}・ルート検索${c.insights.directionRequests || 0}・サイト訪問${c.insights.websiteClicks || 0}`

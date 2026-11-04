@@ -1,3 +1,4 @@
+import { requireStaff } from './_auth.js';
 // api/store-settings.js — 改ざん防止 + サイテーション管理
 import { kvGet, kvSet } from './_kv.js';
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
@@ -79,6 +80,7 @@ function diffBaseline(saved, current) {
 }
 
 export default async function handler(req, res) {
+  if (!await requireStaff(req,res)) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

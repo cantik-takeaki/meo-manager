@@ -1,3 +1,4 @@
+import { sameOrigin } from './_auth.js';
 // api/me.js — 認証（GET=状態 / POST=登録・ログイン・2段階認証）
 // ユーザー入口: メール＋パスワード → メールに送られた6桁コードで2段階認証 → ログイン。
 // GBP(Google)は裏で常時接続(_tokens.jsのmaster)。ログイン画面にGoogleは出さない。
@@ -16,7 +17,7 @@ function parseCookies(req) {
   const c = {};
   (req.headers.cookie || '').split(';').forEach(s => {
     const [k, ...v] = s.trim().split('=');
-    if (k) c[k.trim()] = decodeURIComponent(v.join('='));
+    if (k) { try { c[k.trim()] = decodeURIComponent(v.join('=')); } catch {} }
   });
   return c;
 }
@@ -90,7 +91,7 @@ function setTeamSession(res, u) {
 async function resolveSessionUser(req, c) {
   if (c.team_user) {
     const users = await getTeamUsers();
-    const u = users.find(x => x.user === String(c.team_user).toLowerCase());
+    const u = users.find(x => x.user === String(c.team_user).toLowerCase() && x.active !== false && ROLES.includes(x.role));
     if (u && c.pw_session === teamSessionToken(u)) return { role: u.role, email: u.user, name: u.name, team: true };
   }
   const cred = await getCred();
@@ -104,6 +105,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  if (!sameOrigin(req)) return res.status(403).json({error:'同じサイトから操作してください'});
   const c = parseCookies(req);
 
   if (req.method === 'POST') {
@@ -292,7 +294,7 @@ export default async function handler(req, res) {
   // チームユーザー（team_user cookie）を先に判定→各ロールを返す。
   if (c.team_user) {
     const users = await getTeamUsers();
-    const tu = users.find(x => x.user === String(c.team_user).toLowerCase());
+    const tu = users.find(x => x.user === String(c.team_user).toLowerCase() && x.active !== false && ROLES.includes(x.role));
     if (tu && c.pw_session === teamSessionToken(tu)) {
       const gbp = await getMasterInfo();
       return res.json({

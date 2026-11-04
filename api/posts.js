@@ -1,3 +1,6 @@
+import { readJsonBody, validMetaSignature } from '../lib/request-body.js';
+export const config = { api: { bodyParser: false } };
+import { requireStaff } from './_auth.js';
 // api/posts.js — Googleポスト管理（＋予約下書き／Instagram連携／クライアント別写真ライブラリ）
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
 import { kvGet, kvSet, kvDel } from './_kv.js';
@@ -19,14 +22,21 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { storeId, action } = req.query;
+  let rawBody=Buffer.alloc(0);
+  if(!['GET','HEAD'].includes(req.method) && (action==='webhook'||!req.body||Buffer.isBuffer(req.body))) {
+    try { const parsed=await readJsonBody(req);rawBody=parsed.raw;req.body=parsed.value; }
+    catch { return res.status(400).json({error:'リクエスト本文を確認してください'}); }
+  }
+  if(action==='webhook' && req.method==='POST' && !validMetaSignature(rawBody,req.headers['x-hub-signature-256'],process.env.IG_APP_SECRET)) return res.status(403).json({error:'署名を検証できません'});
+
 
   // ── Instagram Webhook（DM/コメント受信）──
   // Metaがここを叩く。GET=検証、POST=イベント受信→KV保存（conversationsはWebhook前提のため）。
   // ※認証不要（Metaサーバーからの呼び出し）。
   if (action === 'webhook') {
     if (req.method === 'GET') {
-      const VERIFY = process.env.IG_WEBHOOK_VERIFY_TOKEN || 'cantik_meo_verify';
-      if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY) {
+      const VERIFY = process.env.IG_WEBHOOK_VERIFY_TOKEN;
+      if (VERIFY && req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY) {
         return res.status(200).send(req.query['hub.challenge']);
       }
       return res.status(403).end();
@@ -76,6 +86,8 @@ export default async function handler(req, res) {
     }
     return res.status(405).end();
   }
+
+  if (!await requireStaff(req,res)) return;
 
   // ── 予約下書き（KV保存。Google APIに予約機能が無いため自前管理） ──
   // ここはトークン不要（自社KVのみ操作）。storeId をキーに使う。

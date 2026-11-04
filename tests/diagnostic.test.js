@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import '../assets/meo-diagnostic.js';
+const run=globalThis.meoDiagnostic;
+const k={storeName:'店',category:'飲食',address:'住所',phone:'電話',businessHours:'時間',description:'説明',services:'商品'};
+test('全件未取得ならゼロ点や緊急対応と断定しない',()=>{const d=run();assert.equal(d.score,null);assert.equal(d.coverage,0);assert.ok(d.items.every(x=>x.ok===null));});
+test('取得失敗のナレッジは未記入と区別する',()=>{const d=run({error:'取得失敗'});assert.ok(d.items.slice(0,7).every(x=>x.ok===null));});
+test('口コミ評価・検索順位・写真の古さで準備スコアを水増ししない',()=>{const args=[k,{keywords:['飲食店'],history:[{rankings:[1]}]},{totalCount:10,unrepliedCount:0,averageRating:5},true,{categories:{primaryCategory:{}},websiteUri:'https://example.com'},{photoCount:2,photoDays:1}];const a=run(...args);args[1].history[0].rankings=[99];args[2].averageRating=2;args[5].photoDays=900;const b=run(...args);assert.equal(a.score,b.score);assert.equal(a.score,100);});
+test('口コミゼロは未返信なし、未返信数欠落は未取得',()=>{assert.equal(run(k,{}, {totalCount:0,unrepliedCount:0}).items.find(x=>x.label==='口コミへの返信').ok,true);assert.equal(run(k,{}, {totalCount:0}).items.find(x=>x.label==='口コミへの返信').ok,null);});
+test('副カテゴリの追加や検索語の数を競わせない',()=>{const a=run(k,{keywords:['店舗']}, {},true,{categories:{primaryCategory:{}},websiteUri:'https://example.com'});const b=run(k,{keywords:['店舗','地域','商品']}, {},true,{categories:{primaryCategory:{},additionalCategories:[{},{}]},websiteUri:'https://example.com'});assert.equal(a.score,b.score);});
+test('一部だけ回答済みの台帳では未回答の項目を減点対象にしない',()=>{const d=run({_partial:true,address:'回答済みの住所'});assert.equal(d.items.find(x=>x.label==='所在地の記録').ok,true);assert.equal(d.items.find(x=>x.label==='店名の記録').ok,null);});

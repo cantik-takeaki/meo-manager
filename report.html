@@ -143,7 +143,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
         <div class="stat-value" style="color:var(--red)" id="statLow">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">平均順位</div>
+        <div class="stat-label">順位確認分の平均</div>
         <div class="stat-value gold" id="statAvg">—</div>
       </div>
     </div>
@@ -194,6 +194,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </div>
 
 <script>
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rankChart = null;
 const storeId = new URLSearchParams(location.search).get('store') || '';
 
@@ -201,22 +202,10 @@ async function init() {
   // URLにstoreIdがあれば自動セット
   if (storeId) document.getElementById('inputStoreId').value = storeId;
 
-  // セッション確認
-  const session = getSession();
-  if (session) {
-    showApp(session.storeName, session.storeId);
-  }
-}
-
-function getSession() {
-  try {
-    const c = document.cookie.split(';').find(c => c.trim().startsWith('client_session='));
-    if (!c) return null;
-    const val = c.split('=')[1];
-    const s = JSON.parse(atob(val));
-    if (s.exp < Date.now()) return null;
-    return s;
-  } catch { return null; }
+  // HttpOnlyのセッションをサーバーで検証する。
+  try { const response=await fetch('/api/client?action=session');
+    if(response.ok){const session=await response.json();if(!storeId||session.storeId===storeId)showApp(session.storeName,session.storeId);}
+  } catch {}
 }
 
 async function doLogin() {
@@ -253,6 +242,7 @@ function showApp(storeName, sid) {
   document.getElementById('topbarStore').textContent = storeName;
   document.getElementById('reportTitle').textContent = storeName + ' — MEOレポート';
   loadReport(sid);
+  if(!document.getElementById('operationsLink')){const a=document.createElement('a');a.id='operationsLink';a.href='/operations.html';a.textContent='掲載情報の確認・承認へ';document.getElementById('reportTitle').after(a);}
 }
 
 async function loadReport(sid) {
@@ -295,9 +285,9 @@ async function loadReport(sid) {
               : change > 0 ? `<span class="rank-change up">▲${change}</span>`
               : change < 0 ? `<span class="rank-change down">▼${Math.abs(change)}</span>`
               : '<span class="rank-change same">→</span>';
-            const status = !rank ? '未計測' : rank <= 3 ? '🥇 上位表示中' : rank <= 10 ? '✅ 1ページ目' : '⚠️ 要改善';
+            const status = !rank ? '未計測' : rank <= 3 ? '上位表示中' : rank <= 10 ? '10位以内' : '改善を検討';
             return `<tr>
-              <td><strong>${r.keyword}</strong></td>
+              <td><strong>${escapeHtml(r.keyword)}</strong></td>
               <td><span class="rank-badge ${rankClass}">${rank || '—'}</span></td>
               <td>${changeHtml}</td>
               <td style="font-size:12px">${status}</td>
@@ -322,13 +312,13 @@ async function loadReport(sid) {
       document.getElementById('challengeList').innerHTML = allChallenges.length
         ? allChallenges.map(c => `
           <div class="challenge-item">
-            <div class="challenge-icon ${c.level}">${c.level === 'high' ? '🔴' : c.level === 'mid' ? '🟡' : '🟢'}</div>
+            <div class="challenge-icon ${c.level}">${c.level === 'high' ? '高' : c.level === 'mid' ? '中' : '低'}</div>
             <div>
               <div class="challenge-label ${c.level}">${c.level === 'high' ? '優先対応' : c.level === 'mid' ? '改善推奨' : '良好'}</div>
-              <div class="challenge-text">${c.message}</div>
+              <div class="challenge-text">${escapeHtml(c.message)}</div>
             </div>
           </div>`).join('')
-        : '<div class="empty">現在課題はありません ✅</div>';
+        : '<div class="empty">取得済みデータから検出した課題はありません</div>';
     }
 
     // Reviews Summary（管理画面が口コミを読み込んだ時点の統計キャッシュ）
@@ -355,26 +345,26 @@ async function loadReport(sid) {
     const cc = data.compCompare || [];
     if (cc.length) {
       document.getElementById('compCard').style.display = '';
-      const fmt = r => (Number.isFinite(r) && r >= 1) ? r + '位' : '圏外';
+      const fmt = r => (Number.isFinite(r) && r >= 1) ? r + '位' : '順位未確認';
       document.getElementById('compTable').innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">
-        <thead><tr style="border-bottom:2px solid var(--border,#e2e8f0)"><th style="text-align:left;padding:8px 6px">キーワード</th><th style="padding:8px 6px">自店</th>${(data.competitors || []).map(n => `<th style="padding:8px 6px">${n}</th>`).join('')}</tr></thead>
+        <thead><tr style="border-bottom:2px solid var(--border,#e2e8f0)"><th style="text-align:left;padding:8px 6px">キーワード</th><th style="padding:8px 6px">自店</th>${(data.competitors || []).map(n => `<th style="padding:8px 6px">${escapeHtml(n)}</th>`).join('')}</tr></thead>
         <tbody>${cc.map(h => `<tr style="border-bottom:1px solid var(--border,#eef2f7)">
-          <td style="padding:8px 6px;font-weight:600">${h.keyword}</td>
+          <td style="padding:8px 6px;font-weight:600">${escapeHtml(h.keyword)}</td>
           <td style="padding:8px 6px;text-align:center;font-weight:700;color:${Number.isFinite(h.self) && h.self <= 3 ? '#10b981' : Number.isFinite(h.self) && h.self <= 10 ? '#f59e0b' : '#64748b'}">${fmt(h.self)}</td>
-          ${h.comps.map(c => `<td style="padding:8px 6px;text-align:center;color:${Number.isFinite(h.self) && (!Number.isFinite(c.rank) || h.self < c.rank) ? '#10b981' : '#ef4444'}">${fmt(c.rank)}</td>`).join('')}
+          ${h.comps.map(c => `<td style="padding:8px 6px;text-align:center;color:${!Number.isFinite(h.self) || !Number.isFinite(c.rank) ? '#64748b' : h.self < c.rank ? '#10b981' : h.self > c.rank ? '#ef4444' : '#64748b'}">${fmt(c.rank)}</td>`).join('')}
         </tr>`).join('')}</tbody></table></div>
-        <div style="font-size:11px;color:var(--text-sub);margin-top:6px">緑＝自店が競合に勝っているキーワード／赤＝負けているキーワード</div>`;
+        <div style="font-size:11px;color:var(--text-sub);margin-top:6px">双方の順位を確認できた場合のみ、緑＝自店が上位、赤＝競合が上位。灰色＝同順位または未確認。</div>`;
     }
 
     // Store Info
     const k = data.knowledge || {};
     document.getElementById('storeInfo').innerHTML = [
-      k.storeName && `<div><strong>店舗名:</strong> ${k.storeName}</div>`,
-      k.category && `<div><strong>業種:</strong> ${k.category}</div>`,
-      k.businessHours && `<div><strong>営業時間:</strong> ${k.businessHours}</div>`,
-      k.phone && `<div><strong>電話:</strong> ${k.phone}</div>`,
-      k.nearbyLandmarks && `<div><strong>アクセス:</strong> ${k.nearbyLandmarks}</div>`,
-      k.parking && `<div><strong>駐車場:</strong> ${k.parking}</div>`,
+      k.storeName && `<div><strong>店舗名:</strong> ${escapeHtml(k.storeName)}</div>`,
+      k.category && `<div><strong>業種:</strong> ${escapeHtml(k.category)}</div>`,
+      k.businessHours && `<div><strong>営業時間:</strong> ${escapeHtml(k.businessHours)}</div>`,
+      k.phone && `<div><strong>電話:</strong> ${escapeHtml(k.phone)}</div>`,
+      k.nearbyLandmarks && `<div><strong>アクセス:</strong> ${escapeHtml(k.nearbyLandmarks)}</div>`,
+      k.parking && `<div><strong>駐車場:</strong> ${escapeHtml(k.parking)}</div>`,
     ].filter(Boolean).join('') || '<div>店舗情報が未登録です</div>';
 
   } catch (e) {
@@ -390,7 +380,7 @@ function renderChart(rankings, history) {
 
   const datasets = rankings.map((r, i) => ({
     label: r.keyword,
-    data: history.map(h => h.rankings[i] ?? null),
+    data: history.map(h => r.history?.find(x => x.date === h.date)?.rank ?? null),
     borderColor: colors[i % colors.length],
     backgroundColor: colors[i % colors.length] + '20',
     tension: 0.3,

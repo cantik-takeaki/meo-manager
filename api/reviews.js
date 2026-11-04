@@ -1,3 +1,4 @@
+import { requireStaff } from './_auth.js';
 // api/reviews.js — 口コミ一覧・返信
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
 import { kvSet } from './_kv.js';
@@ -12,6 +13,7 @@ function parseCookies(req) {
 }
 
 export default async function handler(req, res) {
+  if (!await requireStaff(req,res)) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import {createGoogleClient} from '../lib/workspace-google.js';
+const scope='https://www.googleapis.com/auth/business.manage';
+function fixture(){const env={GOOGLE_CLIENT_ID:'test-client',GOOGLE_CLIENT_SECRET:crypto.randomBytes(12).toString('hex'),WORKSPACE_GOOGLE_REDIRECT_URI:'https://example.com/api/workspace?action=google-callback',WORKSPACE_TOKEN_KEY:crypto.randomBytes(32).toString('base64')};const calls=[];const refresh=crypto.randomBytes(24).toString('hex');return {calls,refresh,client:createGoogleClient(env,async(url,options)=>{calls.push({url,options});let body={};if(url.includes('oauth2.googleapis.com'))body={refresh_token:refresh,access_token:'test-access',scope};else if(url.includes('accountmanagement'))body={accounts:[{name:'accounts/1'}]};else body=new URL(url).searchParams.has('pageToken')?{locations:[{name:'locations/2',title:'店舗2'}]}:{locations:[{name:'locations/1',title:'店舗1'}],nextPageToken:'next-page'};return {ok:true,status:200,json:async()=>body};})};}
+test('Google連携は契約に結び付けて暗号化し全ページを取得する',async()=>{const f=fixture(),sealed=await f.client.exchange('test-code','test-verifier','tenant-a');assert.equal(JSON.stringify(sealed).includes(f.refresh),false);const stores=await f.client.locations(sealed,'tenant-a');assert.equal(stores.length,2);await assert.rejects(()=>f.client.locations(sealed,'tenant-b'),e=>e.status===503);});
+test('Google認証はstateとPKCEを要求し固定の登録済み戻り先を使う',()=>{const {client}=fixture();const u=new URL(client.start('test-state','test-verifier'));assert.equal(u.hostname,'accounts.google.com');assert.equal(u.searchParams.get('state'),'test-state');assert.equal(u.searchParams.get('code_challenge_method'),'S256');assert.equal(u.searchParams.get('scope'),scope);});
+test('Google連携の必須設定なしは代替アカウントへ接続しない',()=>{assert.throws(()=>createGoogleClient({}).start('state','verifier'),e=>e.status===503);});
