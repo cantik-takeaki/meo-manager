@@ -53,3 +53,13 @@ test('モデルの候補選択と代替文を別々に記録する',async()=>{
   const invalid=await composeReview(...args,async()=>'[8]','food');
   assert.equal(invalid.source,'template');
 });
+test('美名家の5項目と店の清潔さを3文につなぎ、未入力の品名や地名を添えない',async()=>{
+ const selected=['料理がおいしい','雰囲気が良い','提供が早い','コスパが良い','おすすめしたい'];
+ const draft=await composeReview(selected,'店が綺麗だった','ja',async()=>'{"choices":[0]}','food');
+ assert.equal(draft.source,'ai');
+ assert.equal(draft.content,'店内はきれいで、雰囲気も良かったです。料理は出てくるのが早くて、おいしかったです。コスパも良く、人にもすすめたいと思います。');
+ const negative='店が綺麗だったとは思わない。18分待った。';
+ const fallback=await composeReview(selected,negative,'ja',async()=>'架空の体験','food');
+ assert.ok(fallback.content.endsWith(negative));
+ assert.ok(!fallback.content.includes('店内はきれいで'));
+});
