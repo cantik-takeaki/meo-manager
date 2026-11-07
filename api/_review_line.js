@@ -68,12 +68,12 @@ export async function formatBubble(q) {
     ] },
     footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
       ...(copy ? [{ type: 'button', height: 'sm', action: copy.length <= 1000
-        ? { type: 'clipboard', label: '返信文をコピー', clipboardText: copy }
+        ? { type: 'clipboard', label: '返信本文をコピー', clipboardText: copy }
         : { type: 'message', label: 'コピー用の返信全文', text: '返信文 ' + q.id } }] : []),
       ...(copy && copy.length <= 1000 ? [t('長押しでコピーする場合は「返信文 ' + q.id + '」と送ってください。', { size: 'xs' })] : []),
       { type: 'button', height: 'sm', action: { type: 'message', label: '口コミ原文を見る', text: '原文 ' + q.id } },
       { type: 'button', style: 'primary', color: '#0f4aa2', height: 'sm',
-        action: { type: 'postback', label: 'この返信で送る', data: `rv=ok&id=${q.id}`, displayText: `送る：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
+        action: { type: 'postback', label: 'この返信でGoogleに送る', data: `rv=ok&id=${q.id}`, displayText: `送る：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
       { type: 'button', style: 'secondary', height: 'sm',
         action: { type: 'postback', label: '文を直す', data: `rv=edit&id=${q.id}`, displayText: `文を直す：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
       { type: 'button', style: 'secondary', height: 'sm',
@@ -234,7 +234,7 @@ export async function listText() {
 }
 
 // Read-only example card. Its ID is separate from approval IDs and cannot publish a review.
-export async function sendReviewPreview(q, operation) {
+export async function sendReviewPreview(q, operation, actionable = false) {
   const digest = crypto.createHash('sha256').update(operation + q.reviewId + q.reply).digest('hex');
   const id = digest.slice(0,10);
   const receiptKey = 'rv_preview_sent_' + digest;
@@ -242,19 +242,32 @@ export async function sendReviewPreview(q, operation) {
   if (receipt) return receipt;
   const target = await lineTarget();
   if (target.error) throw new Error(target.error);
-  const preview = { ...q, id, status: 'preview' };
+  const preview = { ...q, id, status: actionable ? 'pending' : 'preview' };
   const bubble = await formatBubble(preview);
-  bubble.header.contents[0].text = '口コミの確認用見本（公開操作なし）';
-  bubble.footer.contents = bubble.footer.contents.filter(x => x.action?.type !== 'postback');
+  if (!actionable) {
+    bubble.header.contents[0].text = '口コミの確認用見本（公開操作なし）';
+    bubble.footer.contents = bubble.footer.contents.filter(x => x.action?.type !== 'postback');
+  }
   const copy = bubble.footer.contents.find(x => x.action?.type === 'clipboard')?.action.clipboardText;
   if (copy !== q.reply || !copy.includes('\n\nこの度は誠にありがとうございました。\n-')) throw new Error('コピー文の改行を確認できません');
   const label = bubble.body.contents.findIndex(x => x.text === 'お客様の口コミ（日本語訳）');
   if (label < 0) throw new Error('日本語訳を取得できません');
-  await kvSet(PENDING_PREFIX + id, preview);
+  const existing = await kvGet(PENDING_PREFIX + id);
+  if (existing && existing.status !== preview.status) throw new Error('この確認は対応済みです');
+  if (!existing) await kvSet(PENDING_PREFIX + id, preview);
+  if (actionable) {
+    await kvSet('rv_latest_' + q.reviewId, id);
+    const ids = await kvGet(QUEUE_KEY) || [];
+    const old = await Promise.all(ids.filter(other=>other !== id).map(async other=>[other,await kvGet(PENDING_PREFIX+other)]));
+    for (const [other,rec] of old) {
+      if (rec?.reviewId === q.reviewId && rec.status === 'pending') await kvSet(PENDING_PREFIX + other,{...rec,status:'superseded'});
+    }
+    await kvSet(QUEUE_KEY,[...new Set([...ids,id])]);
+  }
   const retryKey = [digest.slice(0,8),digest.slice(8,12),'4'+digest.slice(13,16),'a'+digest.slice(17,20),digest.slice(20,32)].join('-');
   const result = await push(target.token,target.to[0],[{type:'flex',altText:'口コミ確認用：'+q.store,contents:bubble}], retryKey);
   if (!result.ok) throw new Error('LINE受付失敗 '+result.status+' '+result.error);
-  const record = {id, accepted:true, at:new Date().toISOString(), requestId:result.requestId, translation:bubble.body.contents[label+1].text, copy, original:originalComment(q.review)};
+  const record = {id, buttons:bubble.footer.contents.flatMap(x=>x.action?[x.action.label]:[]), accepted:true, at:new Date().toISOString(), requestId:result.requestId, translation:bubble.body.contents[label+1].text, copy, original:originalComment(q.review)};
   await kvSet(receiptKey, record);
   return record;
 }

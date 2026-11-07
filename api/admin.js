@@ -876,6 +876,8 @@ export default async function handler(req, res) {
     // 「あとで」：順番待ちの最後に回して次の1件を出す（店の了解待ちなど）
     if (b.decision === 'later') { await moveToEnd(id); return sayNext(`あとでにしました：${label}`, id); }
     if (b.decision !== 'ok') return say('操作を判別できませんでした。');
+    const latest = await kvGet('rv_latest_' + p.reviewId);
+    if (latest && latest !== id) return say('返信案が更新されています。最新の確認カードから操作してください。');
     // ★押した瞬間に記録（結果を待たない）。もう1人が続けて押しても「対応済み」になる
     await kvSet(key, { ...p, status: 'sending', by: b.userId || '', at: now });
     const fin = async (status, extra = {}) => kvSet(key, { ...p, status, by: b.userId || '', at: now, doneAt: new Date().toISOString(), ...extra });
