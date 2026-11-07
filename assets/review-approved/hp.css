@@ -114,3 +114,13 @@ body[data-slug=jeans][data-hp] .hero-photo img{object-fit:contain}
 @media(min-width:768px){body[data-slug=jeans][data-hp] .hero-photo{height:340px}}
 
 @media(max-width:600px){body[data-family=fitness] .brand-hero .hero-photo{height:180px;min-height:0}body[data-family=fitness] .brand-copy{padding-block:10px}}
+
+@media(max-width:600px){
+ body[data-slug] .progress{padding-block:12px}
+ body[data-slug] .rating-label{margin-block:10px}
+ body[data-slug] .rating-field{margin-top:16px}
+ body[data-slug=jeans][data-hp] .hero-photo{height:145px}
+ body[data-slug=jeans][data-hp] .site-header{height:84px}
+ body[data-slug=jeans][data-hp] .brand-copy,body[data-slug=myondong][data-hp] .brand-copy{padding-block:12px}
+ body[data-slug=myondong][data-hp] .brand-hero{min-height:210px}
+}
