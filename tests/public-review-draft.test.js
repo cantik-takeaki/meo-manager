@@ -175,3 +175,23 @@ test('英中韓の任意項目も選んだときだけ入り、再訪を断る�
  const result=await composeReview(['また来たい'],'もう行きたくありません。','ja',async()=>'[0]','food',[]);
  assert.equal(result.content,'もう行きたくありません。');
 });
+
+test('同業種で同じ3項目を選んだ17店舗に、感謝の結びを除いても異なる本文を割り当てる',async()=>{
+ const seen=new Map();
+ for(const group of Object.values(storeGroups)){
+  if(!seen.has(group))seen.set(group,new Set());
+  const used=seen.get(group),recent=[];
+  const select=[choices[group].ja[0],'また来たい','感謝を伝えたい'];
+  for(let i=0;i<3;i++){
+    const result=await composeReview(select,'','ja',async()=>'[0]',group,recent,async forms=>{
+      const n=forms.findIndex(x=>!used.has(x.body));
+      assert.notEqual(n,-1);
+      used.add(forms[n].body);return n;
+    });
+    assert.ok(result.sharedHistory);
+    assert.doesNotMatch(result.content,/感謝しています/);
+    assert.match(result.content,/ありがとう/);
+    recent.push(result.variant);
+  }
+ }
+});
