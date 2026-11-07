@@ -22,6 +22,102 @@
     {
       "path": "/api/admin?action=cron-tamper",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=0",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=1",
+      "schedule": "15 1 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=2",
+      "schedule": "15 2 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=3",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=4",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=5",
+      "schedule": "15 5 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=6",
+      "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=7",
+      "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=8",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=9",
+      "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=10",
+      "schedule": "15 10 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=11",
+      "schedule": "15 11 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=12",
+      "schedule": "15 12 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=13",
+      "schedule": "15 13 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=14",
+      "schedule": "15 14 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=15",
+      "schedule": "15 15 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=16",
+      "schedule": "15 16 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=17",
+      "schedule": "15 17 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=18",
+      "schedule": "15 18 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=19",
+      "schedule": "15 19 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=20",
+      "schedule": "15 20 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=21",
+      "schedule": "15 21 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=22",
+      "schedule": "15 22 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-review-reply&slot=23",
+      "schedule": "15 23 * * *"
     }
   ]
 }

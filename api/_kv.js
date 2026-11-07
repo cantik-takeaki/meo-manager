@@ -79,3 +79,14 @@ export async function kvScanKeys(match = '*') {
   if(cursor!=='0')throw new Error('保存先の一覧取得が上限に達しました');
   return [...new Set(keys)];
 }
+
+export async function acquireReviewLock(owner) {
+  const {url,token}=getKV();
+  const r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(['SET','review_run_lock',owner,'NX','EX',120]),signal:AbortSignal.timeout(5000)});
+  return (await responseData(r)).result==='OK';
+}
+export async function releaseReviewLock(owner) {
+  const {url,token}=getKV();
+  const r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(['EVAL',"if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0",1,'review_run_lock',owner]),signal:AbortSignal.timeout(5000)});
+  await responseData(r);
+}

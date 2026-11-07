@@ -890,6 +890,9 @@ export default async function handler(req, res) {
     try {
       const cur = await (await fetch(`https://mybusiness.googleapis.com/v4/${p.locationName}/reviews/${p.reviewId}`, { headers: { Authorization: `Bearer ${token}` } })).json();
       if (cur.error) { await fin('failed', { error: cur.error.message }); return sayNext(`口コミを確認できなかったため送りませんでした：${label}\n（${cur.error.message}）`); }
+      if (p.reviewUpdateTime && (p.reviewUpdateTime !== (cur.updateTime || cur.createTime) || (cur.comment || '') !== (p.review || ''))) {
+        await fin('skipped_changed'); return sayNext('口コミが変更されました。最新の内容を確認してから返信してください。');
+      }
       if (cur.reviewReply && cur.reviewReply.comment) {
         if (!p.replace) { await fin('skipped_replied'); return sayNext(`店側ですでに返信済みのため送りませんでした：${label}`); }
         // 差し替え：監査したときの返信から店が自分で変えていたら上書きしない（麻辣王酒場の例）
@@ -1566,157 +1569,8 @@ export default async function handler(req, res) {
   //   （社長叱責 2026-10-06・麻辣王酒場：★1に「ご指摘のとおりです。店として改めます。」と返した。絶対遵守 §1-40）
   // 停止スイッチ＝KV `review_autoreply_mode`（'auto' / 'draft' / 'off'・既定は 'draft'）
   if (req.method === 'GET' && action === 'cron-review-reply') {
-    if (process.env.CRON_SECRET && (req.headers.authorization || '') !== `Bearer ${process.env.CRON_SECRET}` && !access_token && !_c.pw_session) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-    const mode = (await kvGet('review_autoreply_mode')) || 'draft';
-    if (mode === 'off') return res.json({ skipped: 'review_autoreply_mode=off' });
-
-    // VERCEL_URL は「そのデプロイ固有のURL」で、Vercelの保護が有効だと自分自身への
-    // 内部呼び出しが401になる。安定した本番ドメインを先に使う（2026-09-13・生成が全件空だった原因）。
-    const BASE = (process.env.REDIRECT_URI || '').replace(/\/api\/.*$/, '')
-      || 'https://meo-manager-rho.vercel.app';
-    const masterToken = await getMasterToken();
-    const managed = await kvGet('managed_locations') || [];
-    const sentIds = new Set((await kvGet('review_reply_sent')) || []);
-    const alerted = new Set((await kvGet('review_line_alerted')) || []);   // LINEで確認依頼を送った口コミ
-    const lineQueue = [];
-    const summary = { at: new Date().toISOString(), mode, checked: 0, sent: 0, drafted: 0, skipped: 0, paused: [], failed: [] };
-    const audit = (await kvGet('review_reply_log')) || [];
-    const pausedLids = new Set(((await kvGet('meo_paused_stores')) || []).map(x => x.lid));
-    const companyMap = (await kvGet('store_company')) || {};
-
-    for (const m of managed) {
-      const locationName = m.locationName || '';
-      if (!locationName) continue;
-      const sid = String(m.locId || '').replace(/\//g, '_');
-      // 更新停止中の店は、下書きもLINEも作らずに飛ばす（社長指示 2026-10-06・麻辣王酒場）
-      if (pausedLids.has(_lidOf(sid) || _lidOf(locationName))) { summary.paused.push(m.title || sid); continue; }
-      const token = m.storeId ? (await getAccessToken(m.storeId)) || masterToken : masterToken;
-      if (!token) { summary.skipped++; continue; }
-      try {
-        const rr = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/reviews`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const rd = await rr.json();
-        if (rd.error) { summary.failed.push([m.title, rd.error.message]); continue; }
-        const STAR = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
-        const unreplied = (rd.reviews || []).filter(x => !x.reviewReply && !sentIds.has(x.reviewId));
-        summary.checked += unreplied.length;
-
-        // 直近の返信（書き出し重複の判定に使う）
-        const past = (rd.reviews || []).filter(x => x.reviewReply?.comment)
-          .slice(0, 5).map(x => x.reviewReply.comment);
-        const knowledge = (await kvGet(`knowledge_${sid}`)) || {};
-
-        for (const rv of unreplied) {
-          const star = STAR[rv.starRating] || 0;
-          const isPositive = star >= 4;
-          const cls = classifyReview(rv.comment || '', star);
-          try {
-            const g = await fetch(`${BASE}/api/generate-content`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                locationId: sid,
-                type: isPositive ? 'reply_positive' : 'reply_negative',
-                reviewText: rv.comment || '',
-                rating: star,
-                reviewerName: rv.reviewer?.displayName || '',
-                pastReplies: past,
-              }),
-            }).then(r => r.json());
-            const body = String(g.content || '').trim();
-            const gateOk = !g.meta?.gate || g.meta.gate.ok;
-            // 社長指示 2026-10-07「今後全ての口コミに対する返信はグループで確認するようにして」
-            //   ★の数に関係なく、すべての返信を公式LINEのグループで確認してから送る（自動送信はしない）。
-            //   背景＝麻辣王酒場から契約解除の申し入れ（店の確認なしにオーナー名義で返信したため）。
-            const needsHuman = true;
-
-            // すべて下書き保存し、グループで確認してから送る
-            if (needsHuman || !isPositive || !gateOk || mode !== 'auto') {
-              const key = `review_draft_${sid}`;
-              const drafts = (await kvGet(key)) || [];
-              const rec = { reviewId: rv.reviewId, star, name: rv.reviewer?.displayName || '',
-                            review: (rv.comment || '').slice(0, 500), reply: body,
-                            gate: g.meta?.gate || null, at: new Date().toISOString(),
-                            rule: REPLY_RULE, template: !!g.meta?.template, hits: cls.hits,
-                            reason: star <= 3 ? '★3以下（公式LINEのグループで確認）'
-                                  : cls.needsHuman ? '本文にクレームあり（公式LINEのグループで確認）'
-                                  : 'すべての返信はグループで確認（社長指示 2026-10-07）' };
-              const at = drafts.findIndex(d => d.reviewId === rv.reviewId);
-              if (at < 0) {
-                drafts.unshift(rec);
-                if (drafts.length > 50) drafts.length = 50;
-                await kvSet(key, drafts);
-              } else if ((!String(drafts[at].reply || '').trim() && body) || drafts[at].rule !== REPLY_RULE) {
-                // 本文が空の下書きは作り直す。AI生成が落ちた日に空のまま居座り、
-                // 「既にある」判定で二度と埋まらなくなっていた（2026-09-13実測・8件全部が空）。
-                // 旧ルール（2026-10-06より前＝クレームを認める文）で作った下書きも作り直す。
-                drafts[at] = rec;
-                await kvSet(key, drafts);
-              }
-              if (needsHuman && !alerted.has(rv.reviewId)) {
-                lineQueue.push({ reviewId: rv.reviewId, store: m.title, company: companyMap[_lidOf(sid)] || '',
-                                 sid, locationName, star, name: rv.reviewer?.displayName || '',
-                                 date: String(rv.createTime || '').slice(0, 10), review: rv.comment || '', reply: body });
-              }
-              summary.drafted++;
-              if (!body) summary.failed.push([m.title, String(rv.reviewId).slice(0, 12), '生成が空: ' + JSON.stringify(g).slice(0, 180)]);
-              continue;
-            }
-
-            // 自動送信（★4-5・ゲート通過・mode=auto のときだけ）
-            const pr = await fetch(`https://mybusiness.googleapis.com/v4/${locationName}/reviews/${rv.reviewId}/reply`, {
-              method: 'PUT',
-              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ comment: body }),
-            });
-            const pd = await pr.json();
-            if (pd.error) { summary.failed.push([m.title, rv.reviewId, pd.error.message]); continue; }
-            sentIds.add(rv.reviewId);
-            summary.sent++;
-            audit.unshift({ at: new Date().toISOString(), store: m.title, reviewId: rv.reviewId,
-                            star, reply: body, gate: g.meta?.gate || null });
-            past.unshift(body);
-          } catch (e) { summary.failed.push([m.title, rv.reviewId, e.message]); }
-        }
-      } catch (e) { summary.failed.push([m.title, e.message]); }
-    }
-
-    if (audit.length > 200) audit.length = 200;
-    await kvSet('review_reply_log', audit);
-    await kvSet('review_reply_sent', [...sentIds].slice(-1000));
-
-    // 公式LINEで社長と従業員に確認を依頼（★3以下・クレームを含む口コミ）
-    //   送る「前に」送信済みとして記録する。結果を待ってから記録すると、
-    //   途中で落ちた日に翌日また同じ依頼が届く（2026-09-27 メール42社重複送信の再発防止）。
-    //   グループが未設定のうちは送らず、送信済みにもしない（設定後の実行でまとめて届く）。
-    if (lineQueue.length) {
-      const tg = await lineTarget();
-      if (tg.error) summary.line = { skipped: tg.error, items: lineQueue.length };
-      else {
-        for (const q of lineQueue) alerted.add(q.reviewId);
-        await kvSet('review_line_alerted', [...alerted].slice(-1000));
-        try { summary.line = await pushReviewAlerts(lineQueue); }
-        catch (e) { summary.line = { error: e.message }; }
-      }
-    }
-    await kvSet('cron_review_reply_last', summary);
-
-    // 下書きが出たらメールで知らせる（★3以下は人が読む必要があるため）
-    try {
-      if (summary.drafted > 0 && (await kvGet('notify_review_draft')) !== false) {
-        const to = process.env.ADMIN_USER || ((await kvGet('admin_credential')) || {}).user;
-        if (to) {
-          await sendMail(to, `【ラクラクMEO】口コミ返信の下書きが${summary.drafted}件あります`,
-            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">確認が必要な口コミ返信があります</h2>` +
-            `<p>自動送信 ${summary.sent}件 / 下書き ${summary.drafted}件（★3以下・ゲート未通過・draftモードのもの）</p>` +
-            `<p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで確認する →</a></p></div>`);
-        }
-      }
-    } catch (e) { /* メール失敗で本体を落とさない */ }
-
-    return res.json(summary);
+    const { runReviews } = await import('../lib/review-run.js');
+    return runReviews(req, res);
   }
 
   // ── 営業デモ用のサンプル店舗を作成/削除（実データと同じKVに入れるので全機能がそのまま動く） ──
