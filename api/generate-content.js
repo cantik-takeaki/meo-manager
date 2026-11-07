@@ -635,7 +635,7 @@ CRITICAL rules:
     const content = _star <= 3
       ? complaintTemplate(verb, 'Japanese')
       : `この度は${verb}いただき、ありがとうございました。\n評価をお寄せいただき、嬉しく思います。\nまたのお越しをお待ちしております。`;
-    return res.json({ content: formatOwnerReply(content, storeName), meta: { template: true, starOnly: true, needsHuman: true,
+    return res.json({ content: formatOwnerReply(content, storeName, reviewText), meta: { template: true, starOnly: true, needsHuman: true,
       gate: { ok: true, failed: [], len: content.replace(/\s/g, '').length }, via: 'template' } });
   }
 
@@ -1996,7 +1996,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       ? { len: content.replace(/\s/g, '').length, minLen: 300 }
       : gate ? { gate: { ok: gate.ok, failed: gate.failed, len: gate.detail?.len }, template: !!gate.template,
                  needsHuman: !!(_cls && _cls.needsHuman), hits: _cls ? _cls.hits : [] } : undefined;
-    res.json({ content: _isReply ? formatOwnerReply(content, storeName) : content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
+    res.json({ content: _isReply ? formatOwnerReply(content, storeName, reviewText) : content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
