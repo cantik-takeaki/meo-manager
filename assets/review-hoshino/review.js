@@ -51,6 +51,8 @@ function renderPoints(){
 }
 function updateGenerate(){$('generate').disabled=busy||(!selected.size&&!$('freeWord').value.trim());}
 async function publicDraft(chosen,free) {
+ // 自由記述だけの場合は通信せず、本人の文章をそのまま表示。
+ if(!chosen.length)return window.reviewSentenceLines(free);
  const response=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'public_review_draft',locationId:STORE_ID,language:lang,selected:chosen,free,qrToken:params.get('t')||''})});
  if(!response.ok) throw new Error('draft');
  const {content}=await response.json();
@@ -58,7 +60,7 @@ async function publicDraft(chosen,free) {
  return content;
 }
 async function generate(){
- if(busy||!ready||!$('freeWord').value.trim())return;busy=true;updateGenerate();$('regenerate').disabled=true;status('loading');
+ if(busy||!ready||(!selected.size&&!$('freeWord').value.trim()))return;busy=true;updateGenerate();$('regenerate').disabled=true;status('loading');
  const chosen=pointLabels().filter(p=>selected.has(p.key)).map(p=>p.label),free=$('freeWord').value.trim();
  try{
   const draft=PREVIEW?[...chosen,free].filter(Boolean).join('\n'):await publicDraft(chosen,free);

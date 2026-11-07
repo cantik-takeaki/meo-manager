@@ -55,6 +55,8 @@ function renderPoints(){
 function updateGenerate(){$('generate').disabled=busy||(!selected.size&&!$('freeWord').value.trim());}
 const publicStores=new Set(["locations_5578260952676210890", "locations_12332122902027297880", "locations_2627626953772130095", "locations_14391760168482892177", "locations_5106899372643700327", "locations_1959110751756847691", "locations_13828016303183421848", "locations_12710891692154182344", "locations_4456760885406966783", "locations_10230344167681762018", "locations_14671860755109416873", "locations_12301127793604271342", "locations_5780589838975014369", "locations_9518356864474251537", "locations_3901960261682938856", "locations_2654171132731280268", "locations_2965085144069334569"]);
 async function publicDraft(chosen,free) {
+ // 自由記述だけの場合は通信せず、本人の文章をそのまま表示。
+ if(!chosen.length)return window.reviewSentenceLines(free);
  const response=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'public_review_draft',locationId:STORE_ID,language:lang,selected:chosen,free,qrToken:params.get('t')||''})});
  if(!response.ok) throw new Error('draft');
  const {content}=await response.json();
