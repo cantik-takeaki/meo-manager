@@ -84,16 +84,16 @@ export async function formatBubble(q) {
   };
 }
 
-async function push(token, to, messages) {
+async function push(token, to, messages, retryKey = crypto.randomUUID()) {
   const r = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
-      'X-Line-Retry-Key': crypto.randomUUID(),   // LINE側でも同じ送信は1回にする
+      'X-Line-Retry-Key': retryKey,   // LINE側でも同じ送信は1回にする
     },
     body: JSON.stringify({ to, messages }),
   });
-  if (r.ok) return { ok: true };
+  if (r.ok || (r.status === 409 && r.headers.get('x-line-accepted-request-id'))) return { ok: true, requestId: r.headers.get('x-line-accepted-request-id') || r.headers.get('x-line-request-id') };
   return { ok: false, status: r.status, error: (await r.text()).slice(0, 200) };
 }
 
@@ -127,7 +127,8 @@ export async function pushReviewAlerts(queue, opts = {}) {
   if (!opts.carousel) {
     const qk = (await kvGet(QUEUE_KEY)) || [];
     await kvSet(QUEUE_KEY, [...qk, ...items.map(x => x.id)]);
-    const { next, remaining } = await nextPending();
+    const { remaining } = await nextPending();
+    const next = items[0];
     const nNew = items.filter(x => !x.replace).length, nRep = items.filter(x => x.replace).length;
     const head = `口コミの確認が${items.length}件届きました${nNew && nRep ? `（新しい口コミ${nNew}件・返信の差し替え${nRep}件）` : nRep ? '（返信の差し替え）' : ''}。\n確認待ちは合計${remaining}件です。1件ずつお送りします。\n「一覧」と送ると、確認待ちをリストで出します。`;
     const msgs = [{ type: 'text', text: head }];
@@ -223,4 +224,30 @@ export async function listText() {
   }
   if (!rows.length) return '確認待ちの口コミはありません。';
   return `確認待ち ${rows.length}件\n\n${rows.slice(0, 60).join('\n')}${rows.length > 60 ? `\nほか${rows.length - 60}件` : ''}\n\n「次」と送ると次のカードを出します。「確認 番号」で、その口コミのカードを出します。`;
+}
+
+// Read-only example card. Its ID is separate from approval IDs and cannot publish a review.
+export async function sendReviewPreview(q, operation) {
+  const digest = crypto.createHash('sha256').update(operation + q.reviewId + q.reply).digest('hex');
+  const id = digest.slice(0,10);
+  const receiptKey = 'rv_preview_sent_' + digest;
+  const receipt = await kvGet(receiptKey);
+  if (receipt) return receipt;
+  const target = await lineTarget();
+  if (target.error) throw new Error(target.error);
+  const preview = { ...q, id, status: 'preview' };
+  const bubble = await formatBubble(preview);
+  bubble.header.contents[0].text = '口コミの確認用見本（公開操作なし）';
+  bubble.footer.contents = bubble.footer.contents.filter(x => x.action?.type !== 'postback');
+  const copy = bubble.footer.contents.find(x => x.action?.type === 'clipboard')?.action.clipboardText;
+  if (copy !== q.reply || !copy.includes('\n\nこの度は誠にありがとうございました。\n-')) throw new Error('コピー文の改行を確認できません');
+  const label = bubble.body.contents.findIndex(x => x.text === 'お客様の口コミ（日本語訳）');
+  if (label < 0) throw new Error('日本語訳を取得できません');
+  await kvSet(PENDING_PREFIX + id, preview);
+  const retryKey = [digest.slice(0,8),digest.slice(8,12),'4'+digest.slice(13,16),'a'+digest.slice(17,20),digest.slice(20,32)].join('-');
+  const result = await push(target.token,target.to[0],[{type:'flex',altText:'口コミ確認用：'+q.store,contents:bubble}], retryKey);
+  if (!result.ok) throw new Error('LINE受付失敗 '+result.status+' '+result.error);
+  const record = {id, accepted:true, at:new Date().toISOString(), requestId:result.requestId, translation:bubble.body.contents[label+1].text, copy, original:originalComment(q.review)};
+  await kvSet(receiptKey, record);
+  return record;
 }
