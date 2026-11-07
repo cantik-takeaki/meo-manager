@@ -1,3 +1,4 @@
+import { publicReview } from '../lib/public-review-draft.js';
 import { requireStaff } from './_auth.js';
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
 import { kvGet } from './_kv.js';
@@ -138,6 +139,9 @@ function bizPhrasing(category, storeName) {
 }
 
 export default async function handler(req, res) {
+  if (req.method === 'POST' && req.body?.type === 'public_review_draft') {
+    return publicReview(req, res, llmComplete);
+  }
   if (!await requireStaff(req,res)) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

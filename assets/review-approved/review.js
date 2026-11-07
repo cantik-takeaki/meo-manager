@@ -50,6 +50,14 @@ function renderPoints(){
  $('points').replaceChildren();for(const p of pointLabels()){const b=document.createElement('button');b.type='button';b.className='point';b.textContent=p.label;b.setAttribute('aria-pressed',String(selected.has(p.key)));b.addEventListener('click',()=>{selected.has(p.key)?selected.delete(p.key):selected.add(p.key);b.setAttribute('aria-pressed',String(selected.has(p.key)));updateGenerate();});$('points').append(b);}updateGenerate();
 }
 function updateGenerate(){$('generate').disabled=busy||(!selected.size&&!$('freeWord').value.trim());}
+const publicStores=new Set(["locations_5578260952676210890", "locations_12332122902027297880", "locations_2627626953772130095", "locations_14391760168482892177", "locations_5106899372643700327", "locations_1959110751756847691", "locations_13828016303183421848", "locations_12710891692154182344", "locations_4456760885406966783", "locations_10230344167681762018", "locations_14671860755109416873", "locations_12301127793604271342", "locations_5780589838975014369", "locations_9518356864474251537", "locations_3901960261682938856", "locations_2654171132731280268", "locations_2965085144069334569"]);
+async function publicDraft(chosen,free) {
+ const response=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'public_review_draft',locationId:STORE_ID,language:lang,selected:chosen,free,qrToken:params.get('t')||''})});
+ if(!response.ok) throw new Error('draft');
+ const {content}=await response.json();
+ if(typeof content!=='string'||!content.trim())throw new Error('empty draft');
+ return content;
+}
 async function generate(){
  if(busy||!ready)return;busy=true;updateGenerate();$('regenerate').disabled=true;status('loading');
  const chosen=pointLabels().filter(p=>selected.has(p.key)).map(p=>p.label),free=$('freeWord').value.trim();
@@ -57,8 +65,8 @@ async function generate(){
   let draft;
   if(PREVIEW){draft=[...chosen,free].filter(Boolean).join(lang==='ja'?'。\n':'\n');}
   else{
-   const r=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId:STORE_ID,type:'review_draft',words:[...chosen,free].filter(Boolean),language:lang,qrToken:params.get('t')||''})});
-   if(!r.ok)throw new Error('response');const d=await r.json();draft=d.text||d.content||d.draft||d.result;if(typeof draft!=='string'||!draft.trim())throw new Error('empty');
+   if(publicStores.has(STORE_ID)){draft=await publicDraft(chosen,free);}else{const r=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId:STORE_ID,type:'review_draft',words:[...chosen,free].filter(Boolean),language:lang,qrToken:params.get('t')||''})});
+   if(!r.ok)throw new Error('response');const d=await r.json();draft=d.text||d.content||d.draft||d.result;if(typeof draft!=='string'||!draft.trim())throw new Error('empty');}
   }
   $('draft').value=draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
