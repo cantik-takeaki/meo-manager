@@ -6,7 +6,9 @@
       "受付の流れが分かりやすかった",
       "予約時間から待った",
       "説明が足りなかった",
-      "改善してほしい点があった"
+      "改善してほしい点があった",
+      "また来たい",
+      "感謝を伝えたい"
     ],
     "en": [
       "The explanation was clear",
@@ -14,7 +16,9 @@
       "The check-in process was clear",
       "I waited past my appointment time",
       "I needed more explanation",
-      "There was something I would like improved"
+      "There was something I would like improved",
+      "Would visit again",
+      "I want to say thank you"
     ],
     "zh": [
       "说明很清楚",
@@ -22,7 +26,9 @@
       "接待流程很清楚",
       "超过预约时间后仍在等待",
       "说明不够充分",
-      "有希望改进的地方"
+      "有希望改进的地方",
+      "愿意再来",
+      "想表达感谢"
     ],
     "ko": [
       "설명이 이해하기 쉬웠다",
@@ -30,7 +36,9 @@
       "접수 절차가 알기 쉬웠다",
       "예약 시간보다 늦게 안내받았다",
       "설명이 부족했다",
-      "개선되었으면 하는 점이 있었다"
+      "개선되었으면 하는 점이 있었다",
+      "또 오고 싶다",
+      "감사를 전하고 싶어요"
     ]
   },
   "gym": {
@@ -44,7 +52,9 @@
       "コスパが良い",
       "おすすめしたい",
       "説明が足りなかった",
-      "改善してほしい点があった"
+      "改善してほしい点があった",
+      "また来たい",
+      "感謝を伝えたい"
     ],
     "en": [
       "Attentive coaching",
@@ -56,7 +66,9 @@
       "Good value",
       "Would recommend",
       "I needed more explanation",
-      "There was something I would like improved"
+      "There was something I would like improved",
+      "Would visit again",
+      "I want to say thank you"
     ],
     "zh": [
       "指导细致",
@@ -68,7 +80,9 @@
       "性价比好",
       "愿意推荐",
       "说明不够充分",
-      "有希望改进的地方"
+      "有希望改进的地方",
+      "愿意再来",
+      "想表达感谢"
     ],
     "ko": [
       "지도가 꼼꼼하다",
@@ -80,7 +94,9 @@
       "가성비가 좋다",
       "추천하고 싶다",
       "설명이 부족했다",
-      "개선되었으면 하는 점이 있었다"
+      "개선되었으면 하는 점이 있었다",
+      "또 오고 싶다",
+      "감사를 전하고 싶어요"
     ]
   },
   "relax": {
@@ -94,7 +110,8 @@
       "コスパが良い",
       "また来たい",
       "力加減が合わなかった",
-      "改善してほしい点があった"
+      "改善してほしい点があった",
+      "感謝を伝えたい"
     ],
     "en": [
       "Careful treatment",
@@ -106,7 +123,8 @@
       "Good value",
       "Would visit again",
       "The pressure did not suit me",
-      "There was something I would like improved"
+      "There was something I would like improved",
+      "I want to say thank you"
     ],
     "zh": [
       "手法细致",
@@ -118,7 +136,8 @@
       "性价比好",
       "愿意再来",
       "力度不适合我",
-      "有希望改进的地方"
+      "有希望改进的地方",
+      "想表达感谢"
     ],
     "ko": [
       "시술이 꼼꼼하다",
@@ -130,7 +149,8 @@
       "가성비가 좋다",
       "또 오고 싶다",
       "압이 나에게 맞지 않았다",
-      "개선되었으면 하는 점이 있었다"
+      "개선되었으면 하는 점이 있었다",
+      "감사를 전하고 싶어요"
     ]
   },
   "food": {
@@ -144,7 +164,8 @@
       "また来たい",
       "おすすめしたい",
       "料理が出るまで待った",
-      "改善してほしい点があった"
+      "改善してほしい点があった",
+      "感謝を伝えたい"
     ],
     "en": [
       "Delicious food",
@@ -156,7 +177,8 @@
       "Would visit again",
       "Would recommend",
       "I waited for my food",
-      "There was something I would like improved"
+      "There was something I would like improved",
+      "I want to say thank you"
     ],
     "zh": [
       "菜品美味",
@@ -168,7 +190,8 @@
       "愿意再来",
       "愿意推荐",
       "等了一会儿才上菜",
-      "有希望改进的地方"
+      "有希望改进的地方",
+      "想表达感谢"
     ],
     "ko": [
       "음식이 맛있다",
@@ -180,7 +203,8 @@
       "또 오고 싶다",
       "추천하고 싶다",
       "음식이 나오기까지 기다렸다",
-      "개선되었으면 하는 점이 있었다"
+      "개선되었으면 하는 점이 있었다",
+      "감사를 전하고 싶어요"
     ]
   }
 });

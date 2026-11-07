@@ -142,3 +142,18 @@ test('提供や力加減の反対の項目は勝手に決めず、場面が書�
   assert.equal(ok.code,200);assert.equal(ok.data.content.replaceAll('\n',''),free);
  }
 });
+
+test('全店舗で同じ項目を3回選び直しても違う文を返し、自由入力の感謝は重ねない',async()=>{
+ for(const [locationId,group] of Object.entries(storeGroups)){
+  const recentVariants=[],drafts=new Set();
+  for(let i=0;i<3;i++){
+   const {data}=await call({locationId,selected:[choices[group].ja[0],'また来たい','感謝を伝えたい'],recentVariants});
+   assert.match(data.content,/また/);assert.match(data.content,/ありがと|感謝/);
+   assert.ok(!drafts.has(data.content));drafts.add(data.content);recentVariants.push(data.variant);
+  }
+  const only=await call({locationId,selected:[choices[group].ja[0]]});
+  assert.doesNotMatch(only.data.content,/ありがと|感謝|また/);
+  const own=await call({locationId,selected:['感謝を伝えたい','また来たい'],free:'ありがとうございました。また行きたいです。'});
+  assert.equal(own.data.content,'ありがとうございました。\nまた行きたいです。');
+ }
+});
