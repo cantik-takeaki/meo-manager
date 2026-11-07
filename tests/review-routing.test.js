@@ -22,3 +22,10 @@ test('星だけの高評価は事実を補わず、低評価は確認待ち',asy
  const high=await propose(rv('FOUR',''),[],()=>{throw Error('unexpected')});assert.equal(high.approved,true);
  assert.equal((await propose(rv('TWO',''),[],async()=>positive())).approved,false);
 });
+test('英語の口コミに日本語の返信を自動送信しない',async()=>{
+ assert.equal(validateReply(rv('FIVE','Lovely coffee.'),'コーヒーを楽しんでいただけてうれしいです。',[]),false);
+});
+test('自動翻訳付き口コミは原語で照合し、硬い定型句を一度書き直す',async()=>{
+ const values=[JSON.stringify({intent:'positive',reply:'喜んでいただけて何よりです。'}),positive(),'PASS'];
+ const result=await propose(rv('FIVE','温かくてよかった。\n(Translated by Google)\nIt was warm.'),[],async()=>values.shift());assert.equal(result.approved,true);
+});
