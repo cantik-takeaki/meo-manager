@@ -914,7 +914,7 @@ export default async function handler(req, res) {
         method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: p.reply }),
       });
       const pd = await pr.json();
-      if (pd.error) { await fin('failed', { error: pd.error.message }); return sayNext(`送信に失敗しました：${label}\n（${pd.error.message}）`); }
+      if (!pr.ok || pd.error) { const error=pd.error?.message || 'Google HTTP '+pr.status; await fin('failed',{error}); return sayNext(`送信に失敗しました：${label}\n（${error}）`); }
     } catch (e) { await fin('failed', { error: e.message }); return sayNext(`送信に失敗しました：${label}\n（${e.message}）`); }
     await fin('sent');
     // 送信済みの記録（cronが二度作らない）・監査ログ・下書きの片付け
@@ -925,7 +925,10 @@ export default async function handler(req, res) {
     if (audit.length > 200) audit.length = 200; await kvSet('review_reply_log', audit);
     const dk = `review_draft_${p.sid}`; const drafts = (await kvGet(dk)) || [];
     await kvSet(dk, drafts.filter(d => d.reviewId !== p.reviewId));
-    return sayNext(`送信しました：${label}\nGoogleの審査が終わると、口コミの下に表示されます。`);
+    const done = `口コミへの返信が完了しました。\n${label}\nGoogleが返信を受け付けました。公開表示は審査後です。`;
+    let messages;
+    try { messages = await withNext(done, id); } catch { messages = [{type:'text',text:done}]; }
+    return res.json({ text:done, messages });
   }
 
   // ── 口コミPOP: 保存デザインテンプレ（Canva/アップロード画像を再利用） ──
