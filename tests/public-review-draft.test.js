@@ -148,7 +148,7 @@ test('全店舗で同じ項目を3回選び直しても違う文を返し、自�
   const recentVariants=[],drafts=new Set();
   for(let i=0;i<3;i++){
    const {data}=await call({locationId,selected:[choices[group].ja[0],'また来たい','感謝を伝えたい'],recentVariants});
-   assert.match(data.content,/また/);assert.match(data.content,/ありがと|感謝/);
+   assert.match(data.content,/また|次も|次に|もう一度|次の機会/);assert.match(data.content,/ありがと|感謝/);
    assert.ok(!drafts.has(data.content));drafts.add(data.content);recentVariants.push(data.variant);
   }
   const only=await call({locationId,selected:[choices[group].ja[0]]});
@@ -193,5 +193,25 @@ test('同業種で同じ3項目を選んだ17店舗に、感謝の結びを除�
     assert.match(result.content,/ありがとう/);
     recent.push(result.variant);
   }
+ }
+});
+
+test('店舗を越えて冒頭の句を重ねず、同じ体験から3種類の流れで書き出す',async()=>{
+ const {returnPassages}=await import('../lib/review-passages.js');
+ const usedByGroup=new Map();
+ for(const group of Object.values(storeGroups)){
+  if(!usedByGroup.has(group))usedByGroup.set(group,new Set());
+  const used=usedByGroup.get(group),recent=[],seenFlows=new Set(),fact=choices[group].ja[0];
+  for(let i=0;i<3;i++){
+   const r=await composeReview([fact,'また来たい','感謝を伝えたい'],'','ja',async()=>'[0]',group,recent,async options=>{
+     const index=options.findIndex(c=>!used.has(c.opening));
+     assert.notEqual(index,-1);
+     used.add(options[index].opening);
+     seenFlows.add(returnPassages(fact).findIndex(forms=>forms.includes(options[index].body)));
+     return index;
+   });
+   assert.ok(r.sharedHistory);recent.push(r.variant);
+  }
+  assert.deepEqual([...seenFlows].sort(),[0,1,2]);
  }
 });
