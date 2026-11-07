@@ -234,12 +234,13 @@ export async function listText() {
 }
 
 // Read-only example card. Its ID is separate from approval IDs and cannot publish a review.
-export async function sendReviewPreview(q, operation, actionable = false) {
+export async function sendReviewPreview(q, operation, actionable = false, inspectOnly = false) {
   const digest = crypto.createHash('sha256').update(operation + q.reviewId + q.reply).digest('hex');
   const id = digest.slice(0,10);
   const receiptKey = 'rv_preview_sent_' + digest;
   const receipt = await kvGet(receiptKey);
   if (receipt) return receipt;
+  if (inspectOnly) return {id, accepted:false};
   const target = await lineTarget();
   if (target.error) throw new Error(target.error);
   const preview = { ...q, id, status: actionable ? 'pending' : 'preview' };
