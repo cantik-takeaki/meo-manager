@@ -157,3 +157,21 @@ test('全店舗で同じ項目を3回選び直しても違う文を返し、自�
   assert.equal(own.data.content,'ありがとうございました。\nまた行きたいです。');
  }
 });
+
+test('英中韓の任意項目も選んだときだけ入り、再訪を断る原文は優先する',async()=>{
+ for(const group of Object.keys(choices))for(const lang of ['en','zh','ko']){
+  const labels=choices[group][lang], thank=labels[choices[group].ja.indexOf('感謝を伝えたい')];
+  const history=[],sentences=new Set();
+  for(let i=0;i<3;i++){
+   const draft=await composeReview([thank],'',lang,async()=>'[0]',group,history);
+   history.push(draft.variant);sentences.add(draft.content);
+  }
+  assert.equal(sentences.size,3);
+  for(const label of labels){
+   const result=await composeReview([label],'',lang,async()=>'[0]',group,[]);
+   assert.ok(result.content);assert.doesNotMatch(result.content,/undefined/);
+  }
+ }
+ const result=await composeReview(['また来たい'],'もう行きたくありません。','ja',async()=>'[0]','food',[]);
+ assert.equal(result.content,'もう行きたくありません。');
+});
