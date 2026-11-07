@@ -70,7 +70,7 @@ export default async function handler(req, res) {
   const rvEvents = events.filter(e => e.type === 'postback' && /(^|&)rv=/.test((e.postback && e.postback.data) || ''));
   for (const e of rvEvents) {
     const q = new URLSearchParams(e.postback.data);
-    let text = '処理に失敗しました。ラクラクMEOの口コミ画面で確認してください。';
+    let messages = [{ type: 'text', text: '処理に失敗しました。ラクラクMEOの口コミ画面で確認してください。' }];
     try {
       const sec = await kvGet('review_approve_secret');
       const r = await fetch(`${BASE}/api/admin?action=review-approve`, {
@@ -78,9 +78,11 @@ export default async function handler(req, res) {
         body: JSON.stringify({ decision: q.get('rv'), id: q.get('id') || '', userId: e.source.userId || '',
           groupId: e.source.groupId || '', sourceType: e.source.type || '' }),
       });
-      const j = await r.json(); if (j && j.text) text = j.text;
+      const j = await r.json();
+      if (j.messages?.length) messages = j.messages;
+      else if (j.text) messages = [{ type: 'text', text: j.text }];
     } catch (err) { /* text は既定の失敗文 */ }
-    if (e.replyToken && token) await lineApi(token, 'POST', '/v2/bot/message/reply', { replyToken: e.replyToken, messages: [{ type: 'text', text }] });
+    if (e.replyToken && token) await lineApi(token, 'POST', '/v2/bot/message/reply', { replyToken: e.replyToken, messages });
   }
 
   // 3) それ以外は月次レポートの受け口へ、届いた本文と署名をそのまま中継する

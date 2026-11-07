@@ -1,3 +1,4 @@
+import { originalComment } from '../lib/review-routing.js';
 import { requireStaff } from './_auth.js';
 import { rankSummary, compareRanks, compareRankEntries, isDemo, jstMonth, previousMonth } from './_metric_integrity.js';
 // api/admin.js — 店舗登録・順位入力（統合）
@@ -740,14 +741,20 @@ export default async function handler(req, res) {
     if (/^(次|つぎ|次へ)$/.test(text)) {
       const { next, remaining } = await nextPending();
       return res.json({ messages: next ? [{ type: 'text', text: `確認待ち ${remaining}件。次の口コミです。` },
-        { type: 'flex', altText: `口コミの確認：${next.store} ★${next.star}`.slice(0, 390), contents: formatBubble(next) }]
+        { type: 'flex', altText: `口コミの確認：${next.store} ★${next.star}`.slice(0, 390), contents: await formatBubble(next) }]
         : [{ type: 'text', text: '確認待ちの口コミはありません。' }] });
+    }
+    const read = text.match(/^(原文|返信文)\s*([0-9a-f]{10})$/);
+    if (read) {
+      const rec = await kvGet(PENDING_PREFIX + read[2]);
+      const value = rec && (read[1] === '原文' ? originalComment(rec.review) : rec.reply);
+      return res.json({ messages: [{ type: 'text', text: value || '該当する本文がありません。' }] });
     }
     const mk = text.match(/^確認\s*([0-9a-f]{10})$/);
     if (mk) {
       const p0 = await kvGet(PENDING_PREFIX + mk[1]);
       return res.json({ messages: p0 && p0.status === 'pending'
-        ? [{ type: 'flex', altText: `口コミの確認：${p0.store} ★${p0.star}`.slice(0, 390), contents: formatBubble(p0) }]
+        ? [{ type: 'flex', altText: `口コミの確認：${p0.store} ★${p0.star}`.slice(0, 390), contents: await formatBubble(p0) }]
         : [{ type: 'text', text: 'その番号の確認待ちは見つかりませんでした（対応済みの可能性があります）。' }] });
     }
     const m = text.match(/^修正\s*([0-9a-f]{10})\s*\n?([\s\S]*)$/);
@@ -773,7 +780,7 @@ export default async function handler(req, res) {
     const label = `${p.store} ★${p.star} ${p.name || ''}さん`;
     return res.json({ messages: [
       { type: 'text', text: `返信案を差し替えました：${label}\n内容を確認して「この返信で送る」を押してください。${warnings.length ? `\n注意：${warnings.join('・')} が含まれています（このまま送ることもできます）。` : ''}` },
-      { type: 'flex', altText: `直した返信の確認：${label}`.slice(0, 390), contents: formatBubble(next) },
+      { type: 'flex', altText: `直した返信の確認：${label}`.slice(0, 390), contents: await formatBubble(next) },
     ] });
   }
 
