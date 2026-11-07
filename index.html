@@ -13383,11 +13383,18 @@ async function saveDraft(id, silent) {
     targetInstagram: document.getElementById('draftI-' + id)?.checked,
   };
   try {
-    await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`, {
+    const res = await fetch(`/api/posts?action=drafts${storeId ? '&storeId=' + storeId : ''}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
+    const result = await res.json();
+    const saved = result.drafts?.find(draft => draft.id === id);
+    if (!res.ok || !result.success || !saved) throw new Error('下書きを保存できませんでした');
     if (!silent) showToast('保存しました', 'success');
-  } catch { if (!silent) showToast('保存に失敗しました', 'error'); }
+    return saved;
+  } catch {
+    showToast('下書きを保存できませんでした。再読み込みしてください。', 'error');
+    return null;
+  }
 }
 
 // 予約投稿を今すぐ投稿（社長承認の上）
@@ -13403,8 +13410,14 @@ async function publishDraftNow(id) {
   if (toG && !gbpPolicyGate(summary)) return;
   const targets = [toG && 'Google', toI && 'Instagram'].filter(Boolean).join(' と ');
   if (!confirm(`${targets} に投稿します。よろしいですか？（社外公開アクション）`)) return;
-  await saveDraft(id, true);
-  const okMsg = await publishToTargets(summary, imgs, toG, toI, { aspect: _draftAspect[id] || 'portrait', hashtags: _draftHashtags[id] || '' });
+  const locationName = currentLocation.name;
+  const draft = await saveDraft(id, true);
+  if (!draft) return;
+  if (currentLocation?.name !== locationName) return showToast('店舗が切り替わりました。投稿先を確認してください。', 'error');
+  const okMsg = await publishToTargets(draft.summary.trim(), draft.images || [], toG, toI, {
+    topicType: draft.topicType, cta: draft.callToActionType, ctaUrl: draft.callToActionUrl,
+    aspect: draft.aspect || 'portrait', hashtags: draft.hashtags || ''
+  });
   showToast(okMsg.join(' ／ '), 'success');
 }
 
