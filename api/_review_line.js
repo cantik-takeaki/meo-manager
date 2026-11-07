@@ -38,7 +38,8 @@ export async function formatBubble(q) {
   let display;
   const raw = originalComment(q.review);
   const foreign = raw && !(japanese.test(raw) && !/[가-힣]/u.test(raw));
-  if (foreign) display = await kvGet(key).catch(() => null);
+  if (q.localHistory) display={text:q.summary || raw || '（本文なし・星のみ）', translated:!!q.summary};
+  else if (foreign) display = await kvGet(key).catch(() => null);
   if (!display) {
     display = await reviewDisplay(q.review);
     if (foreign && display.translated) await kvSet(key, display).catch(() => {});
@@ -56,7 +57,7 @@ export async function formatBubble(q) {
     ] },
     body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
       t(`評価 ★${q.star}　投稿者 ${q.name || '不明'}${q.date ? '　' + q.date : ''}`, { color: '#475569', size: 'xs' }),
-      { type: 'text', text: display.translated ? 'お客様の口コミ（日本語訳）' : 'お客様の口コミ', weight: 'bold', size: 'sm', color: '#0a2e5c' },
+      { type: 'text', text: display.translated ? (q.localHistory ? 'お客様の口コミ（日本語要旨）' : 'お客様の口コミ（日本語訳）') : 'お客様の口コミ', weight: 'bold', size: 'sm', color: '#0a2e5c' },
       t(display.text),
       ...(q.replace && q.currentReply ? [{ type: 'separator' }, { type: 'text', text: '今の返信（差し替え前）', weight: 'bold', size: 'sm', color: '#b91c1c' },
         t(clip(q.currentReply, 300), { color: '#64748b' })] : []),

@@ -441,7 +441,7 @@ export default async function handler(req, res) {
   //   （従来はゲートで401になり cron-rank/cron-tamper 本体に到達できず、cronが一度も発火していなかった）
   const _c = parseCookies(req);
   const access_token = _c.access_token;
-  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper' || action === 'cron-review-reply' || action === 'review-inventory' || action === 'review-preview');
+  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper' || action === 'cron-review-reply' || action === 'review-inventory' || action === 'review-preview' || action === 'stage-review-history');
   const _cronAuthOk = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
   // 口コミ返信のLINE承認（cantik.co.jp/line/webhook.php から呼ばれる）。管理者Cookieの代わりに共有の合言葉で通す
   let _approveAuthOk = false;
@@ -735,6 +735,11 @@ export default async function handler(req, res) {
     const fromUser = b.sourceType === 'user' && (conf.to || []).includes(b.userId);
     if (!fromGroup && !fromUser) return res.json({ ignore: true });
     let text = String(b.text || '').trim();
+    if (/^過去/.test(text)) {
+      const {historicalMessages}=await import('../lib/review-history.js');
+      const messages=await historicalMessages(text);
+      if(messages)return res.json({messages});
+    }
     let id = '';
     // 「一覧」「次」「確認 番号」（1件ずつ方式の操作）
     if (/^(一覧|いちらん|リスト)$/.test(text)) return res.json({ messages: [{ type: 'text', text: await listText() }] });
@@ -1580,6 +1585,10 @@ export default async function handler(req, res) {
   //   ★3以下 … 生成（クレームは社長の定型）→ 下書き保存 → 送信しない → 公式LINEで社長と従業員に確認依頼
   //   （社長叱責 2026-10-06・麻辣王酒場：★1に「ご指摘のとおりです。店として改めます。」と返した。絶対遵守 §1-40）
   // 停止スイッチ＝KV `review_autoreply_mode`（'auto' / 'draft' / 'off'・既定は 'draft'）
+  if (action === 'stage-review-history' && req.method === 'POST') {
+    const {saveReviewHistory}=await import('../lib/review-history.js');
+    return saveReviewHistory(req,res);
+  }
   if (action === 'review-inventory' && req.method === 'GET') {
     const {reviewInventory}=await import('../lib/review-run.js');
     return reviewInventory(req,res);
