@@ -30,7 +30,7 @@ const GROQ_FALLBACKS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'moonshotai
   'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b', 'gemma2-9b-it', GROQ_MODEL];
 const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9 } = {}) {
+export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9, reviewChoices = false } = {}) {
   LAST_LLM_ERROR = '';
   LAST_LLM_VIA = '';
   const reasons = [];
@@ -44,7 +44,7 @@ export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, 
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       // thinkingBudget:0 で思考トークン消費を止め、空応答と遅延を回避（flash/lite両対応）
-      generationConfig: { maxOutputTokens: maxTokens, temperature, topP, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { maxOutputTokens: maxTokens, temperature, topP, ...(reviewChoices ? { responseMimeType: "application/json", responseSchema: { type: "OBJECT", properties: { choices: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["choices"] } } : {}), thinkingConfig: { thinkingBudget: 0 } },
     };
     outer:
     for (const model of GEMINI_FALLBACKS) {
@@ -84,6 +84,7 @@ export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, 
         max_tokens: isOss ? Math.max(maxTokens, 1200) : maxTokens,
         temperature, top_p: topP,
       };
+      if (reviewChoices) payload.response_format = { type: "json_object" };
       if (isOss) payload.reasoning_effort = 'low';
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${GROQ}`, 'Content-Type': 'application/json' },
