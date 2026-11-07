@@ -59,6 +59,20 @@ async function publicDraft(chosen,free) {
  // 自由記述だけの場合は通信せず、本人の文章をそのまま表示。
  if(!chosen.length)return window.reviewSentenceLines(free);
  const response=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'public_review_draft',locationId:STORE_ID,language:lang,selected:chosen,free,qrToken:params.get('t')||''})});
+ if(response.status===422){
+  const data=await response.json();
+  if(data.error==='oppositePoints' && data.pair?.length===2){
+   const [first,second]=data.pair;
+   const prompts={
+    ja:`「${first}」と「${second}」のどちらかを選んでください。両方を経験した場合は、2項目の選択を外し、その違いを自由入力にお書きください。`,
+    en:`Choose either “${first}” or “${second}”. If both happened, clear those two options and describe the difference in your own words.`,
+    zh:`请在“${first}”和“${second}”中选择一项。如果两种情况都发生过，请取消这两项，再在输入框中写明区别。`,
+    ko:`‘${first}’와 ‘${second}’ 중 하나를 선택해 주세요. 둘 다 경험했다면 두 항목의 선택을 해제하고 차이를 직접 적어 주세요.`
+   };
+   $('status').textContent=prompts[lang];
+   return null;
+  }
+ }
  if(!response.ok) throw new Error('draft');
  const {content}=await response.json();
  if(typeof content!=='string'||!content.trim())throw new Error('empty draft');
@@ -74,6 +88,7 @@ async function generate(){
    if(publicStores.has(STORE_ID)){draft=await publicDraft(chosen,free);}else{const r=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId:STORE_ID,type:'review_draft',words:[...chosen,free].filter(Boolean),language:lang,qrToken:params.get('t')||''})});
    if(!r.ok)throw new Error('response');const d=await r.json();draft=d.text||d.content||d.draft||d.result;if(typeof draft!=='string'||!draft.trim())throw new Error('empty');}
   }
+  if(draft===null)return;
   $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;$('manualNext').hidden=true;show('confirm');if(LOCAL_PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
 }

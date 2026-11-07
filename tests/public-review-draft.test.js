@@ -129,3 +129,16 @@ test('施術・予約・設備の自由入力を、同じ話題の選択項目�
   assert.equal(r.source,'ai');assert.ok(r.content.endsWith(free.replace('。会計','。\n会計')));
  }
 });
+test('提供や力加減の反対の項目は勝手に決めず、場面が書かれた場合は自由入力を使う',async()=>{
+ const scenarios=[
+  ['food',['提供が早い','料理が出るまで待った'],'前菜はすぐに届きました。次の料理は15分待ちました。'],
+  ['relax',['力加減がちょうど良い','力加減が合わなかった'],'肩の力加減はちょうど良く、背中は強すぎました。']
+ ];
+ for(const [group,selected,free] of scenarios){
+  const locationId=Object.keys(storeGroups).find(id=>storeGroups[id]===group);
+  const conflict=await call({locationId,language:'ja',selected,free:''});
+  assert.equal(conflict.code,422);assert.deepEqual(conflict.data.pair,selected);
+  const ok=await call({locationId,language:'ja',selected,free});
+  assert.equal(ok.code,200);assert.equal(ok.data.content.replaceAll('\n',''),free);
+ }
+});
