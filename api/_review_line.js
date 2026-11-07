@@ -118,15 +118,22 @@ export async function pushReviewAlerts(queue, opts = {}) {
   if (tg.error) return { skipped: tg.error };
   const items = [];
   for (const q of queue) {
-    const id = crypto.randomBytes(5).toString('hex');
+    const id = q.replace ? crypto.randomBytes(5).toString('hex') :
+      crypto.createHash('sha256').update(q.sid + ':' + q.reviewId).digest('hex').slice(0,10);
+    const previous = await kvGet(PENDING_PREFIX + id);
+    if (previous) {
+      if (previous.status === 'pending') items.push(previous);
+      continue;
+    }
     const rec = { ...q, id, status: 'pending', createdAt: new Date().toISOString() };
     await kvSet(PENDING_PREFIX + id, rec);
     items.push(rec);
   }
+  if (!items.length) return { sent: 0, failed: [], items: 0, ids: [] };
   // 1件ずつ方式（既定）：順番待ちに積み、「◯件あります」と先頭の1件だけを送る
   if (!opts.carousel) {
     const qk = (await kvGet(QUEUE_KEY)) || [];
-    await kvSet(QUEUE_KEY, [...qk, ...items.map(x => x.id)]);
+    await kvSet(QUEUE_KEY, [...new Set([...qk, ...items.map(x => x.id)])]);
     const { remaining } = await nextPending();
     const next = items[0];
     const nNew = items.filter(x => !x.replace).length, nRep = items.filter(x => x.replace).length;
