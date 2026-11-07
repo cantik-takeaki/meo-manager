@@ -49,7 +49,7 @@ test('モデルの候補選択と代替文を別々に記録する',async()=>{
   const args=[['料理がおいしい'],'注文から20分待った。','ja'];
   const ai=await composeReview(...args,async()=>'[1]','food');
   assert.equal(ai.source,'ai');
-  assert.equal(ai.content,'料理がおいしい。\n注文から20分待った。');
+  assert.equal(ai.content,'料理が美味しい。\n注文から20分待った。');
   const invalid=await composeReview(...args,async()=>'[8]','food');
   assert.equal(invalid.source,'template');
 });
@@ -57,9 +57,20 @@ test('美名家の5項目と店の清潔さを3文につなぎ、未入力の品
  const selected=['料理がおいしい','雰囲気が良い','提供が早い','コスパが良い','おすすめしたい'];
  const draft=await composeReview(selected,'店が綺麗だった','ja',async()=>'{"choices":[0]}','food');
  assert.equal(draft.source,'ai');
- assert.equal(draft.content,'店内はきれいで、雰囲気も良かったです。料理は出てくるのが早くて、おいしかったです。コスパも良く、人にもすすめたいと思います。');
+ assert.equal(draft.content,'店内は綺麗で雰囲気も良かったです。料理はすぐに出てきて美味しくいただきました。コスパも良くて人にも勧めたくなるお店でした。');
  const negative='店が綺麗だったとは思わない。18分待った。';
  const fallback=await composeReview(selected,negative,'ja',async()=>'架空の体験','food');
  assert.ok(fallback.content.endsWith(negative));
- assert.ok(!fallback.content.includes('店内はきれいで'));
+ assert.ok(!fallback.content.includes('店内は綺麗で'));
+});
+test('全業種の日本語選択肢で生成した文の表記と「です」の回数を検査する',async()=>{
+ for(const [group,labels] of Object.entries(choices)){
+  for(const selected of [...labels.ja.map(key=>[key]),labels.ja]){
+   for(const choose of [async()=>'{"choices":[0]}',async()=>'形式エラー']){
+    const {content}=await composeReview(selected,'','ja',choose,group);
+    assert.doesNotMatch(content,/きれい|おいし[いくか]|人にもすすめたい/u);
+    assert.ok((content.match(/です。/gu)||[]).length<=1,content);
+   }
+  }
+ }
 });
