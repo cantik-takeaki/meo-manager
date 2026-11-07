@@ -61,7 +61,7 @@ async function generate(){
  const chosen=pointLabels().filter(p=>selected.has(p.key)).map(p=>p.label),free=$('freeWord').value.trim();
  try{
   const draft=PREVIEW?[...chosen,free].filter(Boolean).join('\n'):await publicDraft(chosen,free);
-  $('draft').value=draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}
+  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
 }
 async function init(){

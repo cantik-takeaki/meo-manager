@@ -2,6 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <script>
+    const destination = new URL('review-approved.html', location.href);
+    destination.search = location.search;
+    destination.searchParams.set('store','locations_2654171132731280268');
+    destination.hash = location.hash;
+    location.replace(destination.href);
+  </script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="color-scheme" content="light">

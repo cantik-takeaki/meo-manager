@@ -70,7 +70,7 @@ async function generate(){
    if(publicStores.has(STORE_ID)){draft=await publicDraft(chosen,free);}else{const r=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId:STORE_ID,type:'review_draft',words:[...chosen,free].filter(Boolean),language:lang,qrToken:params.get('t')||''})});
    if(!r.ok)throw new Error('response');const d=await r.json();draft=d.text||d.content||d.draft||d.result;if(typeof draft!=='string'||!draft.trim())throw new Error('empty');}
   }
-  $('draft').value=draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
+  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
 }
 async function init(){
