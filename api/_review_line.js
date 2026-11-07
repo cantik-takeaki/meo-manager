@@ -273,3 +273,12 @@ export async function sendReviewPreview(q, operation, actionable = false, inspec
   await kvSet(receiptKey, record);
   return record;
 }
+
+// Manual replies from the management screen do not pass through the LINE approval webhook.
+export async function notifyManualReply(store,reviewName,googleTime) {
+  const target=await lineTarget();
+  if(target.error)return {ok:false,error:target.error};
+  const digest=crypto.createHash('sha256').update([store,reviewName,googleTime].join('|')).digest('hex');
+  const retryKey=[digest.slice(0,8),digest.slice(8,12),'4'+digest.slice(13,16),'a'+digest.slice(17,20),digest.slice(20,32)].join('-');
+  return push(target.token,target.to[0],[{type:'text',text:'口コミへの返信が完了しました。\n'+store+'\nGoogleが返信を受け付けました。公開表示は審査後です。'}],retryKey);
+}

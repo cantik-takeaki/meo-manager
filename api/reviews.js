@@ -1,7 +1,7 @@
 import { requireStaff } from './_auth.js';
 // api/reviews.js — 口コミ一覧・返信
 import { getAccessToken, getValidCookieToken } from './_tokens.js';
-import { kvSet } from './_kv.js';
+import { kvGet, kvSet } from './_kv.js';
 
 function parseCookies(req) {
   const c = {};
@@ -106,6 +106,16 @@ export default async function handler(req, res) {
       );
       const data = await r.json();
       if (data.error) return res.status(r.status).json({ error: data.error.message, pending: true });
+      if (!r.ok) return res.status(r.status).json({error:'Googleが返信を受け付けませんでした'});
+      try {
+        const stores=await kvGet('managed_locations')||[];
+        const store=stores.find(m=>m.locationName && String(reviewName).startsWith(m.locationName+'/reviews/'));
+        if(store){
+          const {notifyManualReply}=await import('./_review_line.js');
+          const notice=await notifyManualReply(store.title,reviewName,data.updateTime||comment);
+          data.confirmationNotified=notice.ok;
+        }
+      } catch { data.confirmationNotified=false; }
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: e.message });
