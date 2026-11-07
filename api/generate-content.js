@@ -1,3 +1,4 @@
+import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
 import { publicReview } from '../lib/public-review-draft.js';
 import { requireStaff } from './_auth.js';
 // api/generate-content.js — キーワード＋ナレッジから自然な文章を生成
@@ -634,7 +635,7 @@ CRITICAL rules:
     const content = _star <= 3
       ? complaintTemplate(verb, 'Japanese')
       : `この度は${verb}いただき、ありがとうございました。\n評価をお寄せいただき、嬉しく思います。\nまたのお越しをお待ちしております。`;
-    return res.json({ content, meta: { template: true, starOnly: true, needsHuman: true,
+    return res.json({ content: formatOwnerReply(content, storeName), meta: { template: true, starOnly: true, needsHuman: true,
       gate: { ok: true, failed: [], len: content.replace(/\s/g, '').length }, via: 'template' } });
   }
 
@@ -1757,6 +1758,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
     if (extra && String(extra).trim()) prompt += `\n\n【運用者からの追加指示（上のルールに加えて必ず従う）】\n${String(extra).trim().slice(0, 1500)}`;
   } catch (e) { /* 追加指示の取得失敗は無視して既定プロンプトで続行 */ }
 
+  if (_isReply) prompt += '\n' + ownerReplyStyle;
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
@@ -1994,7 +1996,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       ? { len: content.replace(/\s/g, '').length, minLen: 300 }
       : gate ? { gate: { ok: gate.ok, failed: gate.failed, len: gate.detail?.len }, template: !!gate.template,
                  needsHuman: !!(_cls && _cls.needsHuman), hits: _cls ? _cls.hits : [] } : undefined;
-    res.json({ content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
+    res.json({ content: _isReply ? formatOwnerReply(content, storeName) : content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
