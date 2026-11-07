@@ -12,6 +12,7 @@ const photoInvite={ja:'ご自身で撮った写真があれば、お気に入り
 for(const lang of Object.keys(photoInvite))I18N[lang].photoInvite=photoInvite[lang];
 for(const [l,[commentIntro,manualNext]] of Object.entries({"ja": ["選択肢を使わず、ご自身の言葉だけでも書けます。良かった点も気になった点もお聞かせください。", "手動でコピーしたので次へ"], "en": ["You can skip the options and write in your own words. Both positive and critical feedback are welcome.", "I copied the text manually. Continue"], "zh": ["可以不选任何选项，直接写下您的真实感受。满意或希望改进的地方都欢迎分享。", "我已手动复制，继续"], "ko": ["항목을 선택하지 않고 직접 작성해도 됩니다. 좋았던 점과 아쉬웠던 점을 자유롭게 적어 주세요.", "직접 복사했습니다. 다음으로"]}))Object.assign(I18N[l],{commentIntro,manualNext});
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
+const LOCAL_PREVIEW=['localhost','127.0.0.1',''].includes(location.hostname);
 const PREVIEW=params.get('preview')==='1'||['localhost','127.0.0.1',''].includes(location.hostname);
 let STORE_ID=params.get('store')||'';
 let lang=(I18N[params.get('lang')]?params.get('lang'):'ja'),store=null,survey=null,rating=0,stage='rating',ready=false,busy=false;
@@ -68,12 +69,12 @@ async function generate(){
  const chosen=pointLabels().filter(p=>selected.has(p.key)).map(p=>p.label),free=$('freeWord').value.trim();
  try{
   let draft;
-  if(PREVIEW){draft=[...chosen,free].filter(Boolean).join(lang==='ja'?'。\n':'\n');}
+  if(LOCAL_PREVIEW){draft=[...chosen,free].filter(Boolean).join(lang==='ja'?'。\n':'\n');}
   else{
    if(publicStores.has(STORE_ID)){draft=await publicDraft(chosen,free);}else{const r=await fetch('/api/generate-content',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locationId:STORE_ID,type:'review_draft',words:[...chosen,free].filter(Boolean),language:lang,qrToken:params.get('t')||''})});
    if(!r.ok)throw new Error('response');const d=await r.json();draft=d.text||d.content||d.draft||d.result;if(typeof draft!=='string'||!draft.trim())throw new Error('empty');}
   }
-  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;$('manualNext').hidden=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
+  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;$('manualNext').hidden=true;show('confirm');if(LOCAL_PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}track('ai');
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
 }
 async function init(){

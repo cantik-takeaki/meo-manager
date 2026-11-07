@@ -50,7 +50,7 @@ test('モデルの候補選択と代替文を別々に記録する',async()=>{
   const args=[['料理がおいしい'],'注文から20分待った。','ja'];
   const ai=await composeReview(...args,async()=>'[1]','food');
   assert.equal(ai.source,'ai');
-  assert.equal(ai.content,'料理が美味しい。\n注文から20分待った。');
+  assert.equal(ai.content,'料理が美味しかったです。\n注文から20分待った。');
   const invalid=await composeReview(...args,async()=>'[8]','food');
   assert.equal(invalid.source,'template');
 });
@@ -58,7 +58,7 @@ test('美名家の選択項目と手書きの清潔さを分けて、未入力�
  const selected=['料理がおいしい','雰囲気が良い','提供が早い','コスパが良い','おすすめしたい'];
  const draft=await composeReview(selected,'店が綺麗だった','ja',async()=>'{"choices":[0]}','food');
  assert.equal(draft.source,'ai');
- assert.equal(draft.content,'料理はすぐに出てきて美味しくいただきました。\nコスパも良くて人にも勧めたくなるお店でした。\n雰囲気が良かったです。\n店が綺麗だった');
+ assert.equal(draft.content,'注文した料理はすぐに出てきて、美味しくいただきました。\nお店の雰囲気が気に入りました。\n値段にも満足でき、人にも勧めたいと思いました。\n店が綺麗だった');
  const negative='店が綺麗だったとは思わない。18分待った。';
  const fallback=await composeReview(selected,negative,'ja',async()=>'架空の体験','food');
  assert.ok(fallback.content.endsWith('店が綺麗だったとは思わない。\n18分待った。'));
@@ -87,5 +87,23 @@ test('自由入力と重なる選択肢だけを外し、待ち時間や否定�
  for(const free of ['説明は分かりやすかった。予約時間から18分待った。','説明は分かりにくかった。予約時間から18分待った。']){
  const r=await composeReview(['説明が分かりやすかった','予約時間から待った'],free,'ja',()=>{throw Error()},'clinic');
  assert.equal(r.source,'original');assert.equal(r.content,free.replace('。予約','。\n予約'));
+ }
+});
+
+test('美名家で料理の待ち時間と接客を自分で書いた場合、早い提供や二重の接客を追加しない',async()=>{
+ const free='スタッフの方が丁寧でした。料理は18分待った。';
+ for(const choose of [async()=>'{"choices":[0]}',async()=>'{"choices":[1]}',async()=>{throw Error()}]){
+  const r=await composeReview(['スタッフが丁寧','提供が早い','料理がおいしい'],free,'ja',choose,'food');
+  assert.ok(r.content.includes('美味し'));assert.doesNotMatch(r.content,/早|すぐ/);
+  assert.equal(r.content.match(/丁寧/gu).length,1);assert.ok(r.content.endsWith('料理は18分待った。'));
+ }
+ const other=await composeReview(['提供が早い'],'会計で18分待った。','ja',async()=>'[0]','food');
+ assert.match(other.content,/注文した料理はすぐ/);
+});
+test('美名家の接客・雰囲気・再訪・推薦は二文で述べ、未入力の料理は足さない',async()=>{
+ for(const pick of [0,1]){
+ const {content}=await composeReview(['雰囲気が良い','また来たい','おすすめしたい','スタッフが丁寧'],'','ja',async()=>JSON.stringify({choices:[pick]}),'food');
+ assert.equal(content.split('。').length,3);assert.match(content,/丁寧/);assert.match(content,/雰囲気/);assert.match(content,/勧めたい/);assert.match(content,/また来/);
+ assert.doesNotMatch(content,/料理|と思いまた|です。\n.*です。/u);
  }
 });
