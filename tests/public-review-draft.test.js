@@ -107,3 +107,25 @@ test('美名家の接客・雰囲気・再訪・推薦は二文で述べ、未�
  assert.doesNotMatch(content,/料理|と思いまた|です。\n.*です。/u);
  }
 });
+
+test('施術・予約・設備の自由入力を、同じ話題の選択項目で上書きしない',async()=>{
+ const cases=[
+  ['relax','力加減がちょうど良い','私には少し強かったです。'],
+  ['relax','予約が取りやすい','予約が取りづらかったです。'],
+  ['gym','設備が清潔','設備に汚れがありました。'],
+  ['food','雰囲気が良い','お店の雰囲気が好きでした。']
+ ];
+ for(const [group,label,free] of cases){
+  const r=await composeReview([label],free,'ja',()=>{throw Error('選択文を足さない')},group);
+  assert.equal(r.content,free);assert.equal(r.source,'original');
+ }
+ for(const [group,label,free] of [
+  ['relax','力加減がちょうど良い','香りは少し強かったです。'],
+  ['relax','予約が取りやすい','予約時間から15分待った。'],
+  ['gym','設備が清潔','服に汚れがありました。'],
+  ['food','提供が早い','料理は美味しかった。会計で待った。']
+ ]){
+  const r=await composeReview([label],free,'ja',async()=>'[0]',group);
+  assert.equal(r.source,'ai');assert.ok(r.content.endsWith(free.replace('。会計','。\n会計')));
+ }
+});
