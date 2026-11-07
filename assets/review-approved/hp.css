@@ -124,3 +124,4 @@ body[data-slug=jeans][data-hp] .hero-photo img{object-fit:contain}
  body[data-slug=jeans][data-hp] .brand-copy,body[data-slug=myondong][data-hp] .brand-copy{padding-block:12px}
  body[data-slug=myondong][data-hp] .brand-hero{min-height:210px}
 }
+@media(max-width:600px){body[data-slug=myondong] .site-header{height:60px}body[data-slug=myondong] .brand-hero .brand-copy{padding-block:7px}body[data-slug=myondong] .progress{padding-block:7px}}
