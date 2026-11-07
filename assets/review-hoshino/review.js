@@ -11,6 +11,7 @@ const CLINIC_I18N={"ja": {"logoSub": "みどり市笠懸町の接骨院・整体
 Object.keys(CLINIC_I18N).forEach(k=>Object.assign(I18N[k],CLINIC_I18N[k]));
 const photoInvite={ja:'ご自身で撮った写真があれば、お気に入りの一枚もぜひ口コミと一緒にご投稿ください。',en:'If you took a photo, you’re welcome to add a favorite one to your Google review.',zh:'如果您拍了照片，欢迎选一张喜欢的照片，和评价一起发布到Google。',ko:'직접 찍은 사진이 있다면 마음에 드는 한 장을 Google 리뷰에 함께 올려 주세요.'};
 for(const lang of Object.keys(photoInvite))I18N[lang].photoInvite=photoInvite[lang];
+for(const [l,[commentIntro,manualNext]] of Object.entries({"ja": ["選択肢を使わず、ご自身の言葉だけでも書けます。良かった点も気になった点もお聞かせください。", "手動でコピーしたので次へ"], "en": ["You can skip the options and write in your own words. Both positive and critical feedback are welcome.", "I copied the text manually. Continue"], "zh": ["可以不选任何选项，直接写下您的真实感受。满意或希望改进的地方都欢迎分享。", "我已手动复制，继续"], "ko": ["항목을 선택하지 않고 직접 작성해도 됩니다. 좋았던 점과 아쉬웠던 점을 자유롭게 적어 주세요.", "직접 복사했습니다. 다음으로"]}))Object.assign(I18N[l],{commentIntro,manualNext});
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search);
 const PREVIEW=params.get('preview')==='1'||['localhost','127.0.0.1',''].includes(location.hostname);
 let STORE_ID=params.get('store')||'';
@@ -43,10 +44,10 @@ function renderStars(){
  for(let i=1;i<=5;i++){const b=document.createElement('button');b.type='button';b.className='star'+(i<=rating?' selected':'');b.setAttribute('aria-label',i+' / 5 — '+text('ratings')[i-1]);b.setAttribute('aria-pressed',String(i===rating));b.textContent='★';b.addEventListener('click',()=>{rating=i;renderStars();});$('stars').append(b);}
  $('ratingLabel').textContent=rating?rating+' / 5 — '+text('ratings')[rating-1]:text('chooseStar');$('ratingNext').disabled=!rating||!ready;
 }
-const clinicChoices = {"ja": ["説明が分かりやすかった", "質問する時間があった", "受付の流れが分かりやすかった", "予約時間から待った"], "en": ["The explanation was clear", "I had time to ask questions", "The check-in process was clear", "I waited past my appointment time"], "zh": ["说明很清楚", "有时间提问", "接待流程很清楚", "超过预约时间后仍在等待"], "ko": ["설명이 이해하기 쉬웠다", "질문할 시간이 있었다", "접수 절차가 알기 쉬웠다", "예약 시간보다 늦게 안내받았다"]};
+const clinicChoices=window.reviewChoices.clinic;
 function pointLabels(){return clinicChoices.ja.map((key,i)=>({key,label:clinicChoices[lang][i]}));}
 function renderPoints(){
- $('points').replaceChildren();for(const p of pointLabels()){const b=document.createElement('button');b.type='button';b.className='point';b.textContent=p.label;b.setAttribute('aria-pressed',String(selected.has(p.key)));b.addEventListener('click',()=>{selected.has(p.key)?selected.delete(p.key):selected.add(p.key);b.setAttribute('aria-pressed',String(selected.has(p.key)));updateGenerate();});$('points').append(b);}updateGenerate();
+ $('points').replaceChildren();const items=pointLabels();if(rating<=2)items.unshift(...items.splice(-2));for(const p of items){const b=document.createElement('button');b.type='button';b.className='point';b.textContent=lang==='ja'?p.label.replace('おいしい','美味しい').replace('おすすめしたい','人に勧めたい'):p.label;b.setAttribute('aria-pressed',String(selected.has(p.key)));b.addEventListener('click',()=>{selected.has(p.key)?selected.delete(p.key):selected.add(p.key);b.setAttribute('aria-pressed',String(selected.has(p.key)));updateGenerate();});$('points').append(b);}updateGenerate();
 }
 function updateGenerate(){$('generate').disabled=busy||(!selected.size&&!$('freeWord').value.trim());}
 async function publicDraft(chosen,free) {
@@ -61,7 +62,7 @@ async function generate(){
  const chosen=pointLabels().filter(p=>selected.has(p.key)).map(p=>p.label),free=$('freeWord').value.trim();
  try{
   const draft=PREVIEW?[...chosen,free].filter(Boolean).join('\n'):await publicDraft(chosen,free);
-  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}
+  $('draft').value=PREVIEW?window.reviewSentenceLines(draft):draft;$('consent').checked=false;$('copy').disabled=true;$('manualNext').hidden=true;show('confirm');if(PREVIEW)status('previewDraft');if(!surveyTracked){track('survey');surveyTracked=true;}
  }catch{status('generateError');}finally{busy=false;updateGenerate();$('regenerate').disabled=false;}
 }
 async function init(){
@@ -102,9 +103,10 @@ $('ratingNext').addEventListener('click',()=>{if(!ready||!rating)return;track('r
 document.querySelectorAll('[data-back]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.back)));
 $('freeWord').addEventListener('input',updateGenerate);
 $('generate').addEventListener('click',generate);$('regenerate').addEventListener('click',generate);
-function copyState(){$('copy').disabled=!$('consent').checked||!$('draft').value.trim();}
+function copyState(){$('manualNext').hidden=true;$('copy').disabled=!$('consent').checked||!$('draft').value.trim();}
 $('consent').addEventListener('change',copyState);$('draft').addEventListener('input',()=>{$('consent').checked=false;copyState();});
-$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('draft').value);show('google');}catch{status('copyError');$('draft').focus();$('draft').select();}});
+$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('draft').value);show('google');}catch{$('manualNext').hidden=false;status('copyError');$('draft').focus();$('draft').select();}});
+$('manualNext').addEventListener('click',()=>{if($('consent').checked&&$('draft').value.trim())show('google');});
 $('googleLink').addEventListener('click',e=>{if(PREVIEW){e.preventDefault();status('previewGoogle');return;}if(e.currentTarget.dataset.ready!=='true'){e.preventDefault();status('missingGoogle');return;}track('click');});
 $('feedback').addEventListener('input',()=>{$('sendFeedback').disabled=!$('feedback').value.trim()||busy;});
 $('sendFeedback').addEventListener('click',async()=>{

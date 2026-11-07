@@ -112,3 +112,5 @@ body[data-slug=jeans][data-hp] .brand-copy{background:var(--paper);color:var(--i
 body[data-slug=jeans][data-hp] .hero-photo{height:260px;background:#fff}
 body[data-slug=jeans][data-hp] .hero-photo img{object-fit:contain}
 @media(min-width:768px){body[data-slug=jeans][data-hp] .hero-photo{height:340px}}
+
+@media(max-width:600px){body[data-family=fitness] .brand-hero .hero-photo{height:180px;min-height:0}body[data-family=fitness] .brand-copy{padding-block:10px}}

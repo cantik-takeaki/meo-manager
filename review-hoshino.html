@@ -6,10 +6,11 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="color-scheme" content="light">
   <title>ご感想をお聞かせください</title>
-  <link rel="stylesheet" href="assets/review-hoshino/review.css?v=20261107">
+  <link rel="stylesheet" href="assets/review-hoshino/review.css?v=honest2">
+  <script defer src="assets/review-common/choices.js?v=honest2"></script>
   <script defer src="assets/review-common/sentence-lines.js"></script>
   <script src="assets/review-hoshino/stores-data.js?v=20261027-hoshino" defer></script>
-  <script src="assets/review-hoshino/review.js?v=sentence-lines" defer></script>
+  <script src="assets/review-hoshino/review.js?v=honest2" defer></script>
 </head>
 <body class="review-hoshino">
   <aside id="previewNotice" class="preview-notice" hidden>確認用です。回答・口コミは送信されません。</aside>
@@ -63,6 +64,7 @@
         <label for="draft" class="sr-only" data-i18n="draftLabel">口コミの下書き</label><textarea id="draft" rows="7" maxlength="1500"></textarea>
         <label class="consent"><input id="consent" type="checkbox"><span data-i18n="consent">自分の体験と合っていることを確認しました。</span></label>
         <button id="copy" class="primary" disabled data-i18n="copy">文章をコピーして次へ</button>
+        <button id="manualNext" type="button" class="secondary" hidden data-i18n="manualNext">手動でコピーしたので次へ</button>
         <button id="regenerate" class="secondary" data-i18n="regenerate">下書きを作り直す</button>
         <p class="note" data-i18n="voluntary">投稿は任意です。最後の投稿操作はご本人がGoogle上で行います。</p>
       </section>

@@ -8,3 +8,5 @@
 @media(max-width:375px){#ratingTitle{font-size:19px;letter-spacing:0}}
 
 .hero-thanks{font:700 clamp(18px,2vw,22px)/1.55 var(--round);color:#593625}.hero-title{font-family:var(--round);color:#5f7a0a}.hero-photo img{border-radius:48px 12px 48px 12px}.clinic-caption{color:#454545}
+
+@media(max-width:600px){.hero-photo img{height:132px}.clinic-caption{padding-block:6px}.progress{margin-bottom:12px}.site-header{padding-block:10px}.brand-copy{padding-bottom:12px}}

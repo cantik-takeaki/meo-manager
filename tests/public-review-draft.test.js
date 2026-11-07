@@ -54,11 +54,11 @@ test('モデルの候補選択と代替文を別々に記録する',async()=>{
   const invalid=await composeReview(...args,async()=>'[8]','food');
   assert.equal(invalid.source,'template');
 });
-test('美名家の5項目と店の清潔さを3文につなぎ、未入力の品名や地名を添えない',async()=>{
+test('美名家の選択項目と手書きの清潔さを分けて、未入力の品名や地名を添えない',async()=>{
  const selected=['料理がおいしい','雰囲気が良い','提供が早い','コスパが良い','おすすめしたい'];
  const draft=await composeReview(selected,'店が綺麗だった','ja',async()=>'{"choices":[0]}','food');
  assert.equal(draft.source,'ai');
- assert.equal(draft.content,'店内は綺麗で雰囲気も良かったです。\n料理はすぐに出てきて美味しくいただきました。\nコスパも良くて人にも勧めたくなるお店でした。');
+ assert.equal(draft.content,'料理はすぐに出てきて美味しくいただきました。\nコスパも良くて人にも勧めたくなるお店でした。\n雰囲気が良かったです。\n店が綺麗だった');
  const negative='店が綺麗だったとは思わない。18分待った。';
  const fallback=await composeReview(selected,negative,'ja',async()=>'架空の体験','food');
  assert.ok(fallback.content.endsWith('店が綺麗だったとは思わない。\n18分待った。'));
@@ -81,4 +81,11 @@ test('自由記述・既存の改行・引用の句点・末尾の句点を保�
  const expect='「綺麗でした。」\n次の店では18分待った。\n味は良かった。';
  const {content}=await composeReview([],input,'ja',()=>{throw Error()},'food');
  assert.equal(content,expect);
+});
+
+test('自由入力と重なる選択肢だけを外し、待ち時間や否定をそのまま残す',async()=>{
+ for(const free of ['説明は分かりやすかった。予約時間から18分待った。','説明は分かりにくかった。予約時間から18分待った。']){
+ const r=await composeReview(['説明が分かりやすかった','予約時間から待った'],free,'ja',()=>{throw Error()},'clinic');
+ assert.equal(r.source,'original');assert.equal(r.content,free.replace('。予約','。\n予約'));
+ }
 });
