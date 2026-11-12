@@ -14,3 +14,5 @@
 /* 質問を通常のスマホ幅で一行に収める。拡大表示時は折り返しを許す。 */
 #ratingStage{container-type:inline-size}
 #ratingTitle:lang(ja){font-size:clamp(1rem,6.5cqi,1.625rem);letter-spacing:0;line-height:1.5;word-break:normal;overflow-wrap:anywhere}
+
+[data-i18n]:lang(ja),[data-i18n]:lang(zh),[role=status]{white-space:pre-line}

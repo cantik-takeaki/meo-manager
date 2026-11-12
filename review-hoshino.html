@@ -6,15 +6,15 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="color-scheme" content="light">
   <title>ご感想をお聞かせください</title>
-  <link rel="stylesheet" href="assets/review-hoshino/review.css?v=copy1112">
+  <link rel="stylesheet" href="assets/review-hoshino/review.css?v=copy1112b">
   <script defer src="assets/review-common/choices.js?v=closing1"></script>
   <script defer src="assets/review-common/variants.js?v=1"></script>
   <script defer src="assets/review-common/sentence-lines.js"></script>
   <script src="assets/review-hoshino/stores-data.js?v=20261027-hoshino" defer></script>
-  <script src="assets/review-hoshino/review.js?v=copy1112" defer></script>
+  <script src="assets/review-hoshino/review.js?v=copy1112b" defer></script>
 </head>
 <body class="review-hoshino">
-  <aside id="previewNotice" class="preview-notice" hidden>確認用です。回答・口コミは送信されません。</aside>
+  <aside id="previewNotice" class="preview-notice" hidden>確認用の画面です。回答や口コミは送信されません。</aside>
   <div class="page-shell">
     <header class="site-header">
       <a class="clinic-logo" href="https://hoshinosekkotuinn.jp/" target="_blank" rel="noopener noreferrer"><img src="assets/review-hoshino/logo-mark.svg" width="52" height="52" alt=""><span class="logo-text"><span class="logo-sub" data-i18n="logoSub">みどり市笠懸町の接骨院・整体院</span><span id="headerName" class="logo-name">ほしの接骨院</span></span></a>
@@ -38,19 +38,19 @@
       <nav class="progress" aria-label="回答の手順"><ol><li id="progress0" aria-current="step"><span>1</span><b data-i18n="stepRating">評価</b></li><li id="progress1"><span>2</span><b data-i18n="stepComment">感想</b></li><li id="progress2"><span>3</span><b data-i18n="stepConfirm">確認</b></li></ol></nav>
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <section class="stage" id="ratingStage" aria-labelledby="ratingTitle">
-        <p class="eyebrow" data-i18n="yourVoice">お客様の声をお聞かせください</p>
+        <p class="eyebrow" data-i18n="yourVoice">お客様の声をお聞かせください。</p>
         <h2 id="ratingTitle" data-i18n="ratingTitle">本日の満足度は如何でしたか？</h2>
         <p class="intro" data-i18n="ratingIntro">感じたままの評価を選んでください。</p>
         <fieldset class="rating-field"><legend class="sr-only" data-i18n="ratingTitle">本日の満足度は如何でしたか？</legend><div id="stars" class="stars"></div></fieldset>
         <div class="rating-scale"><span data-i18n="lowRating">不満</span><span data-i18n="highRating">満足</span></div>
-        <p id="ratingLabel" class="rating-label" aria-live="polite" data-i18n="chooseStar">星を1つ選んでください</p>
+        <p id="ratingLabel" class="rating-label" aria-live="polite" data-i18n="chooseStar">星を1つ選んでください。</p>
         <button id="ratingNext" class="primary" disabled data-i18n="nextComment">感想の入力へ進む</button>
         <p class="note" data-i18n="noAutoPost">この画面の操作だけでGoogleに投稿されることはありません。</p>
       </section>
       <section class="stage" id="commentStage" hidden aria-labelledby="commentTitle">
         <button class="back" data-back="rating" data-i18n="backRating">評価を選び直す</button>
-        <h2 id="commentTitle" data-i18n="commentTitle">印象に残ったことを教えてください</h2>
-        <p class="intro" data-i18n="commentIntro">当てはまる項目を選べます。複数選択もできます。</p>
+        <h2 id="commentTitle" data-i18n="commentTitle">印象に残ったことを教えてください。</h2>
+        <p class="intro" data-i18n="commentIntro">体験に合う項目をいくつでも選べます。</p>
         <div id="points" class="points"></div>
         <label for="freeWord" data-i18n="freeLabel">ご感想（任意）</label>
         <textarea id="freeWord" rows="3" maxlength="1500" data-placeholder="freePlaceholder" placeholder="実際に体験したことをご自由にお書きください。"></textarea>
@@ -60,19 +60,19 @@
       </section>
       <section class="stage" id="confirmStage" hidden aria-labelledby="confirmTitle">
         <button class="back" data-back="comment" data-i18n="backComment">感想の入力に戻る</button>
-        <h2 id="confirmTitle" data-i18n="confirmTitle">投稿する文章をご確認ください</h2>
-        <p class="intro" data-i18n="confirmIntro">実際のご体験と合っているかお確かめください。文章は自由に修正できます。</p>
+        <h2 id="confirmTitle" data-i18n="confirmTitle">投稿する文章をご確認ください。</h2>
+        <p class="intro" data-i18n="confirmIntro">実際のご体験と合っているかお確かめください。文章はご自身で直せます。</p>
         <label for="draft" class="sr-only" data-i18n="draftLabel">口コミの下書き</label><textarea id="draft" rows="7" maxlength="1500"></textarea>
         <label class="consent"><input id="consent" type="checkbox"><span data-i18n="consent">自分の体験と合っていることを確認しました。</span></label>
         <button id="copy" class="primary" disabled data-i18n="copy">文章をコピーして次へ</button>
         <button id="manualNext" type="button" class="secondary" hidden data-i18n="manualNext">手動でコピーしたので次へ</button>
         <button id="regenerate" class="secondary" data-i18n="regenerate">下書きを作り直す</button>
-        <p class="note" data-i18n="voluntary">投稿は任意です。最後の投稿操作はご本人がGoogle上で行います。</p>
+        <p class="note" data-i18n="voluntary">投稿は任意です。Googleでの投稿はご本人が行います。</p>
       </section>
       <section class="stage" id="googleStage" hidden aria-labelledby="googleTitle">
         <p class="eyebrow" data-i18n="lastStep">あと1つの操作です</p><h2 id="googleTitle" data-i18n="googleTitle">Googleで文章を貼り付けて投稿</h2>
         <p id="copyMessage" class="intro" data-i18n="copied">文章をコピーしました。</p>
-        <ol class="instructions"><li data-i18n="googleHow1">下のボタンでGoogleの画面を開きます。</li><li data-i18n="googleHow2">評価を選び、文章を貼り付けます。</li><li data-i18n="photoInvite">ご自身で撮った写真があれば、お気に入りの一枚もぜひ口コミと一緒にご投稿ください。</li><li data-i18n="googleHow3">内容を確認して「投稿」を押します。</li></ol>
+        <ol class="instructions"><li data-i18n="googleHow1">下のボタンでGoogleの画面を開きます。</li><li data-i18n="googleHow2">評価を選んで文章を貼り付けます。</li><li data-i18n="photoInvite">ご自身で撮った写真も一緒に投稿できます。</li><li data-i18n="googleHow3">内容を確認して「投稿」を押します。</li></ol>
         <a id="googleLink" class="primary" target="_blank" rel="noopener noreferrer" data-i18n="openGoogle">Googleの口コミ投稿画面を開く</a>
         <p class="note" data-i18n="googleAccount">Googleアカウントへのログインが必要な場合があります。</p>
         <button class="secondary" data-back="confirm" data-i18n="backDraft">文章を確認・修正する</button>
