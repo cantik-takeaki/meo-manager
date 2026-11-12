@@ -148,7 +148,7 @@ test('全店舗で同じ項目を3回選び直しても違う文を返し、自�
   const recentVariants=[],drafts=new Set();
   for(let i=0;i<3;i++){
    const {data}=await call({locationId,selected:[choices[group].ja[0],'また来たい','感謝を伝えたい'],recentVariants});
-   assert.match(data.content,/また|次も|次に|もう一度|次の機会/);assert.match(data.content,/ありがと|感謝/);
+   assert.match(data.content,/また|次も|次に|もう一度|次の機会/);assert.match(data.content,/ありがと|ありがた|ごちそう|感謝/);
    assert.ok(!drafts.has(data.content));drafts.add(data.content);recentVariants.push(data.variant);
   }
   const only=await call({locationId,selected:[choices[group].ja[0]]});
@@ -190,7 +190,7 @@ test('同業種で同じ3項目を選んだ17店舗に、感謝の結びを除�
     });
     assert.ok(result.sharedHistory);
     assert.doesNotMatch(result.content,/感謝しています/);
-    assert.match(result.content,/ありがとう/);
+    assert.match(result.content,/ありがとう|ありがた|ごちそう/);
     recent.push(result.variant);
   }
  }
@@ -198,6 +198,7 @@ test('同業種で同じ3項目を選んだ17店舗に、感謝の結びを除�
 
 test('店舗を越えて冒頭の句を重ねず、同じ体験から3種類の流れで書き出す',async()=>{
  const {returnPassages}=await import('../lib/review-passages.js');
+ const {gratefulPassages}=await import('../lib/review-thanks.js');
  const usedByGroup=new Map();
  for(const group of Object.values(storeGroups)){
   if(!usedByGroup.has(group))usedByGroup.set(group,new Set());
@@ -207,11 +208,22 @@ test('店舗を越えて冒頭の句を重ねず、同じ体験から3種類の�
      const index=options.findIndex(c=>!used.has(c.opening));
      assert.notEqual(index,-1);
      used.add(options[index].opening);
-     seenFlows.add(returnPassages(fact).findIndex(forms=>forms.includes(options[index].body)));
+     seenFlows.add(gratefulPassages(fact,returnPassages(fact)).findIndex(forms=>forms.includes(options[index].text)));
      return index;
    });
    assert.ok(r.sharedHistory);recent.push(r.variant);
   }
   assert.deepEqual([...seenFlows].sort(),[0,1,2]);
  }
+});
+
+test('感謝だけなら対象を想像せず、体験を選んだ場合だけその体験に結び付ける',async()=>{
+ const unknown=async()=>'[0]';
+ const thanks=await composeReview(['感謝を伝えたい'],'','ja',unknown,'gym',[]);
+ assert.doesNotMatch(thanks.content,/指導|教え|施術|また/);
+ const coach=await composeReview(['感謝を伝えたい','指導が丁寧'],'','ja',unknown,'gym',[]);
+ assert.match(coach.content,/指導|教え/);assert.match(coach.content,/ありがと|ありがた/);
+ assert.equal(coach.content.trim().split('。').filter(Boolean).length,1);
+ const text=await composeReview(['感謝を伝えたい'],'ごちそうさまでした。','ja',unknown,'food',[]);
+ assert.equal(text.content,'ごちそうさまでした。');
 });

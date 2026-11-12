@@ -48,7 +48,7 @@ function renderStars(){
 const clinicChoices=window.reviewChoices.clinic;
 function pointLabels(){return clinicChoices.ja.map((key,i)=>({key,label:clinicChoices[lang][i]}));}
 function renderPoints(){
- $('points').replaceChildren();const items=pointLabels();if(rating<=2){const concerns=new Set(['予約時間から待った','料理が出るまで待った','力加減が合わなかった','説明が足りなかった','改善してほしい点があった']);items.sort((a,b)=>Number(concerns.has(b.key))-Number(concerns.has(a.key)));}for(const p of items){const b=document.createElement('button');b.type='button';b.className='point';b.textContent=lang==='ja'?p.label.replace('おいしい','美味しい').replace('おすすめしたい','人に勧めたい'):p.label;b.setAttribute('aria-pressed',String(selected.has(p.key)));b.addEventListener('click',()=>{selected.has(p.key)?selected.delete(p.key):selected.add(p.key);b.setAttribute('aria-pressed',String(selected.has(p.key)));updateGenerate();});$('points').append(b);}updateGenerate();
+ $('points').replaceChildren();const items=pointLabels();for(const p of items){const b=document.createElement('button');b.type='button';b.className='point';b.textContent=lang==='ja'?p.label.replace('おいしい','美味しい').replace('おすすめしたい','人に勧めたい'):p.label;b.setAttribute('aria-pressed',String(selected.has(p.key)));b.addEventListener('click',()=>{selected.has(p.key)?selected.delete(p.key):selected.add(p.key);b.setAttribute('aria-pressed',String(selected.has(p.key)));updateGenerate();});$('points').append(b);}updateGenerate();
 }
 function updateGenerate(){$('generate').disabled=busy||(!selected.size&&!$('freeWord').value.trim());}
 async function publicDraft(chosen,free) {
