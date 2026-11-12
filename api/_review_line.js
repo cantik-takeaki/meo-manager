@@ -11,7 +11,7 @@
 import crypto from 'node:crypto';
 import { llmComplete } from './generate-content.js';
 import { originalComment } from '../lib/review-routing.js';
-import { kvGet, kvSet } from './_kv.js';
+import { kvGet, kvSet, kvGetMany } from './_kv.js';
 
 export const LINE_TOKEN_KEY = 'line_conn__review_alert';
 export const LINE_TO_KEY = 'review_alert_line';
@@ -225,13 +225,21 @@ export async function withNext(text, excludeId = '') {
 export async function listText() {
   const q = (await kvGet(QUEUE_KEY)) || [];
   const rows = [];
-  for (const id of q) {
-    const p = await kvGet(PENDING_PREFIX + id);
-    if (!p || p.status !== 'pending') continue;
-    rows.push(`${rows.length + 1}. ${p.store} ★${p.star} ${p.name || ''}さん${p.replace ? '（差し替え）' : ''}${p.humanEdited ? '（直した文）' : ''}　番号 ${p.id}`);
+  let total = 0, used = 0;
+  for (let offset = 0; offset < q.length; offset += 100) {
+    const records = await kvGetMany(q.slice(offset, offset + 100).map(id => PENDING_PREFIX + id));
+    for (const p of records) {
+      if (p?.status !== 'pending') continue;
+      total++;
+      const row = `${total}. ${clip(p.store,64)} ★${p.star} ${clip(p.name,40)}さん${p.replace ? '（差し替え）' : ''}${p.humanEdited ? '（直した文）' : ''}　番号 ${p.id}`;
+      if (total === rows.length + 1 && rows.length < 60 && used + row.length < 4600) {
+        rows.push(row);
+        used += row.length + 1;
+      }
+    }
   }
-  if (!rows.length) return '確認待ちの口コミはありません。';
-  return `確認待ち ${rows.length}件\n\n${rows.slice(0, 60).join('\n')}${rows.length > 60 ? `\nほか${rows.length - 60}件` : ''}\n\n「次」と送ると次のカードを出します。「確認 番号」で、その口コミのカードを出します。`;
+  if (!total) return '確認待ちの口コミはありません。';
+  return `確認待ち ${total}件\n\n${rows.join('\n')}${total > rows.length ? `\nほか${total - rows.length}件` : ''}\n\n「次」で次のカードを表示します。「確認 番号」で個別に確認できます。`;
 }
 
 // Read-only example card. Its ID is separate from approval IDs and cannot publish a review.

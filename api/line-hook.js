@@ -9,7 +9,7 @@
 // LINE Developers の Webhook URL をここに向けたときだけ動く（向ける前は何も起きない）。
 import crypto from 'node:crypto';
 import { kvGet, kvSet } from './_kv.js';
-import { LINE_TOKEN_KEY } from './_review_line.js';
+import { LINE_TOKEN_KEY, LINE_TO_KEY, listText } from './_review_line.js';
 
 export const config = { api: { bodyParser: false } };   // 署名検証と中継に「届いたままの本文」が要る
 
@@ -40,8 +40,9 @@ export default async function handler(req, res) {
   if (!sig || !calc || sig.length !== calc.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(calc))) {
     return res.status(403).send('forbidden');
   }
+  let envelope = {};
   let events = [];
-  try { events = JSON.parse(raw.toString('utf8')).events || []; } catch (e) {}
+  try { envelope = JSON.parse(raw.toString('utf8')); events = envelope.events || []; } catch (e) {}
   const conn = await kvGet(LINE_TOKEN_KEY);
   const token = conn && conn.token;
 
@@ -87,11 +88,30 @@ export default async function handler(req, res) {
 
   // 3) それ以外は月次レポートの受け口へ、届いた本文と署名をそのまま中継する
   //    口コミのボタンだけの通知は中継しない（webhook.php が「管理者のみ」等を二重に返すため）
-  const onlyRv = events.length > 0 && rvEvents.length === events.length;
-  if (!onlyRv) {
-    try {
-      await fetch(FORWARD, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Line-Signature': sig }, body: raw });
-    } catch (e) { /* 中継の失敗でLINEへの応答を落とさない */ }
+  const remaining = [];
+  for (const event of events) {
+    if (rvEvents.includes(event)) continue;
+    const source = event.source || {};
+    if (event.type === 'message' && event.message?.type === 'text' && /^(一覧|いちらん|リスト)$/.test(event.message.text.trim())) {
+      const conf = (await kvGet(LINE_TO_KEY)) || {};
+      const allowed = (source.type === 'group' && source.groupId && source.groupId === conf.group)
+        || (source.type === 'user' && source.userId && conf.to?.includes(source.userId));
+      if (allowed && token && event.replyToken) {
+        let text;
+        try { text = await listText(); }
+        catch { text = '一覧を取得できませんでした。少し時間を置いて「一覧」と送ってください。'; }
+        const reply = await lineApi(token, 'POST', '/v2/bot/message/reply', { replyToken: event.replyToken, messages: [{type:'text', text}] });
+        if (reply.status >= 300) return res.status(502).send('LINE reply failed');
+        continue;
+      }
+    }
+    remaining.push(event);
+  }
+  if (remaining.length || !events.length) {
+    const unchanged = remaining.length === events.length;
+    const body = unchanged ? raw : Buffer.from(JSON.stringify({...envelope, events: remaining}));
+    const signature = unchanged ? sig : crypto.createHmac('sha256', secret).update(body).digest('base64');
+    await fetch(FORWARD, {method:'POST', headers:{'Content-Type':'application/json','X-Line-Signature':signature}, body});
   }
   return res.status(200).send('OK');
 }

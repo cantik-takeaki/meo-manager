@@ -34,6 +34,18 @@ export async function kvGet(key) {
   try { return JSON.parse(data.result); } catch { return data.result; }
 }
 
+export async function kvGetMany(keys) {
+  if (!keys.length) return [];
+  const {url, token} = getKV();
+  const response = await fetch(url, {
+    method: 'POST', signal: AbortSignal.timeout(8000),
+    headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify(['MGET', ...keys]),
+  });
+  const {result} = await responseData(response);
+  return result.map(value => value === null ? null : JSON.parse(value));
+}
+
 export async function kvDel(key) {
   const { url, token } = getKV();
   const res = await fetch(url, {
