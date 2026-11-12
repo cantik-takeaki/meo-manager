@@ -63,3 +63,7 @@ body[data-slug=shunkatou] .brand-copy h1{font-size:38px;letter-spacing:.03em}
 body[data-slug=hiroshimakko] .brand-copy h1{font-size:28px;letter-spacing:.02em}
 
 .extra-actions{border-top:1px solid var(--line);margin-top:26px;padding-top:22px}.extra-actions:empty{display:none}input[type=email]{display:block;width:100%;min-height:52px;padding:12px;border:1px solid #aaa69e;border-radius:3px;background:#fff;color:var(--ink);margin-bottom:14px}.private-link{margin:20px 0 0;text-align:center;width:100%}.lead-status{font-size:14px;margin:12px 0}.lead-box h2{font-family:var(--sans);font-size:18px}.lead-box label{margin-top:18px}
+
+/* 質問を通常のスマホ幅で一行に収める。拡大表示時は折り返しを許す。 */
+#ratingStage{container-type:inline-size}
+#ratingTitle:lang(ja){font-size:clamp(1rem,6.5cqi,1.625rem);letter-spacing:0;line-height:1.5;word-break:normal;overflow-wrap:anywhere}
