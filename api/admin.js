@@ -6,7 +6,7 @@ import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
 import { shindanOne, fetchPerf } from './_shindan.js';
 import { classifyReview, findAffirm, findUnsupported, findEffectClaims, findRebuttal, REPLY_RULE } from './_review_safety.js';
-import { unavailableCard, pushReviewAlerts, pushTest, lineTarget, formatBubble, nextPending, moveToEnd, withNext, listText, LINE_TO_KEY, LINE_TOKEN_KEY, PENDING_PREFIX } from './_review_line.js';
+import { makeControlTest, unavailableCard, pushReviewAlerts, pushTest, lineTarget, formatBubble, nextPending, moveToEnd, withNext, listText, LINE_TO_KEY, LINE_TOKEN_KEY, PENDING_PREFIX } from './_review_line.js';
 
 function parseCookies(req) {
   const c = {};
@@ -441,7 +441,7 @@ export default async function handler(req, res) {
   //   （従来はゲートで401になり cron-rank/cron-tamper 本体に到達できず、cronが一度も発火していなかった）
   const _c = parseCookies(req);
   const access_token = _c.access_token;
-  const _isCronAction = (action === 'cron-rank' || action === 'cron-tamper' || action === 'cron-review-reply' || action === 'review-inventory' || action === 'review-preview' || action === 'stage-review-history');
+  const _isCronAction = ((action === 'post-inventory' && req.method === 'GET') || action === 'cron-rank' || action === 'cron-tamper' || action === 'cron-review-reply' || action === 'review-inventory' || action === 'review-preview' || action === 'stage-review-history');
   const _cronAuthOk = !!process.env.CRON_SECRET && (req.headers.authorization || '') === `Bearer ${process.env.CRON_SECRET}`;
   // 口コミ返信のLINE承認（cantik.co.jp/line/webhook.php から呼ばれる）。管理者Cookieの代わりに共有の合言葉で通す
   let _approveAuthOk = false;
@@ -736,6 +736,7 @@ export default async function handler(req, res) {
     if (!fromGroup && !fromUser) return res.json({ ignore: true });
     const paused=await kvGet('meo_paused_stores')||[];
     let text = String(b.text || '').trim();
+    if(fromGroup && text==='社内ボタン動作試験')return res.json({messages:[await makeControlTest()]});
     if (/^過去/.test(text)) {
       const {historicalMessages}=await import('../lib/review-history.js');
       const messages=await historicalMessages(text);
@@ -852,7 +853,7 @@ export default async function handler(req, res) {
     const b = req.body || {};
     const say = (text, extra = {}) => res.json({ text, ...extra });
     // 結果の文に、次の確認待ちのカードを添えて返す（1件ずつ方式・社長指示 2026-10-07）
-    const sayNext = async (text, excludeId = '') => res.json({ text, messages: await withNext(text, excludeId) });
+    const sayNext = async (text, excludeId = '') => p?.controlTest ? say(text) : res.json({ text, messages: await withNext(text, excludeId) });
     const conf = (await kvGet(LINE_TO_KEY)) || {};
     const fromGroup = b.sourceType === 'group' && conf.group && b.groupId === conf.group;
     const fromUser = b.sourceType === 'user' && (conf.to || []).includes(b.userId);
@@ -882,8 +883,9 @@ export default async function handler(req, res) {
       return res.json({ text: guide, messages: msgs });
     }
     // 「あとで」：順番待ちの最後に回して次の1件を出す（店の了解待ちなど）
-    if (b.decision === 'later') { await moveToEnd(id); return sayNext(`あとでにしました：${label}`, id); }
+    if (b.decision === 'later') { if(!p.controlTest)await moveToEnd(id); return sayNext(`あとでにしました：${label}`, id); }
     if (b.decision !== 'ok') return say('操作を判別できませんでした。');
+    if(p.controlTest || !p.locationName || !p.reviewId)return say('このカードはGoogleに送信できません。');
     const latest = await kvGet('rv_latest_' + p.reviewId);
     if (latest && latest !== id) return say('返信案が更新されています。最新の確認カードから操作してください。');
     // ★押した瞬間に記録（結果を待たない）。もう1人が続けて押しても「対応済み」になる
@@ -1591,6 +1593,17 @@ export default async function handler(req, res) {
   if (action === 'stage-review-history' && req.method === 'POST') {
     const {saveReviewHistory}=await import('../lib/review-history.js');
     return saveReviewHistory(req,res);
+  }
+  if (action === 'post-inventory' && req.method === 'GET') {
+    const location=(await kvGet('managed_locations')||[]).find(m=>_lidOf(m.locationName)===req.query.store);
+    if (!location || unavailableCard(location, await kvGet('meo_paused_stores')||[])) return res.status(404).json({error:'対象店舗なし'});
+    const token=(location.storeId && await getAccessToken(location.storeId)) || await getMasterToken();
+    const query=new URLSearchParams({pageSize:'100'});
+    if(req.query.cursor)query.set('pageToken',String(req.query.cursor));
+    const page=await fetch('https://mybusiness.googleapis.com/v4/'+location.locationName+'/localPosts?'+query,{headers:{Authorization:'Bearer '+token}});
+    if(!page.ok)return res.status(page.status).json({error:'Googleの投稿を取得できませんでした'});
+    const data=await page.json();
+    return res.json({posts:(data.localPosts||[]).map(p=>({created:p.createTime,updated:p.updateTime,state:p.state,summary:p.summary,url:p.searchUrl})),next:data.nextPageToken||''});
   }
   if (action === 'review-inventory' && req.method === 'GET') {
     const {reviewInventory}=await import('../lib/review-run.js');

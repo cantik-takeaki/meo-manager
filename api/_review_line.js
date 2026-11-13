@@ -20,10 +20,19 @@ export const PENDING_PREFIX = 'rv_pending_';
 // 契約台帳の終了分は、停止一覧を更新する前に発行されたカードにも適用する。
 export function unavailableCard(p, paused = []) {
   if (!p) return false;
-  const lid=String(p.sid||p.locationName||'').match(/(?:locations[\/_])?(\d+)$/)?.[1];
-  return lid==='12710891692154182344' || paused.some(v=>String(v.lid)===lid);
+  const lid=String(p.sid||p.locationName||p.locId||'').match(/(?:locations[\/_])?(\d+)$/)?.[1];
+  return lid==='12710891692154182344' || lid==='3635533343268879986' || paused.some(v=>String(v.lid)===lid);
 }
 const clip = (s, n) => { const t = String(s || '').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+
+// 社内の確認グループだけで使う架空のカード。Googleの店舗・口コミの識別子は持たない。
+export async function makeControlTest() {
+  const id = crypto.randomBytes(5).toString('hex');
+  const record = {id, controlTest:true, status:'pending', store:'社内操作テスト', star:5,
+    name:'テスト担当', review:'操作確認用の架空の口コミです。', reply:'こちらはテスト用の返信案です。'};
+  await kvSet(PENDING_PREFIX + id, record);
+  return {type:'flex',altText:'社内操作テスト（架空の口コミ）',contents:await formatBubble(record)};
+}
 
 /** 1件分のカード（Flex bubble）。ボタンの postback は webhook.php が rv=ok/ng&id=… として受ける */
 const japanese = /[ぁ-んァ-ヶ]/u;
@@ -55,7 +64,7 @@ export async function formatBubble(q) {
   // 既にある返信の差し替え（店の了解を取ってから押す）／手で直した文
   const title = q.replace ? '返信の差し替え（店の了解を取ってから押してください）' : q.humanEdited ? '直した返信の確認' : '口コミの確認をお願いします';
   const t = (text, extra = {}) => ({ type: 'text', text, wrap: true, size: 'sm', color: '#1e293b', ...extra });
-  return {
+  const bubble = {
     type: 'bubble',
     header: { type: 'box', layout: 'vertical', backgroundColor: '#0f4aa2', paddingAll: '12px', contents: [
       { type: 'text', text: title, color: '#ffffff', size: 'xs', wrap: true },
@@ -89,6 +98,10 @@ export async function formatBubble(q) {
         action: { type: 'postback', label: '送らない', data: `rv=ng&id=${q.id}`, displayText: `送らない：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
     ] },
   };
+  if (q.controlTest) {
+    bubble.footer.contents = bubble.footer.contents.filter(x => /^rv=(edit|later|ng)&/.test(x.action?.data||''));
+  }
+  return bubble;
 }
 
 async function push(token, to, messages, retryKey = crypto.randomUUID()) {
