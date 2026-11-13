@@ -13,11 +13,11 @@ test('接客への感想の直前の読点と重複するお礼を整える',()=
 for(const count of [0,2,480])test('署名付き一覧と通常メッセージの混在 '+count,async t=>{
   process.env.KV_REST_API_URL='https://kv.invalid';process.env.KV_REST_API_TOKEN='fixture';
   const sign=b=>createHmac('sha256','fixture').update(b).digest('base64');
-  const kv={line_channel_secret__review_alert:'fixture',line_conn__review_alert:{token:'fixture'},review_alert_line:{group:'group'},line_seen_groups:{group:{}},rv_queue:Array.from({length:count},(_,i)=>String(i))};
+  const kv={meo_paused_stores:[{lid:'1122'}],line_channel_secret__review_alert:'fixture',line_conn__review_alert:{token:'fixture'},review_alert_line:{group:'group'},line_seen_groups:{group:{}},rv_queue:['ended','paused',...Array.from({length:count},(_,i)=>String(i))]};
   const receipts=[], relayed=[];
   t.mock.method(globalThis,'fetch',async(url,opts)=>{
     if(url.startsWith('https://kv.invalid/get/'))return Response.json({result:JSON.stringify(kv[url.split('/').pop()])});
-    if(url==='https://kv.invalid'){const [op,...keys]=JSON.parse(opts.body);return Response.json({result:op==='MGET'?keys.map(id=>JSON.stringify({status:'pending',id,store:'店'.repeat(62),name:'名'.repeat(38),star:5})):'OK'});}
+    if(url==='https://kv.invalid'){const [op,...keys]=JSON.parse(opts.body);return Response.json({result:op==='MGET'?keys.map(id=>JSON.stringify({sid:id.endsWith('ended')?'locations_12710891692154182344':id.endsWith('paused')?'locations_1122':'locations_415',status:'pending',id,store:'店'.repeat(62),name:'名'.repeat(38),star:5})):'OK'});}
     if(url.endsWith('/message/reply')){receipts.push(JSON.parse(opts.body));return Response.json({});}
     assert.equal(opts.headers['X-Line-Signature'],sign(opts.body));relayed.push(...JSON.parse(opts.body).events);return Response.json({});
   });

@@ -6,7 +6,7 @@ import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
 import { shindanOne, fetchPerf } from './_shindan.js';
 import { classifyReview, findAffirm, findUnsupported, findEffectClaims, findRebuttal, REPLY_RULE } from './_review_safety.js';
-import { pushReviewAlerts, pushTest, lineTarget, formatBubble, nextPending, moveToEnd, withNext, listText, LINE_TO_KEY, LINE_TOKEN_KEY, PENDING_PREFIX } from './_review_line.js';
+import { unavailableCard, pushReviewAlerts, pushTest, lineTarget, formatBubble, nextPending, moveToEnd, withNext, listText, LINE_TO_KEY, LINE_TOKEN_KEY, PENDING_PREFIX } from './_review_line.js';
 
 function parseCookies(req) {
   const c = {};
@@ -734,6 +734,7 @@ export default async function handler(req, res) {
     const fromGroup = b.sourceType === 'group' && conf.group && b.groupId === conf.group;
     const fromUser = b.sourceType === 'user' && (conf.to || []).includes(b.userId);
     if (!fromGroup && !fromUser) return res.json({ ignore: true });
+    const paused=await kvGet('meo_paused_stores')||[];
     let text = String(b.text || '').trim();
     if (/^過去/.test(text)) {
       const {historicalMessages}=await import('../lib/review-history.js');
@@ -752,13 +753,13 @@ export default async function handler(req, res) {
     const read = text.match(/^(原文|返信文)\s*([0-9a-f]{10})$/);
     if (read) {
       const rec = await kvGet(PENDING_PREFIX + read[2]);
-      const value = rec && (read[1] === '原文' ? originalComment(rec.review) : rec.reply);
+      const value = rec && !unavailableCard(rec,paused) && (read[1] === '原文' ? originalComment(rec.review) : rec.reply);
       return res.json({ messages: [{ type: 'text', text: value || '該当する本文がありません。' }] });
     }
     const mk = text.match(/^確認\s*([0-9a-f]{10})$/);
     if (mk) {
       const p0 = await kvGet(PENDING_PREFIX + mk[1]);
-      return res.json({ messages: p0 && p0.status === 'pending'
+      return res.json({ messages: p0 && !unavailableCard(p0,paused) && p0.status === 'pending'
         ? [{ type: 'flex', altText: `口コミの確認：${p0.store} ★${p0.star}`.slice(0, 390), contents: await formatBubble(p0) }]
         : [{ type: 'text', text: 'その番号の確認待ちは見つかりませんでした（対応済みの可能性があります）。' }] });
     }
@@ -773,6 +774,7 @@ export default async function handler(req, res) {
     const key = PENDING_PREFIX + id;
     const p = await kvGet(key);
     const T = (t) => res.json({ messages: [{ type: 'text', text: t }] });
+    if(unavailableCard(p,paused))return T('この口コミは運用停止中のため対象外です。');
     if (!p) return T('対象の口コミが見つかりませんでした。');
     if (p.status !== 'pending') return T(`この口コミはすでに対応済みのため、直せません（${p.status}）。`);
     // 絵文字は消す（cantik全社ルール）。長さはGoogleの上限（4,096字）まで
@@ -859,6 +861,7 @@ export default async function handler(req, res) {
     const key = PENDING_PREFIX + id;
     const p = id ? await kvGet(key) : null;
     if (!p) return say('対象の口コミが見つかりませんでした。ラクラクMEOの口コミ画面で確認してください。');
+    if(unavailableCard(p,await kvGet('meo_paused_stores')||[]))return say('この口コミは運用停止中のため対象外です。');
     const label = `${p.store} ★${p.star} ${p.name || ''}さん`;
     const STATUS = { sending: '送信処理中', sent: '送信済み', rejected: '送らないに決定済み', skipped_paused: '更新停止中のため未送信',
                      skipped_replied: '店側で返信済み', skipped_changed: '店側で返信が変わっていたため未送信', blocked: '使えない表現のため未送信', failed: '送信失敗' };

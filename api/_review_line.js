@@ -17,6 +17,12 @@ export const LINE_TOKEN_KEY = 'line_conn__review_alert';
 export const LINE_TO_KEY = 'review_alert_line';
 export const PENDING_PREFIX = 'rv_pending_';
 
+// 契約台帳の終了分は、停止一覧を更新する前に発行されたカードにも適用する。
+export function unavailableCard(p, paused = []) {
+  if (!p) return false;
+  const lid=String(p.sid||p.locationName||'').match(/(?:locations[\/_])?(\d+)$/)?.[1];
+  return lid==='12710891692154182344' || paused.some(v=>String(v.lid)===lid);
+}
 const clip = (s, n) => { const t = String(s || '').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
 
 /** 1件分のカード（Flex bubble）。ボタンの postback は webhook.php が rv=ok/ng&id=… として受ける */
@@ -118,7 +124,9 @@ export async function pushReviewAlerts(queue, opts = {}) {
   const tg = await lineTarget(opts);
   if (tg.error) return { skipped: tg.error };
   const items = [];
+  const paused=await kvGet('meo_paused_stores')||[];
   for (const q of queue) {
+    if(unavailableCard(q,paused))continue;
     const id = q.replace ? crypto.randomBytes(5).toString('hex') :
       crypto.createHash('sha256').update(q.sid + ':' + q.reviewId).digest('hex').slice(0,10);
     const previous = await kvGet(PENDING_PREFIX + id);
@@ -193,10 +201,11 @@ export const QUEUE_KEY = 'rv_queue';
 /** 順番待ちの先頭から、まだ確認待ちのものを返す。対応済みは並びから外す */
 export async function nextPending(excludeId = '') {
   const q = (await kvGet(QUEUE_KEY)) || [];
+  const paused=await kvGet('meo_paused_stores')||[];
   const keep = []; let found = null;
   for (const id of q) {
     const p = await kvGet(PENDING_PREFIX + id);
-    if (!p || p.status !== 'pending') continue;     // 対応済み・消えたものは外す
+    if (!p || p.status !== 'pending' || unavailableCard(p,paused)) continue;     // 対応済み・消えたものは外す
     keep.push(id);
     if (!found && id !== excludeId) found = p;
   }
@@ -224,12 +233,13 @@ export async function withNext(text, excludeId = '') {
 /** 確認待ちの一覧（文字）。グループで「一覧」と打つと出す */
 export async function listText() {
   const q = (await kvGet(QUEUE_KEY)) || [];
+  const paused=await kvGet('meo_paused_stores')||[];
   const rows = [];
   let total = 0, used = 0;
   for (let offset = 0; offset < q.length; offset += 100) {
     const records = await kvGetMany(q.slice(offset, offset + 100).map(id => PENDING_PREFIX + id));
     for (const p of records) {
-      if (p?.status !== 'pending') continue;
+      if (p?.status !== 'pending'||unavailableCard(p,paused)) continue;
       total++;
       const row = `${total}. ${clip(p.store,64)} ★${p.star} ${clip(p.name,40)}さん${p.replace ? '（差し替え）' : ''}${p.humanEdited ? '（直した文）' : ''}　番号 ${p.id}`;
       if (total === rows.length + 1 && rows.length < 60 && used + row.length < 4600) {
@@ -244,6 +254,7 @@ export async function listText() {
 
 // Read-only example card. Its ID is separate from approval IDs and cannot publish a review.
 export async function sendReviewPreview(q, operation, actionable = false, inspectOnly = false) {
+  if(unavailableCard(q,await kvGet('meo_paused_stores')||[]))return {accepted:false,skipped:'運用停止中'};
   const digest = crypto.createHash('sha256').update(operation + q.reviewId + q.reply).digest('hex');
   const id = digest.slice(0,10);
   const receiptKey = 'rv_preview_sent_' + digest;
