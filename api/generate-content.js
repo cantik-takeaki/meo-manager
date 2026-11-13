@@ -1,3 +1,4 @@
+import { highRatingGuidance, highRatingDraftFits } from '../lib/review-routing.js';
 import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
 import { publicReview } from '../lib/public-review-draft.js';
 import { requireStaff } from './_auth.js';
@@ -1744,11 +1745,11 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
 - 口コミの中の不満・指摘・悪口（接客・態度・服装・味・量・衛生・待ち時間・価格・設備など）を、店側が事実として認めたように書かない。
 - 次の言葉は使わない：ご指摘のとおり／おっしゃるとおり／〜させてしまい／ご不快な思い／ご迷惑をおかけ／改めます／至らず／不手際／スタッフの教育・指導／徹底いたします。
 - 相手の悪口や決めつけの言葉は繰り返さず、「身だしなみ」「対応」「味付け」のように角の立たない言葉にまとめる。
-- 改善の姿勢は「〜について、ご期待に沿えず申し訳ございません。」「いただいたご意見を店内で共有し、〜を見直してまいります。」の形で示す。
+- ${_star >= 4 ? highRatingGuidance : '改善の姿勢は「〜について、ご期待に沿えず申し訳ございません。」「いただいたご意見を店内で共有し、〜を見直してまいります。」の形で示す。'}
 - 店の細かい内容・設定・対応可否（量や辛さの調整、メニュー、価格、設備、具体的な新しい取り組み等）は、分からないので書かない。
 - 過去の返信に「ご不快な思いをさせてしまい」「改めます」があっても真似しない。`;
     if (_cls && _cls.needsHuman && type === 'reply_positive') {
-      prompt += `\n- この口コミには不満の表明も含まれている（${_cls.hits.slice(0, 3).join('・')}）。良かった点へのお礼のあとに、上の形で1〜2文だけ添える。悪口の言葉は繰り返さない。`;
+      prompt += `\n- この口コミには不満の表明も含まれている（${_cls.hits.slice(0, 3).join('・')}）。良かった点へのお礼のあとに、実際に書かれたご要望に一文だけ応える。悪口の言葉は繰り返さない。`;
     }
   }
 
@@ -1989,6 +1990,10 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
           gate = { ...gate, ok: false, failed: [...(gate.failed || []), '事実を認める表現を削除した（人が確認してから送る）'] };
         }
       }
+    }
+
+    if (_isReply && _star >= 4 && content && !await highRatingDraftFits(reviewText, content, llmComplete)) {
+      return res.json({content:'',meta:{needsHuman:true,gate:{ok:false,failed:['口コミの主な感想に沿った返信を入力してください。']}}});
     }
 
     // 投稿は実測字数を返す（300字未満のまま出たら人が気づけるように）

@@ -29,3 +29,17 @@ test('自動翻訳付き口コミは原語で照合し、硬い定型句を一�
  const values=[JSON.stringify({intent:'positive',reply:'喜んでいただけて何よりです。'}),positive(),'PASS'];
  const result=await propose(rv('FIVE','温かくてよかった。\n(Translated by Google)\nIt was warm.'),[],async()=>values.shift());assert.equal(result.approved,true);
 });
+test('春夏冬の星5で要望だけの案を落とし、良かった点と要望を扱った案は確認待ちにする',async()=>{
+ const review=rv('FIVE','玉子はふわふわで美味い。スープはもう少し熱いと嬉しい。');
+ const first='スープの温度について、貴重なご意見をありがとうございます。今後の参考にさせていただきます。';
+ const second='玉子炒めのふわふわした食感を喜んでいただけて嬉しいです。スープの温度についてもご感想をありがとうございます。';
+ const responses=[JSON.stringify({intent:'check',reply:first}),JSON.stringify({intent:'check',reply:second}),'PASS'];
+ const p=await propose(review,[],async()=>responses.shift());
+ assert.equal(p.reply,second);assert.equal(p.approved,false);assert.equal(responses.length,0);
+});
+test('言い換えた要望だけの返信も再検査に落ちたらLINE下書きに残さない',async()=>{
+ const draft=JSON.stringify({intent:'check',reply:'スープの温度のご感想をありがとうございます。'});
+ const responses=[draft,'CHECK',draft,'CHECK'];
+ const p=await propose(rv('FIVE','玉子が美味しい。スープはもう少し熱いと嬉しい。'),[],async()=>responses.shift());
+ assert.equal(p.reply,'');assert.equal(p.approved,false);
+});
