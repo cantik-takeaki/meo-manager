@@ -1,3 +1,4 @@
+import {postPrompt,checkPost} from '../lib/post-policy.js';
 import { highRatingGuidance, highRatingDraftFits } from '../lib/review-routing.js';
 import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
 import { publicReview } from '../lib/public-review-draft.js';
@@ -742,65 +743,8 @@ CRITICAL rules:
   }
 
   // Googleポスト生成
-  if (type === 'post') {
-    const { customInstruction } = req.body;
-    // 値のある項目だけを情報ブロックに含める（未設定の項目はそもそも見せない）
-    const infoLines = [];
-    if (knowledge.storeName) infoLines.push(`店名: ${knowledge.storeName}`);
-    if (knowledge.category) infoLines.push(`業種: ${knowledge.category}`);
-    const area = [knowledge.address, knowledge.nearbyLandmarks].filter(Boolean).join(' ');
-    if (area) infoLines.push(`地域/アクセス: ${area}`);
-    if (strengths) infoLines.push(`強み・特徴: ${strengths}`);
-    if (knowledge.expertise) infoLines.push(`専門性・実績: ${knowledge.expertise}`);
-    if (services) infoLines.push(`提供サービス・メニュー: ${services}`);
-    if (knowledge.serviceArea) infoLines.push(`対応エリア: ${knowledge.serviceArea}`);
-    if (knowledge.targetCustomer) infoLines.push(`客層: ${knowledge.targetCustomer}`);
-    if (keywords.length) infoLines.push(`キーワード: ${keywords.join('、')}`);
-    const infoBlock = infoLines.length ? infoLines.join('\n') : '（店舗情報が未登録）';
+  if (type === 'post') prompt = postPrompt({store:storeName,facts:knowledge,purpose:req.body.customInstruction});
 
-    // 毎回ちがう投稿にするため、切り口・書き出しをローテーション（同じテーマでも文面が変わる）
-    const _angles = [
-      '読者への問いかけで始める', '具体的な数字や事実を前面に出す', 'お客様の利用シーン・体験を描く',
-      '季節や時期・曜日に絡める', 'スタッフのこだわり・裏側を語る', '悩み→解決の切り口で書く',
-      'よくある質問に答える形にする', 'ビフォー/アフターや変化を伝える', '「知っていますか？」と豆知識から入る',
-      '限定・お知らせ・おすすめを主役にする',
-    ];
-    const _angle = _angles[Math.floor(Math.random() * _angles.length)];
-    const _hasTheme = !!(customInstruction && customInstruction.trim());
-    prompt = `あなたは「${knowledge.storeName || storeName}」で実際に働くスタッフです。
-この店のGoogleビジネスプロフィール投稿（1本）を、自然で魅力的に書いてください。
-
-【実際の店舗情報（背景として使う）】
-${infoBlock}
-
-【今回の投稿の主役・テーマ${_hasTheme ? '（必ずこの内容を中心に、具体的に書く）' : ''}】
-${_hasTheme ? customInstruction : '（指定なし＝上の店舗情報から魅力を1つ選んで紹介する）'}
-${_hasTheme ? '※このテーマ欄に書かれた内容は、利用者が指定した"事実"として本文に使ってよい（例：「制作実績400件」なら実績400件を具体的にうたう）。' : ''}
-
-【今回の切り口（毎回この指定で変える）】${_angle}
-
-【ルール】
-- **まず読み手の"悩み・不安・不満"から入り、共感してから解決を示す**。「〜ですか？」の薄い問いかけや一般的な店紹介で終わらせない。読み手が「これ自分のことだ」と感じる具体的な状況（例：見積が高い/更新が放置される/集客が伸びない等）を1つ描いてから、この店/サービスがどう解決するかを続ける。
-- テーマがある時は、そのテーマを中心に具体的に書く。書き出し・構成・語り口を上の「切り口」に沿って毎回変え、前回と同じ言い回しの繰り返しを避ける。
-- テーマ欄以外で、店舗情報に無い事実（架空のメニュー・価格・イベント等）は創作しない。
-- 指示の言葉自体を店名やお店のコンセプトとして誤用しない。
-- 「店名:」「業種:」等のラベルは投稿文に書かない。自然な文章に溶け込ませる。地域名・サービス名を自然に含める。
-- **本文は必ず300文字以上（300〜400文字が目安・上限1,500文字）**。社長指示 2026-08-29。150〜200字で終わらせない。字数を埋めるための同じ内容の言い換えではなく、**具体（メニュー名や施術名＋価格、利用シーン、併せて頼める/受けられるもの、アクセス、営業時間、決済、予約方法）を足して**300字以上にする。
-- **対策キーワードを1〜2個、本文に自然に入れる**（下の【MEO対策キーワード】欄がある場合は必ずそこから使う）。2文目までに「エリア名＋業種・カテゴリ」の形で1つ出す（例「新宿東口の四川料理店」「大塚の整体」）。キーワードの羅列・不自然な繰り返しはしない。
-- 読みやすい改行・効果や順位の断定・誇大表現はしない。順位や効果を保証する書き方はしない。
-- **絵文字は絶対に使わない（cantik全社ルール・禁止）**。記号の多用もしない。
-- **【書いてはいけない"AIっぽい型"（厳守・社長指示 2026-10-06）】**
-  (1)冒頭に【〇〇】のような鉤括弧の見出し・キャッチを置かない（いきなり本文から書く）。
-  (2)「〇〇で△△をお探しの方へ／お探しなら」で始めない。具体的な場面・メニュー・出来事から書き出す。
-  (3)末尾に「📍店名／住所」のような住所の貼り付けをしない（住所・ピン記号を本文末に並べない）。
-  (4)「ぜひお気軽に」「特別なひととき」「至福の」「心も体も」等の量産テンプレ語を使わない。
-  (5)全店で同じ構成（見出し→地域＋業種→本文→住所）にしない。その店の写真・具体の話から、毎回ちがう入り方で書く。
-- 予約・問い合わせを促す一言を1つ入れる。来店型の業種（飲食・カフェ・整体・整骨・エステ・美容・レンタカー等）は「ご予約・ご来店」を自然に促す。非来店型（Web制作・士業・BtoB等）は ZOOM・電話・メール を案内する（店舗情報に従う）。
-- 【Google掲載ポリシー厳守】電話番号を本文に書かない／酒類・タバコ等の規制商品の販促をしない。
-- 投稿文のみ出力（前置き・説明は書かない）。${seoWeave}${_meoBoost}${_industryGuide(knowledge.category)}${_gbpAdultSafety(knowledge.category, knowledge)}`;
-  }
-
-  // 外国語口コミの日本語訳（オーナーが本文を読んで返信・投稿判断できるように。ボタン押下時のみ実行）
   if (type === 'review_translate') {
     prompt = `次の口コミを自然な日本語に翻訳してください。意訳しすぎず内容に忠実に。翻訳文のみ出力（前置き・説明・原文の繰り返しは書かない）。
 
@@ -1730,7 +1674,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
   // 実件(2026-07): 本文末尾の電話番号フッター＋酒類販促で4店舗の投稿が一斉非公開化。
   // Instagram系・自社HP系は対象外（酒類等の制約がないため通常どおり生成する）。
   const _gbpSurfaceTypes = ['post', 'post_themes', 'event_ideas', 'gbp_description', 'product_desc', 'product_batch', 'qa_generate', 'photo_caption'];
-  if (_gbpSurfaceTypes.includes(type)) {
+  if (type !== 'post' && _gbpSurfaceTypes.includes(type)) {
     prompt += `\n\n【Google掲載ポリシー（違反すると自動で非公開化・拒否されるため、他のどの指示より優先して厳守）】
 - 電話番号を絶対に書かない（明文で禁止・非公開化の最多原因）。電話への誘導が必要なら「プロフィールの電話ボタンから」等と書く。住所・最寄り駅はOK。
 - 酒類の宣伝をしない: 「飲み放題」という語を絶対に使わない。テーマや店舗情報に「飲み放題」「食べ飲み放題」が含まれていても、本文では必ず「食べ放題」と言い換える（例:「90分食べ飲み放題3850円」→「90分食べ放題プラン」。飲み物に触れたい場合は「ドリンクも充実」までに留め、酒の名前は出さない）。酒の名前（ビール・ハイボール・日本酒・ワイン・紹興酒・カクテル・サワー等）を価格・割引・無料・特典と組み合わせない。お酒のあるお店でも料理・技術・雰囲気・体験を主役に書く。
@@ -1759,12 +1703,13 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
     if (extra && String(extra).trim()) prompt += `\n\n【運用者からの追加指示（上のルールに加えて必ず従う）】\n${String(extra).trim().slice(0, 1500)}`;
   } catch (e) { /* 追加指示の取得失敗は無視して既定プロンプトで続行 */ }
 
+  if (type === 'post') prompt = postPrompt({store:storeName,facts:knowledge,purpose:req.body.customInstruction});
   if (_isReply) prompt += '\n' + ownerReplyStyle;
   if (!prompt) return res.status(400).json({ error: '不明なtype' });
 
   try {
-    const _maxTok = type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500;
-    const _temp = type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85;
+    const _maxTok = type === 'post' ? 1600 : type === 'blog_article' ? 2000 : type === 'keyword_ideas' ? 1800 : (type === 'weekly_tasks' || type === 'monthly_report') ? 1100 : 500;
+    const _temp = type === 'post' ? 0.3 : type === 'keyword_ideas' ? 0.55 : (type === 'weekly_tasks' || type === 'monthly_report') ? 0.5 : type === 'category_suggest' ? 0.4 : 0.85;
     let content = (await llmComplete(prompt, { maxTokens: _maxTok, temperature: _temp }))?.trim();
     // ★3以下はAIが落ちても空にしない（見本の型だけの安全な返信。送信は人が確認してから）
     if (!content && _isReply && _star <= 3) {
@@ -1782,7 +1727,7 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
     }
     // ── Google掲載type: 生成後のポリシー保険（プロンプト指示をモデルがすり抜けた場合の二段目）──
     // ①「飲み放題」混入→1回だけ除去リライト ②電話番号は決定論的に最終除去（リライト後も残ったら機械で消す）
-    if (_gbpSurfaceTypes.includes(type)) {
+    if (type !== 'post' && _gbpSurfaceTypes.includes(type)) {
       const _phoneRe = /(0\d{1,4}[-‐－ー()（）\s]\d{1,4}[-‐－ー()（）\s]\d{3,4}|0\d{9,10})(?!\d)/;
       if (/飲み放題|呑み放題/.test(content)) {
         const fixed = await llmComplete(
@@ -1849,27 +1794,9 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
         .replace(/。{2,}/g, '。')
         .trim();
     }
-    // ★AIっぽい型の最終除去（社長指示 2026-10-06）。プロンプトで禁止しても出たときの保険。
-    //   (1)冒頭の【…】見出し行を外す (2)末尾の「店名/住所だけの貼り付け」行を外す。
-    if (content && type === 'post') {
-      let lines = content.split('\n');
-      // 先頭の【…】だけの見出し行（または ■◆ で始まる見出し）を落とす
-      while (lines.length && /^[\s　]*[【［\[■◆●▶].{0,40}$/.test(lines[0]) && !/[。．！？]/.test(lines[0])) lines.shift();
-      // 末尾の、住所・店名・アクセスだけの行を落とす（本文ではない貼り付け）
-      const sName = String(knowledge.storeName || storeName || '').trim();
-      const isFooter = (l) => {
-        const t = l.trim();
-        if (!t) return true;
-        if (sName && (t === sName || t === '店名：' + sName || t.replace(/[（(].*$/, '') === sName)) return true;  // 店名だけの行
-        if (/^〒?\s*[都道府県]/.test(t) && !/[。！？]/.test(t)) return true;                                        // 住所行
-        return /(丁目|番地|[0-9]-[0-9]|ビル|階|駅(から)?徒歩)/.test(t) && t.length < 40 && !/[。！？]/.test(t);
-      };
-      while (lines.length && isFooter(lines[lines.length - 1])) lines.pop();
-      content = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-    }
     // ★Googleコンテンツポリシー・バックストップ：投稿/説明文で「男性専用×時間帯×マッサージ」の
     //   成人向け誤検知クラスタが残っていたら機械的に安全化（明洞整体院の投稿削除事例の再発防止）。
-    if (content && (type === 'post' || type === 'gbp_description')) {
+    if (content && type === 'gbp_description') {
       const risky = /(男性専用|メンズ専用|男性限定)/.test(content) && /(24時間|深夜|早朝|いつでも|お好きな時間)/.test(content);
       if (risky) {
         content = String(content)
@@ -1883,36 +1810,6 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
           .trim();
       }
     }
-    // ★社長指示 2026-08-29「MEOの投稿は全て300文字以上・キーワードも入れる」
-    //   モデル任せにせず機械ゲートを置く。300字未満なら1回だけ延長パスを回す（事実の創作は禁止）。
-    //   上限はGBP仕様の1,500字。延長しても届かない場合はそのまま返し、UIに実測字数を出して人が判断する。
-    const POST_MIN_LEN = 300;
-    if (type === 'post' && content && content.replace(/\s/g, '').length < POST_MIN_LEN) {
-      try {
-        const _kwLine = _targetedKws && _targetedKws.length
-          ? `\n【必ず自然に含める対策キーワード】${_targetedKws.slice(0, 2).join('、')}` : '';
-        const _extended = await llmComplete(
-          `次のGoogleビジネスプロフィール投稿を、**${POST_MIN_LEN}文字以上**になるまで書き足してください。\n` +
-          `【厳守】\n` +
-          `- 元の文に無い事実（メニュー・価格・イベント・実績・営業時間等）を新しく作らない。既に書かれている事実の説明を具体的にするだけ。\n` +
-          `- 同じ内容の言い換えで字数を埋めない。利用シーン・誰に向くか・どう使えるか、を足す。\n` +
-          `- 絵文字は使わない。効果や順位の断定・誇大表現・保証はしない。電話番号は書かない。\n` +
-          `- 「。」ごとに改行する。投稿文のみ出力し、前置きや説明は書かない。${_kwLine}\n\n` +
-          `【元の投稿文】\n${content}`,
-          { maxTokens: 900, temperature: 0.6 }
-        );
-        const _cand = String(_extended || '').trim();
-        // 延長版が「元より長く」「上限内」のときだけ採用（短くなったら元を残す）
-        if (_cand && _cand.replace(/\s/g, '').length > content.replace(/\s/g, '').length && _cand.length <= 1500) {
-          content = _cand
-            .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}]/gu, '')
-            .replace(/。[ \t　]*(?=[^\n」』）)】\]])/g, '。\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-      } catch (_) { /* 延長に失敗しても元の投稿文はそのまま返す */ }
-    }
-
     // 対策キーワードの織り込み達成度を返す（UIで可視化・再生成の判断材料に）
     // キーワードを空白で分割し、全トークンが本文に含まれれば「織り込み済み」と判定（語順・助詞の差を許容）
     let kw;
@@ -1998,9 +1895,10 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
 
     // 投稿は実測字数を返す（300字未満のまま出たら人が気づけるように）
     const meta = type === 'post' && content
-      ? { len: content.replace(/\s/g, '').length, minLen: 300 }
+      ? checkPost(content, knowledge)
       : gate ? { gate: { ok: gate.ok, failed: gate.failed, len: gate.detail?.len }, template: !!gate.template,
                  needsHuman: !!(_cls && _cls.needsHuman), hits: _cls ? _cls.hits : [] } : undefined;
+    if(type==='post'&&!meta.ok)return res.status(422).json({error:'確認が必要なため生成案を採用しませんでした',content:'',meta});
     res.json({ content: _isReply ? formatOwnerReply(content, storeName, reviewText) : content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
   } catch (e) {
     res.status(500).json({ error: e.message });

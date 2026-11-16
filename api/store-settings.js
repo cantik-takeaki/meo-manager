@@ -1,3 +1,5 @@
+import {diffBaseline as compareBaseline,alertSignature,BASELINE_VERSION} from '../lib/gbp-baseline.js';
+import {unavailableCard} from './_review_line.js';
 import { requireStaff } from './_auth.js';
 // api/store-settings.js — 改ざん防止 + サイテーション管理
 import { kvGet, kvSet } from './_kv.js';
@@ -13,15 +15,6 @@ function parseCookies(req) {
 }
 
 // 比較用の正規化：空白・記号・全角ゆれを吸収し、誤検知を抑える
-const normGeneric = (s) => String(s || '').replace(/[\s　・\-―ー（）()]/g, '').toLowerCase();
-const normPhone = (s) => String(s || '').replace(/[^0-9]/g, '');
-const normUrl = (s) => String(s || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
-const looseSame = (a, b) => { a = normGeneric(a); b = normGeneric(b); return !a || !b || a === b || a.includes(b) || b.includes(a); };
-// 営業時間の時刻トークン抽出（全角→半角・H:MM正規化）。自由記述とGBP構造化の表記ゆれを吸収する緩判定用
-const hoursTokens = (s) => {
-  const z = String(s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/：/g, ':');
-  return [...z.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => `${parseInt(m[1], 10)}:${m[2]}`);
-};
 const fmtGbpTime = (t) => {
   // Google の TimeOfDay は protobuf の既定値を省略するため、0時は {} で返る。
   // 旧実装は `t.hours != null` で弾いて空文字にしていた＝「0:00-3:00」が「-3:00」になり
@@ -58,26 +51,7 @@ async function fetchCurrentGbp(locationName, token) {
 }
 
 // 正規情報と現在のGBP情報を比較して差分を返す
-function diffBaseline(saved, current) {
-  const diffs = [];
-  const check = (field, label, eq) => {
-    const s = saved[field], c = current[field];
-    if (s && c && !eq(s, c)) diffs.push({ field: label, saved: s, current: c });
-  };
-  check('title', '店舗名', looseSame);
-  check('phone', '電話番号', (a, b) => normPhone(a) === normPhone(b) || !normPhone(a) || !normPhone(b));
-  check('address', '住所', looseSame);
-  check('category', 'カテゴリ', looseSame);
-  check('url', '公式URL', (a, b) => normUrl(a) === normUrl(b));
-  // 営業時間（緩判定）：保存値の時刻(H:MM)がGBP側に全て含まれるかだけを見る。自由記述との表記ゆれ誤検知を防ぐ
-  if (saved.hours && current.hours) {
-    const st = hoursTokens(saved.hours);
-    if (st.length && st.some(t => !hoursTokens(current.hours).includes(t))) {
-      diffs.push({ field: '営業時間', saved: saved.hours, current: current.hours, note: '表記ゆれの可能性あり（時刻ベースの緩判定）' });
-    }
-  }
-  return diffs;
-}
+const diffBaseline=compareBaseline;
 
 export default async function handler(req, res) {
   if (!await requireStaff(req,res)) return;
@@ -92,6 +66,7 @@ export default async function handler(req, res) {
 
   const { locationId, action } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId必須' });
+  if(unavailableCard({locId:locationId},await kvGet('meo_paused_stores')||[]))return res.json({status:'excluded',reason:'運用対象外'});
 
   // ── 改ざん検知：正規情報 vs 現在のGBP情報を自動比較 ──
   if (action === 'verify') {
@@ -112,7 +87,7 @@ export default async function handler(req, res) {
     const now = new Date().toISOString();
     if (diffs.length) {
       const alerts = saved.alerts || [];
-      alerts.unshift({ detectedAt: now, diffs });
+      if(!alerts.some(a=>!a.resolvedAt&&alertSignature(a.diffs||[])===alertSignature(diffs))) alerts.unshift({ detectedAt: now, diffs });
       if (alerts.length > 20) alerts.length = 20;
       await kvSet(key, { ...saved, alerts, lastCheckedAt: now });
       return res.json({ status: 'changed', diffs, current: got.current, checkedAt: now });

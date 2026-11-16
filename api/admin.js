@@ -1,3 +1,4 @@
+import {diffBaseline as compareBaseline,alertSignature,BASELINE_VERSION} from '../lib/gbp-baseline.js';
 import { originalComment } from '../lib/review-routing.js';
 import { requireStaff } from './_auth.js';
 import { rankSummary, compareRanks, compareRankEntries, isDemo, jstMonth, previousMonth } from './_metric_integrity.js';
@@ -30,15 +31,6 @@ function generatePassword() {
 const _normName = (s) => String(s || '').replace(/\s|　|・|（.*?）|\(.*?\)/g, '').toLowerCase();
 
 // ── 改ざん検知の照合（cron-tamper用・store-settings.jsと同一ロジック） ──
-const _normG = (s) => String(s || '').replace(/[\s　・\-―ー（）()]/g, '').toLowerCase();
-const _normP = (s) => String(s || '').replace(/[^0-9]/g, '');
-const _normU = (s) => String(s || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
-const _loose = (a, b) => { a = _normG(a); b = _normG(b); return !a || !b || a === b || a.includes(b) || b.includes(a); };
-// 営業時間の時刻トークン抽出（store-settings.jsと同一の緩判定）
-const _hoursTok = (s) => {
-  const z = String(s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/：/g, ':');
-  return [...z.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => `${parseInt(m[1], 10)}:${m[2]}`);
-};
 const _fmtGbpT = (t) => {
   // Google の TimeOfDay は protobuf の既定値を省略するため、0時は {} で返る。
   // 旧実装は `t.hours != null` で弾いて空文字にしていた＝「0:00-3:00」が「-3:00」になり
@@ -57,23 +49,7 @@ async function fetchCurrentGbpInfo(locationName, token) {
   const hoursStr = (d.regularHours?.periods || []).map(p => `${p.openDay || ''} ${_fmtGbpT(p.openTime)}-${_fmtGbpT(p.closeTime)}`).join(' ');
   return { current: { title: d.title || '', phone: d.phoneNumbers?.primaryPhone || '', address: addr, category: d.categories?.primaryCategory?.displayName || '', url: d.websiteUri || '', hours: hoursStr } };
 }
-function diffGbpBaseline(saved, current) {
-  const diffs = [];
-  const chk = (f, label, eq) => { const s = saved[f], c = current[f]; if (s && c && !eq(s, c)) diffs.push({ field: label, saved: s, current: c }); };
-  chk('title', '店舗名', _loose);
-  chk('phone', '電話番号', (a, b) => _normP(a) === _normP(b) || !_normP(a) || !_normP(b));
-  chk('address', '住所', _loose);
-  chk('category', 'カテゴリ', _loose);
-  chk('url', '公式URL', (a, b) => _normU(a) === _normU(b));
-  // 営業時間（緩判定）：保存値の時刻(H:MM)がGBP側に全て含まれるかだけを見る
-  if (saved.hours && current.hours) {
-    const st = _hoursTok(saved.hours);
-    if (st.length && st.some(t => !_hoursTok(current.hours).includes(t))) {
-      diffs.push({ field: '営業時間', saved: saved.hours, current: current.hours, note: '表記ゆれの可能性あり（時刻ベースの緩判定）' });
-    }
-  }
-  return diffs;
-}
+const diffGbpBaseline=compareBaseline;
 
 // ── 順位取得プロバイダ（既定=SerpApi無料枠 / env RANK_PROVIDER=dataforseo で有料の高精度に差替え） ──
 // 戻り値: { list:[{title,position,rating,reviews,place_id}], error } — 呼び出し側はlistを店名照合して順位を出す。
@@ -1510,7 +1486,9 @@ export default async function handler(req, res) {
     const managed = await kvGet('managed_locations') || [];
     let checked = 0, changed = 0, pending = 0;
     const changes = [];
+    const paused=await kvGet('meo_paused_stores')||[];
     for (const m of managed) {
+      if(unavailableCard(m,paused))continue;
       const locId = String(m.locId || '').replace(/\//g, '_');
       if (!locId) continue;
       const saved = await kvGet(`settings_${locId}`);
@@ -1525,6 +1503,7 @@ export default async function handler(req, res) {
         const now = new Date().toISOString();
         if (diffs.length) {
           const alerts = saved.alerts || [];
+          if(alerts.some(a=>!a.resolvedAt&&alertSignature(a.diffs||[])===alertSignature(diffs))){checked++;await kvSet('settings_'+locId,{...saved,lastCheckedAt:now});continue;}
           alerts.unshift({ detectedAt: now, diffs, auto: true });
           if (alerts.length > 20) alerts.length = 20;
           await kvSet(`settings_${locId}`, { ...saved, alerts, lastCheckedAt: now });
@@ -1545,7 +1524,7 @@ export default async function handler(req, res) {
         if (to) {
           const rows = changes.map(c => `<div style="margin-bottom:8px"><b>${c.store}</b><ul style="margin:2px 0">${c.diffs.map(d => `<li>${d.field}: 「${d.saved}」→「${d.current}」</li>`).join('')}</ul></div>`).join('');
           await sendMail(to, `【ラクラクMEO】ビジネス情報の変更を検知（${today}）`,
-            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">GBPビジネス情報の変更を検知しました</h2><p>${changed}店舗で正規情報との差分を検出しました。心当たりのない変更は改ざんの可能性があります。</p>${rows}<p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで確認する →</a></p></div>`);
+            `<div style="font-family:sans-serif;color:#1e293b"><h2 style="font-size:18px">GBPビジネス情報の変更を検知しました</h2><p>${changed}店舗で正規情報との差分を検出しました。表記の差・店舗の更新・第三者の編集を確認してください。差分だけで改ざんとは判断できません。</p>${rows}<p style="margin-top:14px"><a href="https://meo.cantik.co.jp" style="color:#2e8ff0">ラクラクMEOで確認する →</a></p></div>`);
         }
       }
     } catch (e) { /* メール失敗で本体を落とさない */ }
@@ -1603,7 +1582,7 @@ export default async function handler(req, res) {
     const page=await fetch('https://mybusiness.googleapis.com/v4/'+location.locationName+'/localPosts?'+query,{headers:{Authorization:'Bearer '+token}});
     if(!page.ok)return res.status(page.status).json({error:'Googleの投稿を取得できませんでした'});
     const data=await page.json();
-    return res.json({posts:(data.localPosts||[]).map(p=>({created:p.createTime,updated:p.updateTime,state:p.state,summary:p.summary,url:p.searchUrl})),next:data.nextPageToken||''});
+    return res.json({policyVersion:BASELINE_VERSION,posts:(data.localPosts||[]).map(p=>({name:p.name,created:p.createTime,updated:p.updateTime,state:p.state,summary:p.summary,url:p.searchUrl,media:p.media||[],callToAction:p.callToAction||null,topicType:p.topicType,event:p.event||null,offer:p.offer||null})),next:data.nextPageToken||''});
   }
   if (action === 'review-inventory' && req.method === 'GET') {
     const {reviewInventory}=await import('../lib/review-run.js');
