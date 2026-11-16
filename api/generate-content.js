@@ -1,4 +1,4 @@
-import {postPrompt,checkPost} from '../lib/post-policy.js';
+import {postPrompt,checkPost,refinePostDraft} from '../lib/post-policy.js';
 import { highRatingGuidance, highRatingDraftFits } from '../lib/review-routing.js';
 import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
 import { publicReview } from '../lib/public-review-draft.js';
@@ -1893,12 +1893,13 @@ ${existing ? `【既存の蓄積メモ（重複させず、補強・整理する
       return res.json({content:'',meta:{needsHuman:true,gate:{ok:false,failed:['口コミの主な感想に沿った返信を入力してください。']}}});
     }
 
+    if(type==='post')content=await refinePostDraft(content,{store:storeName,facts:knowledge,purpose:req.body.customInstruction},llmComplete);
     // 投稿は実測字数を返す（300字未満のまま出たら人が気づけるように）
     const meta = type === 'post' && content
       ? checkPost(content, knowledge)
       : gate ? { gate: { ok: gate.ok, failed: gate.failed, len: gate.detail?.len }, template: !!gate.template,
                  needsHuman: !!(_cls && _cls.needsHuman), hits: _cls ? _cls.hits : [] } : undefined;
-    if(type==='post'&&!meta.ok)return res.status(422).json({error:'確認が必要なため生成案を採用しませんでした',content:'',meta});
+    if(type==='post'&&!meta.ok)return res.status(422).json({error:'生成案は確認待ちです。'+meta.failed.join('・'),content:'',meta});
     res.json({ content: _isReply ? formatOwnerReply(content, storeName, reviewText) : content, kw, meta: { ...(meta || {}), via: llmLastVia() } });
   } catch (e) {
     res.status(500).json({ error: e.message });

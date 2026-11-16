@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {checkPost,postPrompt} from '../lib/post-policy.js';
+import {checkPost,postPrompt,refinePostDraft} from '../lib/post-policy.js';
 import {addressKey,urlKey,hoursKey,diffBaseline} from '../lib/gbp-baseline.js';
 test('確認済みの短文を引き延ばさず人の確認を残す',()=>{
  const text='経絡に沿って背面をケアする60分のコースです。\n料金は6,930円です。';
@@ -39,4 +39,12 @@ test('旧資料に含まれる強い健康効果も通さない',()=>assert.equa
 test('旧形式の同日複数時間帯も比較し午後の変更を見逃さない',()=>{
  assert.equal(hoursKey('MONDAY 8:30-12:30,15:30-19:30'),hoursKey('MONDAY 8:30-12:30 MONDAY 15:30-19:30'));
  assert.notEqual(hoursKey('MONDAY 8:30-12:30,15:30-19:30'),hoursKey('MONDAY 8:30-12:30 MONDAY 15:30-18:30'));
+});
+
+test('修正後も事実検査を通った本文だけ採用する',async()=>{
+ const data={store:'検証店',facts:{menu:'60分6,930円'}};
+ let calls=0;const bad='料金は8,000円です。';
+ assert.equal(await refinePostDraft(bad,data,async()=>{calls++;return '料金は6,930円です。';}),'料金は6,930円です。');
+ assert.equal(calls,1);
+ assert.equal(await refinePostDraft(bad,data,async()=>'料金は9,000円です。'),bad);
 });
