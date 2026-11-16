@@ -2680,9 +2680,9 @@ body.role-viewer [data-edit-action] { display:none !important; }
         </div>
       </div>
 
-      <div class="card" id="alertsCard">
+      <div class="card" id="protectionAlertsCard">
         <div class="card-header"><div class="card-title"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;flex-shrink:0"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>アラート履歴</div></div>
-        <div id="alertsList">
+        <div id="protectionAlertsList">
           <div class="empty-state"><p>アラートなし（正常です）</p></div>
         </div>
       </div>
@@ -13459,9 +13459,11 @@ async function copyIg() {
 // ─── Protection ───
 async function loadProtection() {
   if (!currentLocationId) return;
+  const requestedLocationId = currentLocationId;
   try {
     const res = await fetch(`/api/store-settings?locationId=${encodeURIComponent(currentLocationId)}`);
     const d = await res.json();
+    if (requestedLocationId !== currentLocationId) return;
     if (d.info) {
       document.getElementById('baselineStatus').textContent = '設定済み';
       document.getElementById('baselineStatus').className = 'badge badge-active';
@@ -13479,11 +13481,11 @@ async function loadProtection() {
         + (d.lastCheckedAt ? `　／　最終チェック: ${new Date(d.lastCheckedAt).toLocaleString('ja-JP')}` : '');
     }
     const alerts = d.alerts || [];
-    document.getElementById('alertsList').innerHTML = alerts.length
+    document.getElementById('protectionAlertsList').innerHTML = alerts.length
       ? alerts.map(a => `
           <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px;margin-bottom:8px">
             <div style="font-size:11px;color:var(--red);margin-bottom:6px">${new Date(a.detectedAt).toLocaleString('ja-JP')} に変更を検出</div>
-            ${a.diffs.map(df => `<div style="font-size:13px"><strong>${df.field}</strong>: 「${df.saved}」→「${df.current}」</div>`).join('')}
+            ${a.diffs.map(df => `<div style="font-size:13px"><strong>${escapeHtml(df.field)}</strong>: 「${escapeHtml(df.saved)}」→「${escapeHtml(df.current)}」</div>`).join('')}
           </div>`).join('')
       : '<div class="empty-state"><p><svg viewBox="0 0 24 24" width="15" height="15" fill="none" style="vertical-align:-3px;margin-right:5px"><circle cx="12" cy="12" r="10" fill="rgba(16,185,129,0.16)"/><path d="M7.5 12.5l3 3 6-7" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>アラートなし（正常です）</p></div>';
   } catch {}
@@ -13531,12 +13533,13 @@ async function saveBaseline() {
   };
   if (!info.title) return showToast('店舗名を入力してください', 'error');
   try {
-    await fetch(`/api/store-settings?locationId=${encodeURIComponent(currentLocationId)}`, {
+    const savedResponse = await fetch(`/api/store-settings?locationId=${encodeURIComponent(currentLocationId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ info }),
     });
-    showToast('正規情報を保存しました！', 'success');
+    if (!savedResponse.ok) throw new Error('保存失敗');
+    showToast('正規情報を保存しました', 'success');
     loadProtection();
   } catch { showToast('保存に失敗しました', 'error'); }
 }

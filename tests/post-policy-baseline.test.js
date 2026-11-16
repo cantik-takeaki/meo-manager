@@ -35,3 +35,8 @@ test('翌日をまたぐ営業時間は同じ週の時間帯として比較す�
 });
 
 test('旧資料に含まれる強い健康効果も通さない',()=>assert.equal(checkPost('体内毒素を排出します。',{description:'体内毒素を排出'}).ok,false));
+
+test('旧形式の同日複数時間帯も比較し午後の変更を見逃さない',()=>{
+ assert.equal(hoursKey('MONDAY 8:30-12:30,15:30-19:30'),hoursKey('MONDAY 8:30-12:30 MONDAY 15:30-19:30'));
+ assert.notEqual(hoursKey('MONDAY 8:30-12:30,15:30-19:30'),hoursKey('MONDAY 8:30-12:30 MONDAY 15:30-18:30'));
+});
