@@ -2929,7 +2929,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
             <div id="postGenBadge" style="margin-top:10px"></div>
           </div>
           <textarea id="postText" placeholder="投稿内容を入力（または上の「AIで文章生成」）" oninput="updatePostCount()"></textarea>
-          <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google目安150〜300字／Instagram150〜250字）</div>
+          <div id="postCount" style="font-size:11px;color:var(--text-sub);text-align:right;margin-top:2px">0字（Google投稿の社内目安300〜450字・事実が少なければ短文可／Instagram150〜250字）</div>
 
           <div style="margin:6px 0 2px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
@@ -11381,7 +11381,7 @@ function openImageGenFrom(origin) {
 function updatePostCount() {
   const n = (document.getElementById('postText').value || '').length;
   const el = document.getElementById('postCount');
-  if (el) el.textContent = `${n}字（Google目安150〜300字／Instagram150〜250字）`;
+  if (el) el.textContent = `${n}字（Google投稿の社内目安300〜450字・事実が少なければ短文可／Instagram150〜250字）`;
 }
 
 // 新規投稿の文章をAI生成

@@ -33,3 +33,5 @@ test('曜日の削除・閉店時刻変更・項目削除を見逃さない',()=
 test('翌日をまたぐ営業時間は同じ週の時間帯として比較する',()=>{
  assert.equal(hoursKey('MONDAY 9:00-2:00'),hoursKey('MONDAY 9:00-24:00 TUESDAY 0:00-2:00'));
 });
+
+test('旧資料に含まれる強い健康効果も通さない',()=>assert.equal(checkPost('体内毒素を排出します。',{description:'体内毒素を排出'}).ok,false));
