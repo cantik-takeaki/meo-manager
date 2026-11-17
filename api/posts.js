@@ -87,7 +87,14 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
-  if (!await requireStaff(req,res)) return;
+  // ── 機械（CRON_SECRET）の通り道 ──
+  // 2026-10-21にこのAPIへ認証を足したとき、人のログインしか見ていなかった。
+  // そのため自社GBP自動投稿（tools/gbp-daily-poster）が毎朝401で止まっていた。
+  // 目印はBearerあり・なしで同じ401が出ること。643行のgetValidCookieTokenまで届いていない。
+  // 開けるのはactionの無い投稿の読み書きだけ。
+  // drafts/media/instagram/gbp-photo などのサブアクションは従来どおり人のログインが必要。
+  const machineAllowed = !action && ['GET', 'POST'].includes(req.method);
+  if (!await requireStaff(req, res, { machine: machineAllowed })) return;
 
   // ── 予約下書き（KV保存。Google APIに予約機能が無いため自前管理） ──
   // ここはトークン不要（自社KVのみ操作）。storeId をキーに使う。

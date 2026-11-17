@@ -15,3 +15,35 @@ test('Meta受信署名は原文一致のみ受け入れる',()=>{const secret=cr
 test('Webhookは原文署名を検証してから受理し解析済み本文を拒否',async()=>{const h=(await import('../api/posts.js')).default,raw=Buffer.from('{"entry":[]}'),secret=crypto.randomBytes(32).toString('hex');process.env.IG_APP_SECRET=secret;try{for(const valid of [true,false]){const response=res();await h({method:'POST',query:{action:'webhook'},headers:{'x-hub-signature-256':valid?'sha256='+crypto.createHmac('sha256',secret).update(raw).digest('hex'):'invalid'},body:raw},response);assert.equal(response.statusCode,valid?200:403);}const response=res();await h({method:'POST',query:{action:'webhook'},headers:{},body:{entry:[]}},response);assert.equal(response.statusCode,400);}finally{delete process.env.IG_APP_SECRET;}});
 
 test('認証保存先の障害時は環境変数の旧認証へ戻らない',async()=>{const original=global.fetch,previous={...process.env};try{process.env.KV_REST_API_URL='https://kv.example.test';process.env.KV_REST_API_TOKEN=crypto.randomBytes(16).toString('hex');process.env.ADMIN_USER='operator@example.test';process.env.ADMIN_PASS=crypto.randomBytes(18).toString('hex');delete process.env.ADMIN_RESET;global.fetch=async()=>({ok:false,json:async()=>({error:'unavailable'})});const {getCred}=await import('../api/_session.js');await assert.rejects(getCred);const response=res(),h=(await import('../api/locations.js')).default;await h({method:'GET',query:{},headers:{host:'localhost',cookie:'pw_session=fake'}},response);assert.equal(response.statusCode,503);}finally{global.fetch=original;for(const k of ['KV_REST_API_URL','KV_REST_API_TOKEN','ADMIN_USER','ADMIN_PASS','ADMIN_RESET'])if(previous[k]===undefined)delete process.env[k];else process.env[k]=previous[k];}});
+
+test('posts.jsの機械認証はactionの無い投稿経路だけに効く',async()=>{
+ const original=global.fetch,previous={...process.env};
+ try{
+  process.env.KV_REST_API_URL='https://kv.example.test';
+  process.env.KV_REST_API_TOKEN=crypto.randomBytes(16).toString('hex');
+  process.env.CRON_SECRET=crypto.randomBytes(24).toString('hex');
+  delete process.env.ADMIN_USER;delete process.env.ADMIN_PASS;
+  const master={access_token:'live-access',expires_at:Date.now()+3600000,refresh_token:'stub-refresh',email:'owner@example.test'};
+  global.fetch=async url=>{
+   const u=String(url);
+   if(u.startsWith('https://kv.example.test'))return{ok:true,json:async()=>({result:JSON.stringify(master)})};
+   if(u.startsWith('https://mybusiness.googleapis.com/'))return{ok:true,status:200,json:async()=>({localPosts:[]})};
+   throw new Error('呼んではいけない先 '+u);
+  };
+  const h=(await import('../api/posts.js')).default;
+  const headers={authorization:'Bearer '+process.env.CRON_SECRET,host:'localhost'};
+  const allowed=res();
+  await h({method:'GET',query:{locationName:'accounts/1/locations/2'},headers},allowed);
+  assert.equal(allowed.statusCode,200,'actionの無い経路は機械で通る');
+  const blocked=res();
+  await h({method:'GET',query:{action:'drafts',locationName:'accounts/1/locations/2'},headers},blocked);
+  assert.equal(blocked.statusCode,401,'サブアクションは機械では通らない');
+  const noKey=res();
+  await h({method:'GET',query:{locationName:'accounts/1/locations/2'},headers:{authorization:'Bearer wrong-value',host:'localhost'}},noKey);
+  assert.equal(noKey.statusCode,401,'鍵が違えば通らない');
+ }finally{
+  global.fetch=original;
+  for(const k of ['KV_REST_API_URL','KV_REST_API_TOKEN','CRON_SECRET','ADMIN_USER','ADMIN_PASS'])
+   if(previous[k]===undefined)delete process.env[k];else process.env[k]=previous[k];
+ }
+});
