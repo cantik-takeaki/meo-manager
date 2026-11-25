@@ -14,7 +14,7 @@ import { LINE_TOKEN_KEY, LINE_TO_KEY, listText } from './_review_line.js';
 export const config = { api: { bodyParser: false } };   // 署名検証と中継に「届いたままの本文」が要る
 
 const FORWARD = 'https://cantik.co.jp/line/webhook.php';
-const BASE = 'https://meo-manager-rho.vercel.app';
+const BASE = 'https://meo.cantik.co.jp';
 
 async function rawBody(req) {
   const chunks = [];
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       const sec = await kvGet('review_approve_secret');
       const r = await fetch(`${BASE}/api/admin?action=review-approve`, {
         method: 'POST', headers: { Authorization: `Bearer ${sec}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: q.get('rv'), id: q.get('id') || '', userId: e.source.userId || '',
+        body: JSON.stringify({ decision: q.get('rv'), id: q.get('id') || '', revision: q.get('rev') || '', userId: e.source.userId || '',
           groupId: e.source.groupId || '', sourceType: e.source.type || '' }),
       });
       const j = await r.json();

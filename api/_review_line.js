@@ -9,9 +9,11 @@
 //   ボタンを押す → LINEの受け口 cantik.co.jp/line/webhook.php → admin.js の review-approve
 //   → グループの2人のどちらが押しても、その時点で Google に返信を投稿する（押した瞬間に記録・二重投稿なし）
 import crypto from 'node:crypto';
+import {confirmationRevision,CONFIRMATION_ROUTES_KEY} from '../lib/review-confirmation.js';
+import {deliverConfirmations,sendLineConfirmation} from '../lib/review-confirmation-delivery.js';
 import { llmComplete } from './generate-content.js';
 import { originalComment } from '../lib/review-routing.js';
-import { kvGet, kvSet, kvGetMany } from './_kv.js';
+import { kvGet, kvSet, kvGetMany, kvCompareSet } from './_kv.js';
 
 export const LINE_TOKEN_KEY = 'line_conn__review_alert';
 export const LINE_TO_KEY = 'review_alert_line';
@@ -62,7 +64,7 @@ export async function formatBubble(q) {
   const copy = String(q.reply || '');
   const head = q.company ? `${q.company}／${q.store}` : q.store;
   // 既にある返信の差し替え（店の了解を取ってから押す）／手で直した文
-  const title = q.replace ? '返信の差し替え（店の了解を取ってから押してください）' : q.humanEdited ? '直した返信の確認' : '口コミの確認をお願いします';
+  const title = q.controlTest ? '操作デモ（Googleへの送信なし）' : q.replace ? '返信の差し替え（店の了解を取ってから押してください）' : q.humanEdited ? '直した返信の確認' : '口コミの確認をお願いします';
   const t = (text, extra = {}) => ({ type: 'text', text, wrap: true, size: 'sm', color: '#1e293b', ...extra });
   const bubble = {
     type: 'bubble',
@@ -89,16 +91,16 @@ export async function formatBubble(q) {
       ...(copy && copy.length <= 1000 ? [t('長押しでコピーする場合は「返信文 ' + q.id + '」と送ってください。', { size: 'xs' })] : []),
       { type: 'button', height: 'sm', action: { type: 'message', label: '口コミ原文を見る', text: '原文 ' + q.id } },
       { type: 'button', style: 'primary', color: '#0f4aa2', height: 'sm',
-        action: { type: 'postback', label: 'この返信でGoogleに送る', data: `rv=ok&id=${q.id}`, displayText: `送る：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
+        action: { type: 'postback', label: q.controlTest ? 'デモを承認する' : 'この返信でGoogleに送る', data: `rv=ok&id=${q.id}&rev=${confirmationRevision(q)}`, displayText: `送る：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
       { type: 'button', style: 'secondary', height: 'sm',
-        action: { type: 'postback', label: '文を直す', data: `rv=edit&id=${q.id}`, displayText: `文を直す：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
+        action: { type: 'postback', label: '文を直す', data: `rv=edit&id=${q.id}&rev=${confirmationRevision(q)}`, displayText: `文を直す：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
       { type: 'button', style: 'secondary', height: 'sm',
-        action: { type: 'postback', label: 'あとで', data: `rv=later&id=${q.id}`, displayText: `あとで：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
+        action: { type: 'postback', label: 'あとで', data: `rv=later&id=${q.id}&rev=${confirmationRevision(q)}`, displayText: `あとで：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
       { type: 'button', style: 'secondary', height: 'sm',
-        action: { type: 'postback', label: '送らない', data: `rv=ng&id=${q.id}`, displayText: `送らない：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
+        action: { type: 'postback', label: '送らない', data: `rv=ng&id=${q.id}&rev=${confirmationRevision(q)}`, displayText: `送らない：${clip(q.store, 20)} ★${q.star} ${clip(q.name, 12)}さん` } },
     ] },
   };
-  if (q.controlTest) {
+  if (q.controlTest && !q.demoStoreId) {
     bubble.footer.contents = bubble.footer.contents.filter(x => /^rv=(edit|later|ng)&/.test(x.action?.data||''));
   }
   return bubble;
@@ -134,8 +136,9 @@ export async function lineTarget({ allowUsers = false } = {}) {
  * グループが未設定のときは何も作らず { skipped } を返す（呼ぶ側は送信済みにしない）。
  */
 export async function pushReviewAlerts(queue, opts = {}) {
+  const routes=await kvGet(CONFIRMATION_ROUTES_KEY);
   const tg = await lineTarget(opts);
-  if (tg.error) return { skipped: tg.error };
+  if (tg.error && !routes?.enabled) return { skipped: tg.error };
   const items = [];
   const paused=await kvGet('meo_paused_stores')||[];
   for (const q of queue) {
@@ -152,6 +155,14 @@ export async function pushReviewAlerts(queue, opts = {}) {
     items.push(rec);
   }
   if (!items.length) return { sent: 0, failed: [], items: 0, ids: [] };
+  if(routes?.enabled){
+    const queue=await kvGet(QUEUE_KEY)||[];
+    await kvSet(QUEUE_KEY,[...new Set([...queue,...items.map(p=>p.id)])]);
+    const {sendConfirmationEmail}=await import('../lib/review-confirmation-mail.js');
+    return deliverConfirmations(items,routes,{get:kvGet,cas:kvCompareSet,excluded:p=>unavailableCard(p,paused),
+      line:tg.token?(plan,key)=>sendLineConfirmation(plan,key,{token:tg.token,bubble:formatBubble,includedLimit:Number(process.env.REVIEW_LINE_INCLUDED_LIMIT||200)}):null,
+      email:sendConfirmationEmail});
+  }
   // 1件ずつ方式（既定）：順番待ちに積み、「◯件あります」と先頭の1件だけを送る
   if (!opts.carousel) {
     const qk = (await kvGet(QUEUE_KEY)) || [];

@@ -1,0 +1,15 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>口コミの通知先登録｜ラクラクMEO</title>
+<style>body{max-width:44rem;margin:4rem auto;padding:1rem;font:16px/1.7 sans-serif;color:#172e49}button{font:inherit;margin:.25rem;padding:.55rem 1rem}output{display:block}input{display:block;box-sizing:border-box;width:100%;font:inherit}label{display:block;margin:1rem 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<a href="/">管理画面に戻る</a><h1>口コミの通知先登録</h1><p>店舗とLINE公式APIのグループ名を照合して登録します。</p><p>登録操作では通知もGoogleへの返信も送信しません。</p>
+<form id="route"><label>店舗番号<input name="storeId" required pattern="[0-9]+" autocomplete="off"></label><label>通知先のグループ番号<input name="groupId" required pattern="C[0-9a-f]{30,32}" autocomplete="off"></label><button type="submit">店舗とグループを照合する</button><button type="button" id="save" disabled>確認した通知先を保存する</button></form>
+<output id="result" aria-live="polite">登録状況を取得しています。</output><h2>保存済みの通知先</h2><ul id="registered"></ul>
+<script>
+const form=document.getElementById('route'),result=document.getElementById('result'),save=document.getElementById('save');let verified=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function list(){const r=await fetch('/api/admin?action=review-confirmation-config',{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.error||'登録状況を取得できません。');document.getElementById('registered').innerHTML=(d.config?.routes||[]).map(x=>'<li>'+esc(x.name)+'：'+(x.channel==='line'?'LINE':'メール')+'</li>').join('');return d;}
+async function request(body){const r=await fetch('/api/admin?action=review-confirmation-register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw Error(d.error||'登録できませんでした。');return d;}
+form.addEventListener('input',()=>{verified=null;save.disabled=true;});
+form.addEventListener('submit',async e=>{e.preventDefault();save.disabled=true;verified=null;try{const b=Object.fromEntries(new FormData(form)),d=await request({...b,dryRun:true});verified={...b,confirmedGroupName:d.group};result.textContent='店舗：'+d.store+'\nグループ：'+d.group+'\n内容を確認して保存してください。';save.disabled=false;}catch(e){result.textContent=e.message;}});
+save.addEventListener('click',async()=>{if(!verified)return;save.disabled=true;try{const d=await request(verified);await list();result.textContent='保存しました。\n店舗：'+d.store+'\nグループ：'+d.group+'\n登録店舗数：'+d.stores+'\n通知送信：未実施';verified=null;}catch(e){result.textContent=e.message;}});
+list().then(()=>result.textContent='登録する店舗とグループを入力してください。').catch(e=>result.textContent=e.message);
+</script></html>

@@ -57,6 +57,13 @@ export async function kvDel(key) {
   await responseData(res);
 }
 
+export async function kvCompareSet(key,expected,next){
+ const {url,token}=getKV();
+ const script="local v=redis.call('get',KEYS[1]); if (ARGV[1]=='__missing__' and not v) or v==ARGV[1] then redis.call('set',KEYS[1],ARGV[2]); return 1 end return 0";
+ const res=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(['EVAL',script,1,key,expected===null?'__missing__':JSON.stringify(expected),JSON.stringify(next)]),signal:AbortSignal.timeout(8000)});
+ return (await responseData(res)).result===1;
+}
+
 // アトミック加算（SerpApi使用量カウンタ等の並行実行アンダーカウント対策）。新しい合計値を返す
 export async function kvIncrBy(key, n) {
   const { url, token } = getKV();

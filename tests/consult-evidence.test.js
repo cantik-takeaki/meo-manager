@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {buildConsultEvidence,finalizeConsult,insightWindow} from '../lib/consult-evidence.js';
+const now='2026-11-25T03:00:00Z';
+test('未取得の口コミと実測0件を区別する',()=>{
+ assert.equal(buildConsultEvidence({},now).evidence.find(e=>e.id==='reviews').status,'unknown');
+ const b=buildConsultEvidence({reviews:{stats:{totalCount:0,unrepliedCount:0}}},now);
+ assert.equal(b.evidence.find(e=>e.id==='reviews').status,'known');assert.ok(!b.candidates.some(t=>t.id==='review-approval'));
+});
+test('不明項目を未対応に混ぜない',()=>{const b=buildConsultEvidence({diagnostic:{items:[{label:'営業時間',ok:null},{label:'電話',ok:false}],score:null}},now);assert.deepEqual(b.readiness.unknown,['営業時間']);assert.deepEqual(b.readiness.missing,['電話']);assert.equal(b.readiness.score,null);});
+test('検索語の並べ替えを語名で照合する',()=>{const b=buildConsultEvidence({rankData:{keywords:['B','A'],history:[{date:'2026-11-18',keywords:['A','B'],rankings:[2,20],point:'地点1'},{date:'2026-11-25',keywords:['B','A'],rankings:[18,4],point:'地点1'}]}},now);assert.equal(b.rankings.find(r=>r.keyword==='A').diff,-2);assert.equal(b.rankings.find(r=>r.keyword==='B').diff,2);});
+test('地点が異なる順位を増減と断定しない',()=>{const b=buildConsultEvidence({rankData:{keywords:['A'],history:[{date:'2026-11-18',ranksByKw:{A:2},point:'地点1'},{date:'2026-11-25',ranksByKw:{A:20},point:'地点2'}]}},now);assert.equal(b.rankings[0].diff,null);});
+test('語名との対応が不明な旧記録を比較しない',()=>{const b=buildConsultEvidence({rankData:{keywords:['A'],history:[{date:'2026-11-18',rankings:[1]},{date:'2026-11-25',rankings:[9]}]}},now);assert.equal(b.rankings.length,0);assert.ok(b.candidates.some(t=>t.id==='rank-measure'));});
+test('古い順位を現在の改善根拠に使わない',()=>{const b=buildConsultEvidence({rankData:{keywords:['A'],history:[{date:'2026-10-01',ranksByKw:{A:20}}]}},now);assert.ok(!b.candidates.some(t=>t.id.startsWith('keyword-')));});
+test('競合は同じ検索語・同じ日の検索結果で比較する',()=>{const b=buildConsultEvidence({rankData:{keywords:['A']},competitors:[{id:'x',name:'競合店'}],competitorHistory:[{date:'2026-11-24',keyword:'A',self:8,comps:[{id:'x',rank:2,reviews:30}]}]},now);assert.match(b.evidence.find(e=>e.id==='competitor-1').detail,/自店8位.*競合店 2位/);});
+const makePerf=(which,value)=>{const r=insightWindow(now)[which];return {range:r,series:{CALL_CLICKS:Array.from({length:28},(_,i)=>({date:new Date(Date.parse(r.start)+i*864e5).toISOString().slice(0,10),value}))}};};
+test('同じ28日の電話操作を比較し予約件数と混同しない',()=>{const b=buildConsultEvidence({insights:{current:makePerf('current',1),previous:makePerf('previous',2)}},now);const e=b.evidence.find(e=>e.id==='insight-CALL_CLICKS');assert.equal(e.status,'known');assert.match(e.detail,/28回.*56回/);assert.match(e.detail,/予約完了・成約件数ではありません/);});
+test('欠測・重複日・期間違いを0回として比較しない',()=>{for(const mode of ['missing','duplicate','range']){const c=makePerf('current',0);if(mode==='missing')c.series.CALL_CLICKS.pop();if(mode==='duplicate')c.series.CALL_CLICKS[1].date=c.series.CALL_CLICKS[0].date;if(mode==='range')c.range.start='2026-01-01';const b=buildConsultEvidence({insights:{current:c,previous:makePerf('previous',1)}},now);assert.equal(b.evidence.find(e=>e.id==='insight-CALL_CLICKS').status,'unknown');}});
+test('AIの架空の数値や候補を画面に出さない',()=>{const b=buildConsultEvidence({},now);for(const raw of ['{"choices":[999],"summary":"必ず1位"}','壊れたJSON']){const r=finalizeConsult(b,raw);assert.equal(r.aiSelected,false);assert.ok(!JSON.stringify(r).includes('必ず1位'));assert.ok(r.tasks.every(t=>t.evidenceIds.every(id=>r.evidence.some(e=>e.id===id))));}});
+test('AIが未返信を選ばなくても優先タスクから落とさない',()=>{const b=buildConsultEvidence({reviews:{stats:{totalCount:5,unrepliedCount:2}}},now);assert.ok(finalizeConsult(b,'{"choices":[0]}').tasks.some(t=>t.id==='review-approval'));});
+test('前回の提案を新規作業として繰り返さない',()=>{const b=buildConsultEvidence({previousTasks:['未取得の店舗情報を確認する']},now);assert.equal(b.candidates[0].followUp,true);});

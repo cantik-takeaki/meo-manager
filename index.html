@@ -774,7 +774,7 @@ body.role-viewer [data-edit-action] { display:none !important; }
       <div class="card">
         <div class="card-header"><div class="card-title"><span class="ttl-ico" style="background:rgba(139,92,246,0.14);color:#8b5cf6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 00-4 4 3 3 0 00-2 5.24A3 3 0 007 17a3 3 0 005 1 3 3 0 005-1 3 3 0 001-5.76A3 3 0 0016 6a4 4 0 00-4-4z"/><path d="M12 6v12"/></svg></span>AIコンサル</div></div>
         <div id="consulIntro" style="text-align:center;padding:12px 0;color:var(--text-sub);font-size:13px;line-height:2">
-          AIコンサルは店舗ごとに分析を行います。<br>
+          AIコンサルは店舗ごとに実測と未取得を分けて分析します。<br>
           対象店舗を選択すると、<br>
           <b style="color:var(--text)">・MEO健康診断　・改善ポイント　・優先アクション</b><br>
           を表示します。
@@ -5160,7 +5160,8 @@ function popPrint() {
   </style></head><body>
   <div class="sheet">${inner}</div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>
-  </body></html>`);
+  <script type="module" src="/assets/consult-client.js?v=20261125"></script>
+</body></html>`);
   w.document.close();
 }
 
@@ -10465,7 +10466,7 @@ async function runAiConsul() {
     box.innerHTML = `
       <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">
         <div style="border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;min-width:170px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:6px">MEO総合グレード</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">運用準備の確認</div>
           <div style="width:64px;height:64px;border-radius:16px;background:${gradeInfo.color};color:#fff;font-size:38px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto">${grade}</div>
           <div style="font-size:12px;color:${gradeInfo.color};font-weight:700;margin-top:6px">${gradeInfo.label}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">スコア ${score}/100 ・ 達成 ${items.filter(i => i.ok).length}/${items.length}</div>
@@ -10504,7 +10505,7 @@ async function runAiConsul() {
 
       ${ai?.forecast ? `
       <div style="border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:14px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px">AI予測（来月の見通し）</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">来月の方針と確認指標</div>
         <div style="font-size:13px;line-height:1.8">${escapeHtml(ai.forecast.comment || '')}</div>
         ${(ai.forecast.focusKeywords || []).length ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:var(--text-sub)">重点キーワード:</span>${ai.forecast.focusKeywords.map(w => `<span style="font-size:12px;background:rgba(46,143,240,0.1);color:var(--accent);padding:3px 10px;border-radius:999px;font-weight:600">${escapeHtml(w)}</span>`).join('')}</div>` : ''}
         ${(ai.forecast.priorityActions || []).length ? `<ul style="font-size:12.5px;color:var(--text-sub);line-height:1.9;padding-left:18px;margin:8px 0 0">${ai.forecast.priorityActions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>` : ''}

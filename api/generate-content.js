@@ -1,3 +1,4 @@
+import {buildConsultEvidence,consultSelectionPrompt,finalizeConsult} from '../lib/consult-evidence.js';
 import {postPrompt,checkPost,refinePostDraft} from '../lib/post-policy.js';
 import { highRatingGuidance, highRatingDraftFits } from '../lib/review-routing.js';
 import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
@@ -157,6 +158,18 @@ export default async function handler(req, res) {
   if (!locationId || !type) return res.status(400).json({ error: 'locationId・type必須' });
 
   // 口コミ返信：投稿日からの経過日数と、選んだトーンで文面を最適化する
+  if(type==='weekly_tasks'||type==='diagnosis'){
+    const read=key=>kvGet(key).catch(()=>null);
+    const [rankData,competitors,competitorHistory,actions,logs,knowledge]=await Promise.all([
+      read('rankings_'+locationId),read('competitors_'+locationId),read('comp_history_'+locationId),read('actionlog_'+locationId),read('consul_log_'+locationId),read('knowledge_'+locationId)]);
+    const c=req.body.consul||{};
+    if(type==='diagnosis'){const d=req.body.diagnosis||{};c.diagnostic={score:d.score,items:[...(d.filled||[]).map(label=>({label,ok:true})),...(d.missing||[]).map(label=>({label,ok:false})),...(d.unknown||[]).map(label=>({label,ok:null}))]};c.reviews={stats:d.reviewStats||{}};}
+    const bundle=buildConsultEvidence({storeName:knowledge?.storeName,diagnostic:c.diagnostic,reviews:c.reviews,insights:c.insights,rankData,competitors,competitorHistory,actions,previousTasks:Array.isArray(logs)?logs.at(-1)?.tasks:[]});
+    const raw=await llmComplete(consultSelectionPrompt(bundle),{maxTokens:600,temperature:0.1,reviewChoices:true});
+    const result=finalizeConsult(bundle,raw);
+    res.setHeader('Cache-Control','private, no-store');
+    return res.json({content:type==='diagnosis'?[result.summary,...result.tasks.slice(0,3).map(t=>t.name+'\n'+t.reason+'\n確認指標：'+t.metric), '根拠：'+result.evidence.filter(e=>e.status==='known').map(e=>e.source+'（'+e.period+'）').join('、'),'未取得情報から店舗の不備や順位低下の原因は断定しません。'].join('\n\n'):JSON.stringify(result),version:result.version});
+  }
   const reviewDate = req.body.reviewDate || req.body.createTime || '';
   let reviewAgeDays = null;
   if (reviewDate) {

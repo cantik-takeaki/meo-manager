@@ -43,8 +43,10 @@ test('社内試験カードの3操作は架空の口コミだけを扱う',async
     {setHeader(){},status(){return this;},json(v){out=v;}});return out;};
   const card=(await call('review-edit',{text:'社内ボタン動作試験'})).messages[0];
   const controls=card.contents.footer.contents.map(x=>x.action.data);
-  const id=controls[0].split('id=')[1];
-  assert.deepEqual(controls,['edit','later','ng'].map(a=>'rv='+a+'&id='+id));
+  const params=new URLSearchParams(controls[0]);
+  const id=params.get('id'),revision=params.get('rev');
+  assert.match(revision,/^[0-9a-f]{16}$/);
+  assert.deepEqual(controls,['edit','later','ng'].map(a=>'rv='+a+'&id='+id+'&rev='+revision));
   const decision=d=>call('review-approve',{decision:d,id});
   assert.match((await decision('ok')).text,/送信できません/);
   assert.match((await decision('edit')).text,/文を直します/);

@@ -3,7 +3,7 @@ import { originalComment } from '../lib/review-routing.js';
 import { requireStaff } from './_auth.js';
 import { rankSummary, compareRanks, compareRankEntries, isDemo, jstMonth, previousMonth } from './_metric_integrity.js';
 // api/admin.js — 店舗登録・順位入力（統合）
-import { kvGet, kvSet, kvDel, kvIncrBy } from './_kv.js';
+import { kvGet, kvSet, kvDel, kvIncrBy, kvCompareSet, kvGetMany } from './_kv.js';
 import { getMasterInfo, getMasterToken, getAccessToken } from './_tokens.js';
 import { shindanOne, fetchPerf } from './_shindan.js';
 import { classifyReview, findAffirm, findUnsupported, findEffectClaims, findRebuttal, REPLY_RULE } from './_review_safety.js';
@@ -411,6 +411,12 @@ export default async function handler(req, res) {
     return res.json({ success: true, emailed });
   }
 
+  if(action==='review-confirmation-email'){
+    const {emailConfirmationPage}=await import('../lib/review-confirmation-email-page.js');
+    const {publishConfirmedReview}=await import('../lib/review-confirmation-publish.js');
+    const paused=await kvGet('meo_paused_stores')||[];
+    return emailConfirmationPage(req,res,{get:kvGet,getMany:kvGetMany,set:kvSet,cas:kvCompareSet,config:await kvGet('review_confirmation_routes'),central:{},excluded:p=>unavailableCard(p,paused),bubble:formatBubble,publish:publishConfirmedReview});
+  }
   // 管理者ログイン確認：Google連携(access_token) または メール＋パスワード(pw_session) のどちらか。
   // ★重要: Vercel Cron は管理者Cookieを持たず CRON_SECRET のBearerのみで来る。
   //   cron系アクションは、この共通ゲートより前で「CRON_SECRET一致なら通す」＝ゲートを免除する。
@@ -430,11 +436,89 @@ export default async function handler(req, res) {
     if(!await requireStaff(req,res,{admin:req.method!=='GET'||!['dashboard','knowledge','rankings','shindan','kpi'].includes(action)}))return;
   }
 
+
+  if(action==='review-confirmation-register'){
+    if(req.method!=='POST')return res.status(405).end();
+    const {storeId,groupId,dryRun}=req.body||{};
+    if(!/^\d+$/.test(storeId||'')||!/^C[0-9a-f]{30,32}$/.test(groupId||''))return res.status(400).json({error:'店舗番号とグループ番号を確認してください。'});
+    const managed=await kvGet('managed_locations')||[],paused=await kvGet('meo_paused_stores')||[];
+    const store=managed.find(m=>String(m.locationName||m.locId).endsWith('/'+storeId));
+    if(!store||unavailableCard(store,paused))return res.status(400).json({error:'稼働店舗を照合できません。'});
+    const token=(await kvGet('line_conn__review_alert'))?.token;
+    if(!token)return res.status(503).json({error:'LINEの接続情報を取得できません。'});
+    const response=await fetch('https://api.line.me/v2/bot/group/'+groupId+'/summary',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(7000)});
+    if(!response.ok)return res.status(400).json({error:'LINE公式APIでグループを照合できません。'});
+    const group=await response.json();
+    const key='review_confirmation_routes',current=await kvGet(key);
+    if(!current?.enabled)return res.status(409).json({error:'既存の店舗別通知設定を確認してください。'});
+    const existing=current.routes.find(r=>r.storeId===storeId);
+    if(existing&&existing.to!==groupId)return res.status(409).json({error:'別の通知先が登録済みです。上書きはしていません。'});
+    const route={storeId,name:store.title,channel:'line',to:groupId,verified:true,verifiedAt:new Date().toISOString(),source:'LINE公式APIのグループ名を管理者が照合：'+group.groupName};
+    const next={...current,routes:[...current.routes.filter(r=>r.storeId!==storeId),route]};
+    const {validateConfirmationRoutes}=await import('../lib/review-confirmation.js');validateConfirmationRoutes(next);
+    if(dryRun===true)return res.json({preview:true,store:store.title,group:group.groupName,alreadyRegistered:!!existing});
+    if(req.body.confirmedGroupName!==group.groupName)return res.status(409).json({error:'表示したグループ名を確認してから保存してください。'});
+    if(!await kvCompareSet(key,current,next))return res.status(409).json({error:'別の変更が先に反映されました。読み直してください。'});
+    return res.json({saved:true,store:store.title,group:group.groupName,stores:next.routes.length,sent:false});
+  }
+  if(action==='review-confirmation-config'){
+    const key='review_confirmation_routes';
+    if(req.method==='GET')return res.json({config:await kvGet(key),mail:await kvGet('review_confirmation_mail_transport')});
+    if(req.method!=='POST')return res.status(405).end();
+    const {validateConfirmationRoutes}=await import('../lib/review-confirmation.js');
+    try{
+      const next=validateConfirmationRoutes(req.body.config);
+      const managed=await kvGet('managed_locations')||[],paused=await kvGet('meo_paused_stores')||[];
+      for(const r of next.routes){const m=managed.find(m=>String(m.locationName||m.locId).endsWith('/'+r.storeId));if(!m||unavailableCard(m,paused))throw new Error('稼働店舗だけを登録してください。');}
+      await kvSet(key,next);
+      if(typeof req.body.mailEnabled==='boolean')await kvSet('review_confirmation_mail_transport',{enabled:req.body.mailEnabled,from:'info@cantik.co.jp'});
+      if(next.enabled)await kvSet('review_autoreply_mode','draft');
+      return res.json({saved:true,enabled:next.enabled,stores:next.routes.length});
+    }catch(e){return res.status(400).json({error:e.message});}
+  }
+  if(action==='review-confirmation-test'&&req.method==='POST'){
+    const {confirmationRevision}=await import('../lib/review-confirmation.js');
+    const config=await kvGet('review_confirmation_routes');
+    const route=config?.routes?.find(r=>r.storeId===req.body.storeId&&r.verified);
+    if(!config?.enabled||!route)return res.status(400).json({error:'照合済みの確認先を指定してください。'});
+    const crypto=await import('node:crypto');
+    const id=crypto.randomBytes(5).toString('hex');
+    const p={id,controlTest:true,demoStoreId:route.storeId,store:'店舗別通知の操作デモ',star:5,name:'試験用',review:'説明が丁寧で分かりやすかったです。',reply:'ご来店いただきありがとうございます。\n\n説明へのお言葉をありがとうございます。\n\nこの度は誠にありがとうございました。\n-操作デモ-',status:'pending'};
+    await kvSet(PENDING_PREFIX+id,p);
+    const {signEmailAccess}=await import('../lib/review-confirmation-mail.js');
+    const previewUrl=route.channel==='email'?'https://meo.cantik.co.jp/api/admin?action=review-confirmation-email&access='+encodeURIComponent(signEmailAccess(p,route,await kvGet('review_approve_secret'))):null;
+    return res.json({id,revision:confirmationRevision(p),card:await formatBubble(p),previewUrl,published:false});
+  }
+  if(['review-edit','review-approve'].includes(action)){
+    const config=await kvGet('review_confirmation_routes');
+    if(config?.enabled){
+      const {confirmationAction}=await import('../lib/review-confirmation-runtime.js');
+      const {publishConfirmedReview}=await import('../lib/review-confirmation-publish.js');
+      const b=req.body||{},paused=await kvGet('meo_paused_stores')||[];
+      return res.json(await confirmationAction({action:action==='review-edit'?'text':'decision',sourceType:b.sourceType,groupId:b.groupId,userId:b.userId,text:b.text,id:b.id,revision:b.revision,decision:b.decision},
+        {get:kvGet,getMany:kvGetMany,set:kvSet,cas:kvCompareSet,config,central:await kvGet(LINE_TO_KEY)||{},excluded:p=>unavailableCard(p,paused),bubble:formatBubble,publish:publishConfirmedReview}));
+    }
+  }
   // ── 店舗ごとの更新停止（社長指示 2026-10-06：麻辣王酒場は投稿・返信を含む自動のMEO対策を一旦止める） ──
   //   KV `meo_paused_stores` = [{ lid, title, at, reason }]（lid＝locations/ の数字）
   //   停止中の店は、口コミ自動返信（cron）から外し、投稿・基本情報・属性の更新を受け付けない。
   //   ※ api/posts.js は Instagram 審査中で触れないため、そちらの投稿経路はルール（共有ログ・絶対遵守）で止める。
   const _lidOf = (s) => (String(s || '').match(/locations[\/_](\d+)/) || [])[1] || (/^\d+$/.test(String(s || '')) ? String(s) : '');
+  if(action==='review-confirmation-preview'){
+    if(req.method==='GET'){
+      const paused=await kvGet('meo_paused_stores')||[];
+      const stores=(await kvGet('managed_locations')||[]).filter(m=>!unavailableCard(m,paused));
+      const groups=await kvGet('line_seen_groups')||{};
+      res.setHeader('Cache-Control','private, no-store');
+      return res.json({stores:[...new Map(stores.map(m=>[_lidOf(m.locationName||m.locId),{id:_lidOf(m.locationName||m.locId),name:m.title}])).values()].filter(m=>m.id),groups:Object.entries(groups).map(([id,g])=>({id,name:g.name,lastAt:g.lastAt})),mode:'preview-only'});
+    }
+    if(req.method!=='POST')return res.status(405).json({error:'確認先の案を指定してください。'});
+    try{
+      const {prepareConfirmationPreview}=await import('../lib/review-confirmation-preview.js');
+      const result=await prepareConfirmationPreview({config:req.body?.routes,ids:await kvGet('rv_queue')||[],readRecord:id=>kvGet(PENDING_PREFIX+id),paused:await kvGet('meo_paused_stores')||[],cursor:req.body?.cursor??0});
+      res.setHeader('Cache-Control','private, no-store');return res.json(result);
+    }catch(e){return res.status(400).json({error:e.message});}
+  }
   if (action === 'meo-pause') {
     const list = (await kvGet('meo_paused_stores')) || [];
     if (req.method === 'GET') return res.json({ paused: list });
@@ -1364,6 +1448,8 @@ export default async function handler(req, res) {
           let ki = ex.keywords.indexOf(r.job.kw);
           if (ki < 0) { ex.keywords.push(r.job.kw); ki = ex.keywords.length - 1; }
           entry.rankings[ki] = (Number.isFinite(rank) && rank >= 1) ? rank : null;
+          entry.ranksByKw ||= {};entry.ranksByKw[r.job.kw]=entry.rankings[ki];
+          entry.requestedPoints ||= {};entry.requestedPoints[r.job.kw]={ll:r.job.ll||'',area:r.job.area||'',provider:process.env.RANK_PROVIDER||'serpapi'};
           ok++;
           processed.push({ store: r.job.st.name, kw: r.job.kw, rank });
         }
@@ -1920,7 +2006,7 @@ export default async function handler(req, res) {
       const b = req.body || {};
       const entry = {
         date: String(b.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
-        score: Number(b.score) || 0,
+        score: typeof b.score==='number'&&Number.isFinite(b.score)?b.score:null,
         grade: String(b.grade || '').slice(0, 2),
         tasks: Array.isArray(b.tasks) ? b.tasks.slice(0, 6).map(t => String(t).slice(0, 120)) : [],
       };
@@ -1958,7 +2044,7 @@ export default async function handler(req, res) {
     const key = `consul_done_${storeId}_${String(week).slice(0, 10)}`;
     if (req.method === 'GET') return res.json({ done: (await kvGet(key)) || [] });
     if (req.method === 'POST') {
-      const arr = Array.isArray((req.body || {}).done) ? req.body.done.slice(0, 10).map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
+      const arr = Array.isArray((req.body || {}).done) ? req.body.done.slice(0, 10).filter(n => Number.isInteger(n)||typeof n==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(n)) : [];
       await kvSet(key, arr);
       return res.json({ success: true });
     }
