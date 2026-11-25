@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildConsultEvidence,finalizeConsult,insightWindow} from '../lib/consult-evidence.js';
+import {buildConsultEvidence,finalizeConsult,insightWindow,parseConsultChoices,consultSelectionPrompt} from '../lib/consult-evidence.js';
 const now='2026-11-25T03:00:00Z';
 test('未取得の口コミと実測0件を区別する',()=>{
  assert.equal(buildConsultEvidence({},now).evidence.find(e=>e.id==='reviews').status,'unknown');
@@ -19,3 +19,6 @@ test('欠測・重複日・期間違いを0回として比較しない',()=>{for
 test('AIの架空の数値や候補を画面に出さない',()=>{const b=buildConsultEvidence({},now);for(const raw of ['{"choices":[999],"summary":"必ず1位"}','壊れたJSON']){const r=finalizeConsult(b,raw);assert.equal(r.aiSelected,false);assert.ok(!JSON.stringify(r).includes('必ず1位'));assert.ok(r.tasks.every(t=>t.evidenceIds.every(id=>r.evidence.some(e=>e.id===id))));}});
 test('AIが未返信を選ばなくても優先タスクから落とさない',()=>{const b=buildConsultEvidence({reviews:{stats:{totalCount:5,unrepliedCount:2}}},now);assert.ok(finalizeConsult(b,'{"choices":[0]}').tasks.some(t=>t.id==='review-approval'));});
 test('前回の提案を新規作業として繰り返さない',()=>{const b=buildConsultEvidence({previousTasks:['未取得の店舗情報を確認する']},now);assert.equal(b.candidates[0].followUp,true);});
+
+test('候補番号を明示し同じ根拠の二重送付を避ける',()=>{const b=buildConsultEvidence({},now);const prompt=consultSelectionPrompt(b);assert.ok(prompt.includes('"index":0'));assert.ok(!prompt.includes('"evidenceIds"'));});
+test('空白付きJSONは受理し範囲外・文字列・過剰選択は拒否する',()=>{const b=buildConsultEvidence({},now);assert.deepEqual(parseConsultChoices(b,'  ```json\n{"choices":[0,1]}\n```  '),[0,1]);for(const raw of ['{"choices":["0"]}','{"choices":[-1]}','{"choices":[]}','{"choices":[0,0,0,0,0,0]}'])assert.equal(parseConsultChoices(b,raw),null);});

@@ -1,4 +1,4 @@
-import {buildConsultEvidence,consultSelectionPrompt,finalizeConsult} from '../lib/consult-evidence.js';
+import {buildConsultEvidence,consultSelectionPrompt,parseConsultChoices,finalizeConsult} from '../lib/consult-evidence.js';
 import {postPrompt,checkPost,refinePostDraft} from '../lib/post-policy.js';
 import { highRatingGuidance, highRatingDraftFits } from '../lib/review-routing.js';
 import { formatOwnerReply, ownerReplyStyle } from '../lib/review-format.js';
@@ -34,7 +34,7 @@ const GROQ_FALLBACKS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'moonshotai
   'meta-llama/llama-4-scout-17b-16e-instruct', 'qwen/qwen3-32b', 'gemma2-9b-it', GROQ_MODEL];
 const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9, reviewChoices = false } = {}) {
+export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, topP = 0.9, reviewChoices = false, validateResponse = null } = {}) {
   LAST_LLM_ERROR = '';
   LAST_LLM_VIA = '';
   const reasons = [];
@@ -59,7 +59,7 @@ export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, 
           });
           const d = await r.json();
           const text = (d?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-          if (text) { LAST_LLM_VIA = 'gemini:' + model; return text; }
+          if (text) { if(validateResponse&&!validateResponse(text)){reasons.push('gemini:'+model+':invalid_selection');continue;} LAST_LLM_VIA = 'gemini:' + model; return text; }
           const why = String(d?.error?.message || d?.promptFeedback?.blockReason
             || d?.candidates?.[0]?.finishReason || `empty(${r.status})`);
           reasons.push(`gemini:${model}:${why.slice(0, 80)}`);
@@ -96,7 +96,7 @@ export async function llmComplete(prompt, { maxTokens = 600, temperature = 0.7, 
       });
       const d = await r.json();
       const text = (d.choices?.[0]?.message?.content || '').trim();
-      if (text) { LAST_LLM_VIA = 'groq:' + model; return text; }
+      if (text) { if(validateResponse&&!validateResponse(text)){reasons.push('groq:'+model+':invalid_selection');continue;} LAST_LLM_VIA = 'groq:' + model; return text; }
       const fin = d.choices?.[0]?.finish_reason || '';
       reasons.push(`groq:${model}:${String(d?.error?.message || (r.status + (fin ? '/' + fin : '/empty'))).slice(0, 80)}`);
     } catch (e) { reasons.push(`groq:${model}:${String(e.message).slice(0, 60)}`); }
@@ -165,8 +165,9 @@ export default async function handler(req, res) {
     const c=req.body.consul||{};
     if(type==='diagnosis'){const d=req.body.diagnosis||{};c.diagnostic={score:d.score,items:[...(d.filled||[]).map(label=>({label,ok:true})),...(d.missing||[]).map(label=>({label,ok:false})),...(d.unknown||[]).map(label=>({label,ok:null}))]};c.reviews={stats:d.reviewStats||{}};}
     const bundle=buildConsultEvidence({storeName:knowledge?.storeName,diagnostic:c.diagnostic,reviews:c.reviews,insights:c.insights,rankData,competitors,competitorHistory,actions,previousTasks:Array.isArray(logs)?logs.at(-1)?.tasks:[]});
-    const raw=await llmComplete(consultSelectionPrompt(bundle),{maxTokens:600,temperature:0.1,reviewChoices:true});
+    const raw=await llmComplete(consultSelectionPrompt(bundle),{maxTokens:600,temperature:0.1,reviewChoices:true,validateResponse:raw=>parseConsultChoices(bundle,raw)!==null});
     const result=finalizeConsult(bundle,raw);
+    result.selection={status:result.aiSelected?'selected':'unavailable',reason:result.aiSelected?null:/invalid_selection/.test(llmLastError())?'invalid_selection':/quota|exceeded|枠切れ|429/i.test(llmLastError())?'quota':/キー未設定/.test(llmLastError())?'configuration':'provider_unavailable',provider:result.aiSelected?llmLastVia().split(':')[0]:null};
     res.setHeader('Cache-Control','private, no-store');
     return res.json({content:type==='diagnosis'?[result.summary,...result.tasks.slice(0,3).map(t=>t.name+'\n'+t.reason+'\n確認指標：'+t.metric), '根拠：'+result.evidence.filter(e=>e.status==='known').map(e=>e.source+'（'+e.period+'）').join('、'),'未取得情報から店舗の不備や順位低下の原因は断定しません。'].join('\n\n'):JSON.stringify(result),version:result.version});
   }
