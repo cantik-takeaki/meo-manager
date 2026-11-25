@@ -160,7 +160,7 @@ export async function pushReviewAlerts(queue, opts = {}) {
     await kvSet(QUEUE_KEY,[...new Set([...queue,...items.map(p=>p.id)])]);
     const {sendConfirmationEmail}=await import('../lib/review-confirmation-mail.js');
     return deliverConfirmations(items,routes,{get:kvGet,cas:kvCompareSet,excluded:p=>unavailableCard(p,paused),
-      line:tg.token?(plan,key)=>sendLineConfirmation(plan,key,{token:tg.token,bubble:formatBubble,includedLimit:Number(process.env.REVIEW_LINE_INCLUDED_LIMIT||200)}):null,
+      line:tg.token?(plan,key)=>sendLineConfirmation(plan,key,{token:tg.token,bubble:formatBubble,includedLimit:Number(process.env.REVIEW_LINE_INCLUDED_LIMIT||5000)}):null,
       email:sendConfirmationEmail});
   }
   // 1件ずつ方式（既定）：順番待ちに積み、「◯件あります」と先頭の1件だけを送る
